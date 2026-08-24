@@ -4,6 +4,8 @@
   const $ = (s, r=document) => r.querySelector(s);
   const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
   const POLL_RETURN_ROUTE = "participate/poll/restroom-cleanliness";
+  const RSVP_RETURN_ROUTE = "events/guild-debate";
+  const QUIZ_RETURN_ROUTE = "play";
   const VOICE_NEW_RETURN_ROUTE = "participate/voice/new";
   const VOICE_DETAIL_RETURN_PREFIX = "participate/voice/";
   const VOICE_DETAIL_ROUTE_PREFIX = "voice-detail/";
@@ -645,13 +647,15 @@
   function renderQuiz(){
     const opts = D.quiz.options;
     const wrap = $('#quizOptions');
-    const saved = loadState();
-    const done = saved.quizDone;
+    const saved = participationState();
+    const participation = quizParticipationForCurrentDay(saved, D.quiz);
+    const done = Boolean(participation);
+    const selectedChoice = participation ? participation.optionIndex : null;
     const xpPart = D.quiz.xpParticipation || 5;
     const xpBonus = D.quiz.xpBonus || 5;
     wrap.innerHTML = opts.map((o,i)=> `
-      <label class="quiz-opt ${done ? (i===D.quiz.correctIndex ? 'correct' : (saved.quizChoice===i ? 'wrong':'')) : ''}">
-        <input type="radio" name="quiz" value="${i}" ${saved.quizChoice===i?'checked':''} ${done?'disabled':''} />
+      <label class="quiz-opt ${done ? (i===D.quiz.correctIndex ? 'correct' : (selectedChoice===i ? 'wrong':'')) : ''}">
+        <input type="radio" name="quiz" value="${i}" ${selectedChoice===i?'checked':''} ${done?'disabled':''} />
         <span style="flex:1; font-size:14px; font-weight:600;">${escapeHtml(o)}</span>
         ${done && i===D.quiz.correctIndex ? '<span class="pill pill--brand" style="font-size:11px;">Correct</span>' : ''}
       </label>
@@ -663,11 +667,11 @@
       btn.hidden = true;
       fb.hidden = false;
       if(note) note.hidden = false;
-      const correct = saved.quizChoice===D.quiz.correctIndex;
+      const correct = participation.optionIndex===D.quiz.correctIndex;
       fb.style.background = correct ? '#e6f2e9' : '#fef3f2';
       fb.style.borderColor = correct ? '#cfe3d4' : '#fecdc9';
       fb.style.color = correct ? '#115e2b' : '#7a271a';
-      const earned = correct ? (xpPart + xpBonus) : xpPart;
+      const earned = participation.xpAwarded || quizAwardForChoice(participation.optionIndex, D.quiz);
       fb.innerHTML = correct
         ? `<strong>Correct!</strong> ${escapeHtml(D.quiz.explanation)} <br/><span class="pill pill--brand" style="margin-top:6px;">+${earned} XP earned — +${xpPart} for taking part +${xpBonus} bonus for correct answer</span>`
         : `<strong>Not quite.</strong> Correct answer: ${escapeHtml(D.quiz.options[D.quiz.correctIndex])}.<br/><span style="font-size:12px; color:var(--text-muted);">${escapeHtml(D.quiz.explanation)}</span><br/><span class="pill pill--brand" style="margin-top:6px;">+${earned} XP earned — +${xpPart} for taking part</span>`;
@@ -686,19 +690,34 @@
       const c = wrap.querySelector('input[name="quiz"]:checked');
       if(!c) return;
       const choice = parseInt(c.value,10);
-      const correct = choice===D.quiz.correctIndex;
-      // XP only if not done — prevents multiple awards (idempotent)
-      if(!saved.quizDone){
-        saved.quizDone = true;
-        saved.quizChoice = choice;
-        const earned = correct ? (xpPart + xpBonus) : xpPart;
-        D.student.xp += earned;
-        hydrateTenant();
-        saveState(saved);
-        toast(correct ? `Correct — +${earned} XP (+${xpPart} +${xpBonus} bonus). A new quiz will be available tomorrow.` : `Answer recorded — +${earned} XP for taking part. A new quiz will be available tomorrow.`);
+      const state = participationState();
+      const decision = evaluateParticipationAction('daily-quiz', { state, quiz:D.quiz });
+      if(openCanonicalParticipationGate(decision, btn, {
+        returnTo:QUIZ_RETURN_ROUTE,
+        context:'quiz'
+      })) return;
+      // A stale or double-fired action must not award again for this quiz tenant-day.
+      if(quizParticipationForCurrentDay(state, D.quiz)){
+        renderQuiz();
+        return;
       }
-      renderQuiz();
+      const correct = choice===D.quiz.correctIndex;
+      const earned = correct ? (xpPart + xpBonus) : xpPart;
+      state.quizDone = true;
+      state.quizChoice = choice;
+      state.quizParticipation = {
+        quizId:D.quiz.id,
+        tenantDay:D.quiz.tenantDay,
+        optionIndex:choice,
+        xpAwarded:earned
+      };
+      D.student.xp += earned;
+      state.xp = D.student.xp;
+      saveState(state);
+      hydrateTenant();
       renderXPRules();
+      toast(correct ? `Correct — +${earned} XP (+${xpPart} +${xpBonus} bonus). A new quiz will be available tomorrow.` : `Answer recorded — +${earned} XP for taking part. A new quiz will be available tomorrow.`);
+      renderQuiz();
     };
   }
   function onQuizChange(){ /* placeholder */ }
@@ -752,8 +771,12 @@
       tenantLifecycle:"active",
       moduleEnabled:true,
       pollModuleEnabled:true,
+      rsvpModuleEnabled:true,
+      quizModuleEnabled:true,
       resourceStatus:"active",
       audienceEligible:true,
+      rsvpAudienceEligible:true,
+      quizAudienceEligible:true,
       voiceAudienceEligible: D.demoConfig?.voiceParticipation?.audienceEligible !== false,
       verifiedAttributes:true,
       storyPrerequisites:true,
@@ -800,6 +823,10 @@
     if(!state.membership || typeof state.membership!=="object") state.membership = {};
     if(!state.participation || typeof state.participation!=="object") state.participation = {};
 
+    const parsedXp = Number(state.xp);
+    state.xp = Number.isFinite(parsedXp) && parsedXp>=0 ? parsedXp : Number(D.student.xp) || 0;
+    D.student.xp = state.xp;
+
     Object.keys(membershipDefaults).forEach(key=>{
       if(state.membership[key]===undefined || state.membership[key]===null) state.membership[key] = membershipDefaults[key];
     });
@@ -813,6 +840,26 @@
     if(!PARTICIPATION_SCENARIOS[state.participation.demoScenario]) state.participation.demoScenario = "assurance";
     if(typeof state.participation.returnTo!=="string") state.participation.returnTo = null;
     ensureVoiceState(state);
+
+    if(state.quizParticipation && typeof state.quizParticipation!=="object") state.quizParticipation = null;
+    if(state.quizParticipation){
+      const record = state.quizParticipation;
+      record.quizId = typeof record.quizId === "string" ? record.quizId : null;
+      record.tenantDay = typeof record.tenantDay === "string" ? record.tenantDay : null;
+      record.optionIndex = Number.isInteger(Number(record.optionIndex)) ? Number(record.optionIndex) : null;
+      record.xpAwarded = Number.isFinite(Number(record.xpAwarded)) && Number(record.xpAwarded)>=0 ? Number(record.xpAwarded) : 0;
+    }
+    if(!state.quizParticipation && state.quizDone===true && Number.isInteger(Number(state.quizChoice))){
+      const compatibilityChoice = Number(state.quizChoice);
+      if(compatibilityChoice>=0 && compatibilityChoice<(D.quiz.options || []).length){
+        state.quizParticipation = {
+          quizId:D.quiz.id,
+          tenantDay:D.quiz.tenantDay,
+          optionIndex:compatibilityChoice,
+          xpAwarded:quizAwardForChoice(compatibilityChoice)
+        };
+      }
+    }
     return state;
   }
 
@@ -856,10 +903,16 @@
     return ASSURANCE_CODES[level];
   }
 
-  function requiredAssuranceFor(resourceContext){
+  function requiredAssuranceFor(resourceContext, options={}){
     if(resourceContext==="poll") return D.poll?.requiredAssurance;
     if(["voice-submission", "voice-support"].includes(resourceContext)){
       return D.demoConfig?.voiceParticipation?.requiredAssurance;
+    }
+    if(resourceContext==="rsvp"){
+      return (options.event || D.featuredEvent)?.requiredAssurance || "L0";
+    }
+    if(resourceContext==="daily-quiz"){
+      return (options.quiz || D.quiz)?.requiredAssurance || "L0";
     }
     throw new TypeError(`Unsupported migrated participation context: ${resourceContext}.`);
   }
@@ -884,6 +937,16 @@
       moduleEnabled = p.moduleEnabled;
       resourceActionable = Boolean(issue && issue.isPublic);
       audienceEligible = p.voiceAudienceEligible;
+    } else if(resourceContext==="rsvp"){
+      const event = options.event || D.featuredEvent;
+      moduleEnabled = p.rsvpModuleEnabled !== false && event?.rsvpEnabled !== false;
+      resourceActionable = Boolean(event && event.rsvpActionable !== false);
+      audienceEligible = p.rsvpAudienceEligible !== false && event?.audienceEligible !== false;
+    } else if(resourceContext==="daily-quiz"){
+      const quiz = options.quiz || D.quiz;
+      moduleEnabled = p.quizModuleEnabled !== false && quiz?.moduleEnabled !== false;
+      resourceActionable = Boolean(quiz && quiz.available !== false);
+      audienceEligible = p.quizAudienceEligible !== false && quiz.audienceEligible !== false;
     } else {
       throw new TypeError(`Unsupported migrated participation context: ${resourceContext}.`);
     }
@@ -895,10 +958,12 @@
       resourceActionable,
       membershipState:state.membership.status,
       currentAssurance:assuranceCode(state.membership.assuranceLevel),
-      requiredAssurance:requiredAssuranceFor(resourceContext),
+      requiredAssurance:requiredAssuranceFor(resourceContext, options),
       audienceEligible,
       verifiedAttributesPresent:p.verifiedAttributes,
-      storyPrerequisitesMet:p.storyPrerequisites
+      storyPrerequisitesMet: resourceContext==="daily-quiz"
+        ? !quizParticipationForCurrentDay(state, options.quiz || D.quiz)
+        : p.storyPrerequisites
     };
   }
 
@@ -1137,6 +1202,7 @@
         state.pollChoice = idx;
         const pollXp = Number(D.demoConfig?.xp?.pollParticipation) || 0;
         D.student.xp += pollXp;
+        state.xp = D.student.xp;
         hydrateTenant();
         renderXPRules();
         saveState(state);
@@ -1188,6 +1254,14 @@
       location.hash = "#voice-new";
       return;
     }
+    if(returnTo===RSVP_RETURN_ROUTE){
+      location.hash = `#${RSVP_RETURN_ROUTE}`;
+      return;
+    }
+    if(returnTo===QUIZ_RETURN_ROUTE){
+      location.hash = `#${QUIZ_RETURN_ROUTE}`;
+      return;
+    }
     if(isVoiceDetailReturnIntent(returnTo)){
       const issueId = voiceIssueIdFromReturnIntent(returnTo);
       if(getVoiceIssue(issueId)){
@@ -1211,7 +1285,7 @@
       updated.membership.status = "active";
       updated.participation.demoScenario = "eligible";
       const returnTo = updated.participation.returnTo;
-      const returning = [POLL_RETURN_ROUTE, VOICE_NEW_RETURN_ROUTE].includes(returnTo) || isVoiceDetailReturnIntent(returnTo);
+      const returning = [POLL_RETURN_ROUTE, VOICE_NEW_RETURN_ROUTE, RSVP_RETURN_ROUTE, QUIZ_RETURN_ROUTE].includes(returnTo) || isVoiceDetailReturnIntent(returnTo);
       saveState(updated);
       syncStudentTrustState(updated);
       hydrateTenant();
@@ -1222,7 +1296,11 @@
       const detail = $('#verificationSuccessDetail');
       if(detail) detail.textContent = returnTo===VOICE_NEW_RETURN_ROUTE || isVoiceDetailReturnIntent(returnTo)
         ? "Your university membership now matches the current student roster. Returning you to Student Voice…"
-        : returning
+        : returnTo===RSVP_RETURN_ROUTE
+          ? "Your university membership now matches the current student roster. Returning you to the event…"
+          : returnTo===QUIZ_RETURN_ROUTE
+            ? "Your university membership now matches the current student roster. Returning you to the quiz…"
+            : returning
           ? "Your university membership now matches the current student roster. Returning you to the poll…"
           : "Your university membership now matches the current student roster.";
       if(success){ success.hidden=false; success.focus({preventScroll:true}); }
@@ -1737,8 +1815,13 @@
     const going = $('#rsvpGoing');
     const inter = $('#rsvpInterested');
     const meta = $('#rsvpState');
-    const state = loadState();
+    let state = participationState();
+    const event = D.featuredEvent;
     function reflect(){
+      const goingSelected = state.rsvp==='going';
+      const interestedSelected = state.rsvp==='interested';
+      going.setAttribute('aria-pressed', goingSelected ? 'true' : 'false');
+      inter.setAttribute('aria-pressed', interestedSelected ? 'true' : 'false');
       if(state.rsvp==='going'){
         going.classList.add('btn--primary'); going.classList.remove('btn'); going.textContent="Going ✓";
         inter.classList.remove('btn--primary'); inter.classList.add('btn'); inter.textContent="Interested";
@@ -1756,17 +1839,34 @@
       }
     }
     reflect();
-    going.addEventListener('click', ()=>{
-      if(state.rsvp==='going'){
-        state.rsvp=null;
+    function attemptRsvp(trigger, nextState, successMessage){
+      const currentState = participationState();
+      const decision = evaluateParticipationAction('rsvp', { state:currentState, event });
+      if(openCanonicalParticipationGate(decision, trigger, {
+        returnTo:RSVP_RETURN_ROUTE,
+        context:'rsvp'
+      })) return;
+      currentState.rsvp = nextState;
+      state = currentState;
+      saveState(currentState);
+      reflect();
+      toast(successMessage);
+    }
+    going.addEventListener('click', eventTrigger=>{
+      const currentState = participationState();
+      if(currentState.rsvp==='going'){
+        attemptRsvp(eventTrigger.currentTarget, null, "RSVP cleared.");
       } else {
-        state.rsvp='going';
+        attemptRsvp(eventTrigger.currentTarget, 'going', "You're on the list.");
       }
-      saveState(state); reflect(); toast(state.rsvp? `RSVP: ${state.rsvp}` : 'RSVP cleared');
     });
-    inter.addEventListener('click', ()=>{
-      state.rsvp = state.rsvp==='interested' ? null : 'interested';
-      saveState(state); reflect(); toast(state.rsvp? `RSVP: ${state.rsvp}` : 'RSVP cleared');
+    inter.addEventListener('click', eventTrigger=>{
+      const currentState = participationState();
+      if(currentState.rsvp==='interested'){
+        attemptRsvp(eventTrigger.currentTarget, null, "RSVP cleared.");
+      } else {
+        attemptRsvp(eventTrigger.currentTarget, 'interested', "Marked as interested.");
+      }
     });
   }
 
@@ -1862,6 +1962,20 @@
   }
 
   // State
+  function quizAwardForChoice(choice, quiz=D.quiz){
+    const participationXp = Number(quiz?.xpParticipation) || 5;
+    const accuracyXp = Number(quiz?.xpBonus) || 5;
+    return Number(choice)===Number(quiz?.correctIndex) ? participationXp + accuracyXp : participationXp;
+  }
+
+  function quizParticipationForCurrentDay(state, quiz=D.quiz){
+    const record = state?.quizParticipation;
+    if(!record || typeof record!=="object") return null;
+    if(record.quizId!==quiz?.id || record.tenantDay!==quiz?.tenantDay) return null;
+    if(!Number.isInteger(record.optionIndex) || record.optionIndex<0 || record.optionIndex>=((quiz?.options || []).length)) return null;
+    return record;
+  }
+
   function loadState(){
     try{
       const raw = localStorage.getItem('campushub:state');
@@ -1870,6 +1984,8 @@
     return {
       pollDone:false, pollChoice:null,
       quizDone:false, quizChoice:null,
+      quizParticipation:null,
+      xp:D.student.xp,
       rsvp:null,
       saveEvent:false, saveOpp:false,
       saves: D.saves.slice(),
@@ -1940,7 +2056,7 @@
         toast('Demo state reset.');
       },
       resetQuiz(){
-        const s = participationState(); s.quizDone=false; s.quizChoice=null; saveState(s); renderQuiz(); toast('Quiz reset (debug).');
+        const s = participationState(); s.quizDone=false; s.quizChoice=null; s.quizParticipation=null; saveState(s); renderQuiz(); toast('Quiz reset (debug).');
       },
       resetPoll(){
         const s = participationState(); s.pollDone=false; s.pollChoice=null; saveState(s); location.reload();

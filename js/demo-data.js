@@ -127,6 +127,10 @@ window.CampusHubDemo = {
     image: "assets/images/event-debate.webp",
     imageAlt: "University building exterior in daylight",
     description: "Join leading researchers, Guild leaders and student innovators for a debate on AI opportunities, ethics and skills for Africa's next decade.",
+    requiredAssurance: "L0",
+    rsvpEnabled: true,
+    rsvpActionable: true,
+    audienceEligible: true,
     rsvpState: null, // 'going' | 'interested' | null
     href: "#events/guild-debate"
   },
@@ -327,8 +331,14 @@ window.CampusHubDemo = {
   ],
 
   quiz: {
+    id: "daily-quiz-2026-05-20",
+    tenantDay: "2026-05-20",
     kicker: "Daily Quiz",
     question: "Which lake is the largest in East Africa?",
+    requiredAssurance: "L0",
+    moduleEnabled: true,
+    available: true,
+    audienceEligible: true,
     xp: 10, // total possible: 5 participation + 5 accuracy bonus
     xpParticipation: 5,
     xpBonus: 5,
