@@ -20,8 +20,8 @@ window.CampusHubDemo = {
     year: "Year 3",
     campus: "Main Campus",
     residence: "Mary Stuart Hall",
-    assurance: "L2 — Roster Match",
-    assuranceLevel: 2,
+    assurance: "L1 — Weak Affiliation",
+    assuranceLevel: 1,
     assuranceNext: "L3 — Strong Institutional Proof",
     xp: 340,
     level: 4,
@@ -133,7 +133,13 @@ window.CampusHubDemo = {
       body: "Frequent disruptions are affecting daily routines and hygiene.",
       supporters: 124,
       status: "Acknowledged",
-      statusVariant: "acknowledged"
+      statusVariant: "acknowledged",
+      submittedAt: "14 May 2026",
+      history: [
+        { status:"Submitted", date:"14 May 2026", note:"Issue submitted to Student Voice." },
+        { status:"Acknowledged", date:"15 May 2026", note:"The issue has been acknowledged and is awaiting further review." }
+      ],
+      officialUpdates: []
     },
     {
       id: "v2",
@@ -142,7 +148,14 @@ window.CampusHubDemo = {
       body: "Limited buses after 7 PM make it hard for students to get home.",
       supporters: 87,
       status: "Under Review",
-      statusVariant: "review"
+      statusVariant: "review",
+      submittedAt: "12 May 2026",
+      history: [
+        { status:"Submitted", date:"12 May 2026", note:"Issue submitted to Student Voice." },
+        { status:"Acknowledged", date:"13 May 2026", note:"The issue has been acknowledged." },
+        { status:"Under Review", date:"17 May 2026", note:"The issue is being reviewed by the responsible campus team." }
+      ],
+      officialUpdates: []
     },
     {
       id: "v3",
@@ -151,9 +164,67 @@ window.CampusHubDemo = {
       body: "Connectivity drops during peak hours near the graduate wing.",
       supporters: 63,
       status: "Submitted",
-      statusVariant: "submitted"
+      statusVariant: "submitted",
+      submittedAt: "16 May 2026",
+      history: [
+        { status:"Submitted", date:"16 May 2026", note:"Your issue has been submitted for review." }
+      ],
+      officialUpdates: []
     }
   ],
+
+  voiceStatusScenarios: {
+    "voice-under-review": {
+      label: "Student Voice — Under Review",
+      issueId: "v1",
+      status: "Under Review",
+      statusVariant: "review",
+      historyAdditions: [
+        { status:"Under Review", date:"17 May 2026", note:"The issue is being reviewed by the responsible campus team." }
+      ],
+      officialUpdates: []
+    },
+    "voice-action-planned": {
+      label: "Student Voice — Action Planned",
+      issueId: "v1",
+      status: "Action Planned",
+      statusVariant: "planned",
+      historyAdditions: [
+        { status:"Under Review", date:"17 May 2026", note:"The issue is being reviewed by the responsible campus team." },
+        { status:"Action Planned", date:"21 May 2026", note:"An action has been identified to address this issue." }
+      ],
+      officialUpdates: [
+        {
+          department:"Facilities Directorate",
+          date:"21 May 2026",
+          body:"Water supply interruptions have been traced to maintenance work on the western hall line. Repairs are scheduled this week."
+        }
+      ]
+    },
+    "voice-resolved": {
+      label: "Student Voice — Resolved",
+      issueId: "v1",
+      status: "Resolved",
+      statusVariant: "resolved",
+      historyAdditions: [
+        { status:"Under Review", date:"17 May 2026", note:"The issue is being reviewed by the responsible campus team." },
+        { status:"Action Planned", date:"21 May 2026", note:"An action has been identified to address this issue." },
+        { status:"Resolved", date:"28 May 2026", note:"The reported issue has been marked as resolved." }
+      ],
+      officialUpdates: [
+        {
+          department:"Facilities Directorate",
+          date:"21 May 2026",
+          body:"Water supply interruptions have been traced to maintenance work on the western hall line. Repairs are scheduled this week."
+        },
+        {
+          department:"Facilities Directorate",
+          date:"28 May 2026",
+          body:"Repairs to the affected water line have been completed. Students experiencing continued disruption can raise a new issue."
+        }
+      ]
+    }
+  },
 
   voiceMeta: {
     disclosure: "Your identity is visible only to authorised handlers and is not shared publicly.",

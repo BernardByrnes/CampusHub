@@ -3,6 +3,59 @@
   const D = window.CampusHubDemo;
   const $ = (s, r=document) => r.querySelector(s);
   const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
+  const POLL_RETURN_ROUTE = "participate/poll/restroom-cleanliness";
+  const VOICE_NEW_RETURN_ROUTE = "participate/voice/new";
+  const VOICE_DETAIL_RETURN_PREFIX = "participate/voice/";
+  const VOICE_DETAIL_ROUTE_PREFIX = "voice-detail/";
+  const VOICE_CATEGORIES = Object.freeze([
+    "Wi-Fi",
+    "Water & Sanitation",
+    "Facilities",
+    "Lighting",
+    "Library",
+    "Transport",
+    "Academic Facilities",
+    "Campus Services"
+  ]);
+
+  const PARTICIPATION_SCENARIOS = {
+    assurance: {
+      label: "L1 — Roster Match required",
+      description: "The primary interruption-and-return journey.",
+      membership: { assuranceLevel: 1, status: "active" },
+      participation: { moduleEnabled: true, resourceStatus: "active", audienceEligible: true }
+    },
+    eligible: {
+      label: "Eligible L2 experience",
+      description: "The unchanged eligible poll experience at L2 — Roster Match.",
+      membership: { assuranceLevel: 2, status: "active" },
+      participation: { moduleEnabled: true, resourceStatus: "active", audienceEligible: true }
+    },
+    membership: {
+      label: "Membership needs refreshing",
+      description: "Membership state is the primary reason, even when assurance is already L2.",
+      membership: { assuranceLevel: 2, status: "refresh" },
+      participation: { moduleEnabled: true, resourceStatus: "active", audienceEligible: true }
+    },
+    module: {
+      label: "Student Voice unavailable",
+      description: "Open Student Voice and choose “Submit a new issue” to preview this gate; available polls remain usable.",
+      membership: { assuranceLevel: 2, status: "active" },
+      participation: { moduleEnabled: false, resourceStatus: "active", audienceEligible: true }
+    },
+    resource: {
+      label: "Poll has closed",
+      description: "The resource is no longer actionable, so verification is not suggested.",
+      membership: { assuranceLevel: 2, status: "active" },
+      participation: { moduleEnabled: true, resourceStatus: "closed", audienceEligible: true }
+    },
+    audience: {
+      label: "Different student group",
+      description: "The poll is active, but is open to another eligible campus group.",
+      membership: { assuranceLevel: 2, status: "active" },
+      participation: { moduleEnabled: true, resourceStatus: "active", audienceEligible: false }
+    }
+  };
 
   // Populate tenant header
   function hydrateTenant(){
@@ -168,11 +221,99 @@
     // Attach lazy behaviour
   }
 
-  // Voice lists
+  function voiceDetailRoute(issueId){
+    return `#${VOICE_DETAIL_ROUTE_PREFIX}${encodeURIComponent(issueId)}`;
+  }
+
+  function voiceDetailReturnIntent(issueId){
+    return `${VOICE_DETAIL_RETURN_PREFIX}${issueId}`;
+  }
+
+  function isVoiceDetailReturnIntent(value){
+    return typeof value==="string" && value.startsWith(VOICE_DETAIL_RETURN_PREFIX);
+  }
+
+  function voiceIssueIdFromReturnIntent(value){
+    return isVoiceDetailReturnIntent(value) ? value.slice(VOICE_DETAIL_RETURN_PREFIX.length) : null;
+  }
+
+  function voiceStatusVariant(status){
+    return ({
+      "Submitted":"submitted",
+      "Acknowledged":"acknowledged",
+      "Under Review":"review",
+      "Action Planned":"planned",
+      "Resolved":"resolved"
+    })[status] || "submitted";
+  }
+
+  function voiceStatusChipClass(status, variant){
+    const key = variant || voiceStatusVariant(status);
+    return ({
+      acknowledged:"chip-acknowledged",
+      review:"chip-review",
+      planned:"chip-planned",
+      resolved:"chip-resolved",
+      submitted:"chip-submitted"
+    })[key] || "chip-submitted";
+  }
+
+  function formatVoiceDate(value){
+    if(typeof value!=="string") return "";
+    if(/^\d{1,2}\s+[A-Za-z]+\s+\d{4}$/.test(value)) return value;
+    const parsed = new Date(value);
+    if(Number.isNaN(parsed.getTime())) return value;
+    return new Intl.DateTimeFormat("en-GB", { day:"numeric", month:"long", year:"numeric" }).format(parsed);
+  }
+
+  function getVoiceIssue(issueId, state=participationState()){
+    const publicIssue = D.voiceIssues.find(issue=> issue.id===issueId);
+    if(publicIssue){
+      const scenario = state.voiceStatusScenario ? D.voiceStatusScenarios?.[state.voiceStatusScenario] : null;
+      const hasScenario = scenario?.issueId===publicIssue.id;
+      const isSupported = state.supportedVoiceIssues.includes(publicIssue.id);
+      return {
+        ...publicIssue,
+        supporters: publicIssue.supporters + (isSupported ? 1 : 0),
+        status: hasScenario ? scenario.status : publicIssue.status,
+        statusVariant: hasScenario ? scenario.statusVariant : publicIssue.statusVariant,
+        history: [
+          ...(publicIssue.history || []),
+          ...(hasScenario ? scenario.historyAdditions || [] : [])
+        ],
+        officialUpdates: [
+          ...(publicIssue.officialUpdates || []),
+          ...(hasScenario ? scenario.officialUpdates || [] : [])
+        ],
+        isPublic:true,
+        isSupported
+      };
+    }
+    const submission = state.voiceSubmissions.find(item=>item?.id===issueId);
+    if(!submission) return null;
+    const submittedAt = formatVoiceDate(submission.submittedAt);
+    return {
+      id:submission.id,
+      category:submission.category,
+      title:submission.title,
+      body:submission.description,
+      supporters:0,
+      status:"Submitted",
+      statusVariant:"submitted",
+      submittedAt,
+      history:[{ status:"Submitted", date:submittedAt, note:"Your issue has been submitted for review." }],
+      officialUpdates:[],
+      isPublic:false,
+      isLocalSubmission:true,
+      isSupported:false
+    };
+  }
+
   function renderVoiceLists(){
-    const issues = D.voiceIssues;
+    const state = participationState();
+    const issues = D.voiceIssues.map(issue=> getVoiceIssue(issue.id, state));
     const toCard = (it) => `
-      <article class="card list-card">
+      <a class="card list-card voice-issue-card" href="${voiceDetailRoute(it.id)}" data-voice-issue-id="${escapeHtml(it.id)}" aria-label="View Student Voice issue: ${escapeHtml(it.title)}">
         <div style="display:flex; gap:12px;">
           <div class="icon-tile ${it.category.includes('Water')?'icon-tile--info': (it.category==='Transport'?'icon-tile--brand':'')}" aria-hidden="true" style="width:42px; height:42px;">
             ${it.category==='Water & Sanitation' ? waterIcon() : it.category==='Transport' ? busIcon() : wifiIcon()}
@@ -183,27 +324,149 @@
             <p class="body-sm" style="margin:4px 0 0;">${escapeHtml(it.body)}</p>
             <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; gap:8px;">
               <span class="meta" style="display:flex; gap:6px; align-items:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> ${it.supporters} supporters</span>
-              <span class="status-chip ${it.statusVariant==='acknowledged'?'chip-acknowledged': it.statusVariant==='review'?'chip-review':'chip-submitted'}">${escapeHtml(it.status)}</span>
+              <span class="status-chip ${voiceStatusChipClass(it.status, it.statusVariant)}">${escapeHtml(it.status)}</span>
             </div>
           </div>
           <span aria-hidden="true" style="align-self:center; color:var(--text-muted);">›</span>
         </div>
-      </article>
+      </a>
     `;
     $('#voiceList').innerHTML = issues.slice(0,2).map(toCard).join("");
-    $('#voiceAllList').innerHTML = issues.map(it=> toCard(it)).join("") + `<button class="btn" style="width:100%; margin-top:6px;" id="voiceSupportDemo">Support an issue (+1) — demo</button>`;
-    // wire support demo
-    const btn = document.getElementById('voiceSupportDemo');
-    if(btn) btn.addEventListener('click', ()=> {
-      D.voiceIssues[0].supporters += 1;
-      renderVoiceLists();
-      toast("Support recorded.");
-    });
+    $('#voiceAllList').innerHTML = issues.map(toCard).join("");
   }
 
   function waterIcon(){ return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 2.7l7 10.5a7 7 0 1 1-14 0L12 2.7z"/></svg>`; }
   function busIcon(){ return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M7 15v3"/><path d="M17 15v3"/><path d="M3 10h18"/><circle cx="7" cy="18" r="1" fill="currentColor"/><circle cx="17" cy="18" r="1" fill="currentColor"/></svg>`; }
   function wifiIcon(){ return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 12a11 11 0 0 1 14 0"/><path d="M8 15a7 7 0 0 1 8 0"/><path d="M11 18a3 3 0 0 1 2 0"/><circle cx="12" cy="20" r=".5" fill="currentColor"/></svg>`; }
+
+  function selectVoiceIssue(issueId){
+    const state = participationState();
+    const issue = getVoiceIssue(issueId, state);
+    if(!issue) return null;
+    if(state.selectedVoiceIssueId!==issue.id){
+      state.selectedVoiceIssueId = issue.id;
+      saveState(state);
+    }
+    return issue;
+  }
+
+  function focusVoiceDetailTitle(){
+    const title = $('#voiceDetailTitle');
+    if(!title) return;
+    title.focus({preventScroll:true});
+    title.scrollIntoView({block:"start", behavior:"auto"});
+  }
+
+  function renderVoiceDetail(issueId){
+    const selected = selectVoiceIssue(issueId || participationState().selectedVoiceIssueId) || selectVoiceIssue('v1');
+    if(!selected) return null;
+    const status = $('#voiceDetailStatus');
+    const supporters = $('.voice-detail-supporters');
+    const supportAction = $('#voiceDetailSupportAction');
+    const supportButton = $('#voiceSupportButton');
+    const supportFeedback = $('#voiceSupportFeedback');
+    const resolvedNote = $('#voiceResolvedSupportNote');
+
+    $('#voiceDetailKicker').textContent = selected.isLocalSubmission ? 'Your submission' : 'Student Voice';
+    $('#voiceDetailCategory').textContent = selected.category;
+    $('#voiceDetailTitle').textContent = selected.title;
+    $('#voiceDetailDescription').textContent = selected.body;
+    $('#voiceDetailSupporterCount').textContent = String(selected.supporters);
+    $('#voiceDetailSubmitted').textContent = formatVoiceDate(selected.submittedAt);
+    $('#voiceDetailAwaiting').hidden = !selected.isLocalSubmission;
+    if(supporters) supporters.hidden = !!selected.isLocalSubmission;
+    if(status){
+      status.textContent = selected.status;
+      status.className = `status-chip ${voiceStatusChipClass(selected.status, selected.statusVariant)}`;
+    }
+
+    const canSupport = selected.isPublic && selected.status!=="Resolved";
+    if(supportAction) supportAction.hidden = !canSupport;
+    if(supportButton){
+      supportButton.disabled = selected.isSupported;
+      supportButton.textContent = selected.isSupported ? 'Supported ✓' : 'Support this issue';
+    }
+    if(supportFeedback) supportFeedback.textContent = '';
+    if(resolvedNote) resolvedNote.hidden = !(selected.isPublic && selected.status==="Resolved");
+
+    const timeline = $('#voiceTimeline');
+    if(timeline){
+      timeline.innerHTML = selected.history.map(event=>{
+        const variant = voiceStatusVariant(event.status);
+        return `<li class="voice-timeline__item voice-timeline__item--${escapeHtml(variant)}">
+          <div class="voice-timeline__event">
+            <span class="voice-timeline__status">${escapeHtml(event.status)}</span>
+            <time class="voice-timeline__date">${escapeHtml(event.date)}</time>
+          </div>
+          <p class="voice-timeline__note">${escapeHtml(event.note)}</p>
+        </li>`;
+      }).join('');
+    }
+
+    const updateSection = $('#voiceOfficialUpdatesSection');
+    const updates = $('#voiceOfficialUpdates');
+    const officialUpdates = selected.officialUpdates || [];
+    if(updateSection) updateSection.hidden = officialUpdates.length===0;
+    if(updates){
+      updates.innerHTML = officialUpdates.map(update=> `
+        <article class="voice-official-update">
+          <div class="kicker kicker--info">Official update</div>
+          <div class="voice-official-update__meta">
+            <strong class="voice-official-update__source">${escapeHtml(update.department)}</strong>
+            <time class="voice-official-update__date">${escapeHtml(update.date)}</time>
+          </div>
+          <p>${escapeHtml(update.body)}</p>
+        </article>
+      `).join('');
+    }
+    return selected;
+  }
+
+  function supportSelectedVoiceIssue(trigger){
+    const state = participationState();
+    const issue = getVoiceIssue(state.selectedVoiceIssueId, state);
+    if(!issue || !issue.isPublic || issue.status==="Resolved" || issue.isSupported) return;
+    const gate = resolveParticipation(state, 'voice');
+    if(gate){
+      openParticipationGate(gate, trigger, {
+        returnTo:voiceDetailReturnIntent(issue.id),
+        context:'voice'
+      });
+      return;
+    }
+    state.supportedVoiceIssues.push(issue.id);
+    state.supportedVoiceIssues = [...new Set(state.supportedVoiceIssues)];
+    saveState(state);
+    renderVoiceLists();
+    renderVoiceDetail(issue.id);
+    const feedback = $('#voiceSupportFeedback');
+    if(feedback) feedback.textContent = 'Support recorded.';
+    toast('Support recorded.');
+  }
+
+  function applyVoiceStatusScenario(name, announce=false){
+    const scenario = D.voiceStatusScenarios?.[name] || null;
+    const state = participationState();
+    state.voiceStatusScenario = scenario ? name : null;
+    saveState(state);
+    renderVoiceLists();
+    if(!$('#view-voice-detail')?.hidden) renderVoiceDetail(state.selectedVoiceIssueId);
+    if(announce) toast(scenario ? `${scenario.label} selected for this prototype.` : 'Student Voice — Acknowledged selected for this prototype.');
+  }
+
+  function returnFromVoiceDetail(){
+    const previous = historyStack[historyStack.length-2] || '';
+    if(previous==='voice' || previous==='participate'){
+      location.hash = `#${previous}`;
+      return;
+    }
+    location.hash = '#voice';
+  }
+
+  function initVoiceDetail(){
+    $('#voiceDetailBack')?.addEventListener('click', returnFromVoiceDetail);
+    $('#voiceSupportButton')?.addEventListener('click', event=> supportSelectedVoiceIssue(event.currentTarget));
+  }
 
   // Notifications
   function renderNotifications(){
@@ -341,56 +604,749 @@
     }));
   }
 
-  // Poll
-  function initPoll(){
+  // Contextual participation gating — demo-only local state, ordered by the canonical decision path.
+  function assuranceLabel(level){
+    return ({ 0:"L0 — Registered", 1:"L1 — Weak Affiliation", 2:"L2 — Roster Match", 3:"L3 — Strong Institutional Proof" })[Number(level)] || "L1 — Weak Affiliation";
+  }
+
+  function defaultMembership(){
+    return { assuranceLevel:1, status:"active" };
+  }
+
+  function defaultParticipation(){
+    return {
+      tenantLifecycle:"active",
+      moduleEnabled:true,
+      resourceStatus:"active",
+      audienceEligible:true,
+      verifiedAttributes:true,
+      storyPrerequisites:true,
+      returnTo:null,
+      demoScenario:"assurance"
+    };
+  }
+
+  function defaultVoiceDraft(){
+    return { category:"", title:"", description:"", step:1 };
+  }
+
+  function ensureVoiceState(state){
+    const defaults = defaultVoiceDraft();
+    if(!state.voiceDraft || typeof state.voiceDraft!=="object") state.voiceDraft = {};
+    Object.keys(defaults).forEach(key=>{
+      if(state.voiceDraft[key]===undefined || state.voiceDraft[key]===null) state.voiceDraft[key] = defaults[key];
+    });
+    state.voiceDraft.category = VOICE_CATEGORIES.includes(state.voiceDraft.category) ? state.voiceDraft.category : "";
+    state.voiceDraft.title = typeof state.voiceDraft.title==="string" ? state.voiceDraft.title : "";
+    state.voiceDraft.description = typeof state.voiceDraft.description==="string" ? state.voiceDraft.description : "";
+    state.voiceDraft.step = [1,2,3].includes(Number(state.voiceDraft.step)) ? Number(state.voiceDraft.step) : 1;
+    if(!Array.isArray(state.voiceSubmissions)) state.voiceSubmissions = [];
+    state.voiceSubmissionCounter = Number.isInteger(state.voiceSubmissionCounter) && state.voiceSubmissionCounter>=0
+      ? state.voiceSubmissionCounter
+      : 0;
+    if(typeof state.voiceLastSubmissionId!=="string") state.voiceLastSubmissionId = null;
+    if(!Array.isArray(state.supportedVoiceIssues)) state.supportedVoiceIssues = [];
+    state.supportedVoiceIssues = [...new Set(state.supportedVoiceIssues.filter(id=>typeof id==="string"))];
+    if(typeof state.selectedVoiceIssueId!=="string") state.selectedVoiceIssueId = "v1";
+    if(!D.voiceIssues.some(issue=>issue.id===state.selectedVoiceIssueId) && !state.voiceSubmissions.some(issue=>issue?.id===state.selectedVoiceIssueId)){
+      state.selectedVoiceIssueId = "v1";
+    }
+    if(typeof state.voiceStatusScenario!=="string" || !D.voiceStatusScenarios?.[state.voiceStatusScenario]){
+      state.voiceStatusScenario = null;
+    }
+    return state;
+  }
+
+  function ensureParticipationState(state){
+    if(!state || typeof state!=="object") state = {};
+    const membershipDefaults = defaultMembership();
+    const participationDefaults = defaultParticipation();
+    if(!state.membership || typeof state.membership!=="object") state.membership = {};
+    if(!state.participation || typeof state.participation!=="object") state.participation = {};
+
+    Object.keys(membershipDefaults).forEach(key=>{
+      if(state.membership[key]===undefined || state.membership[key]===null) state.membership[key] = membershipDefaults[key];
+    });
+    const parsedLevel = Number(state.membership.assuranceLevel);
+    state.membership.assuranceLevel = [0,1,2,3].includes(parsedLevel) ? parsedLevel : membershipDefaults.assuranceLevel;
+    if(!["active","refresh"].includes(state.membership.status)) state.membership.status = membershipDefaults.status;
+
+    Object.keys(participationDefaults).forEach(key=>{
+      if(state.participation[key]===undefined) state.participation[key] = participationDefaults[key];
+    });
+    if(!PARTICIPATION_SCENARIOS[state.participation.demoScenario]) state.participation.demoScenario = "assurance";
+    if(typeof state.participation.returnTo!=="string") state.participation.returnTo = null;
+    ensureVoiceState(state);
+    return state;
+  }
+
+  function participationState(){
+    return ensureParticipationState(loadState());
+  }
+
+  function syncStudentTrustState(state=participationState()){
+    D.student.assuranceLevel = state.membership.assuranceLevel;
+    D.student.assurance = assuranceLabel(state.membership.assuranceLevel);
+  }
+
+  // One primary actionable reason is selected. Later checks never surface until earlier checks pass.
+  function resolveParticipation(state=participationState(), target="poll"){
+    const p = state.participation;
+    const m = state.membership;
+    if(p.tenantLifecycle!=="active") return "tenant";
+    if(target==="voice" && !p.moduleEnabled) return "module";
+    if(target==="poll" && p.resourceStatus!=="active") return "resource";
+    if(m.status!=="active") return "membership";
+    if(m.assuranceLevel<2) return "assurance";
+    if(target==="poll" && !p.audienceEligible) return "audience";
+    if(!p.verifiedAttributes) return "attributes";
+    if(!p.storyPrerequisites) return "prerequisite";
+    return null;
+  }
+
+  function resolvePollParticipation(state=participationState()){
+    return resolveParticipation(state, "poll");
+  }
+
+  function gateCopy(key, state, context="poll"){
+    const currentAssurance = assuranceLabel(state.membership.assuranceLevel);
+    const copy = {
+      tenant: {
+        kicker:"Participation update", title:"Participation is not available right now",
+        reason:"This campus is not currently accepting participation. You can still read campus information.",
+        primary:"Back to Participate", action:"return"
+      },
+      module: {
+        kicker:"Participation update", title:"Student Voice is not available",
+        reason:"Student Voice has not been enabled for this campus. You can still participate in available polls.",
+        primary:"Back to Participate", action:"return"
+      },
+      resource: {
+        kicker:"Poll update", title:"This poll has closed",
+        reason:"Responses are no longer being accepted.",
+        primary:"Back to polls", action:"return"
+      },
+      membership: {
+        kicker:"Membership update", title:"Membership needs refreshing",
+        reason:"Your university membership needs to be confirmed again before you can participate. You can still read campus information.",
+        currentLabel:"Membership status", currentValue:"Needs refreshing",
+        primary:"Review membership", secondary:"Not now", action:"review"
+      },
+      assurance: {
+        kicker:"Participation requirement", title:"Verify your student status",
+        reason:context==="voice"
+          ? "Student Voice is available to students whose university membership has been matched to the current student roster."
+          : "This poll is available to students whose university membership has been matched to the current student roster.",
+        currentLabel:"Your current status", currentValue:currentAssurance,
+        requiredLabel:"Required", requiredValue:"L2 — Roster Match",
+        primary:"Verify student status", secondary:"Not now", action:"verify"
+      },
+      audience: {
+        kicker:"Poll eligibility", title:"This poll is for a different student group",
+        reason:"This poll is currently open to another eligible campus group.",
+        primary:"Back to polls", action:"return"
+      },
+      attributes: {
+        kicker:"Participation requirement", title:"Your student details need updating",
+        reason:"Some details needed for this poll are not available yet. You can review your membership information.",
+        primary:"Review membership", secondary:"Not now", action:"review"
+      },
+      prerequisite: {
+        kicker:"Participation requirement", title:"One more step is needed",
+        reason:"Please complete the required step for this poll before responding.",
+        primary:"Back to polls", action:"return"
+      }
+    };
+    return copy[key] || copy.assurance;
+  }
+
+  let gateTrigger = null;
+  let gateFocusAfterClose = null;
+  let gateReturnIntent = null;
+
+  function openParticipationGate(key, trigger, options={}){
+    const dialog = $('#participationGate');
+    if(!dialog) return;
+    const state = participationState();
+    const returnTo = options.returnTo || POLL_RETURN_ROUTE;
+    const context = options.context || "poll";
+    const copy = gateCopy(key, state, context);
+    gateTrigger = trigger || document.activeElement;
+    gateFocusAfterClose = null;
+    gateReturnIntent = copy.action==="verify" ? returnTo : null;
+
+    $('#participationGateKicker').textContent = copy.kicker;
+    $('#participationGateTitle').textContent = copy.title;
+    $('#participationGateReason').textContent = copy.reason;
+    const stateWrap = $('#participationGateState');
+    const currentRow = $('#participationGateCurrentRow');
+    const requiredRow = $('#participationGateRequiredRow');
+    stateWrap.hidden = !copy.currentValue && !copy.requiredValue;
+    currentRow.hidden = !copy.currentValue;
+    requiredRow.hidden = !copy.requiredValue;
+    if(copy.currentValue){
+      $('#participationGateCurrentLabel').textContent = copy.currentLabel;
+      $('#participationGateCurrentValue').textContent = copy.currentValue;
+    }
+    if(copy.requiredValue){
+      $('#participationGateRequiredLabel').textContent = copy.requiredLabel;
+      $('#participationGateRequiredValue').textContent = copy.requiredValue;
+    }
+    const primary = $('#participationGatePrimary');
+    const secondary = $('#participationGateSecondary');
+    primary.textContent = copy.primary;
+    primary.dataset.gateAction = copy.action;
+    secondary.hidden = !copy.secondary;
+    secondary.textContent = copy.secondary || "Not now";
+
+    if(!dialog.open){
+      if(typeof dialog.showModal==="function") dialog.showModal();
+      else dialog.setAttribute("open", "");
+    }
+    setTimeout(()=> primary.focus(), 0);
+  }
+
+  function closeParticipationGate(focusTarget=gateTrigger){
+    const dialog = $('#participationGate');
+    if(!dialog) return;
+    gateFocusAfterClose = focusTarget;
+    gateReturnIntent = null;
+    if(dialog.open && typeof dialog.close==="function") dialog.close();
+    else dialog.removeAttribute("open");
+  }
+
+  function dismissGateForNavigation(){
+    const dialog = $('#participationGate');
+    gateTrigger = null;
+    gateFocusAfterClose = null;
+    gateReturnIntent = null;
+    if(dialog?.open && typeof dialog.close==="function") dialog.close();
+    else dialog?.removeAttribute("open");
+  }
+
+  function syncVerificationUi(){
+    const state = participationState();
+    const level = state.membership.assuranceLevel;
+    const membershipRefresh = state.membership.status!=="active";
+    const title = assuranceLabel(level);
+    const titleEl = $('[data-field="assuranceTitle"]');
+    if(!titleEl) return;
+
+    $('#verificationStatusKicker').textContent = membershipRefresh ? "Membership status" : "Current assurance";
+    titleEl.textContent = membershipRefresh ? "Membership needs refreshing" : title;
+    $('#verificationStatusDescription').textContent = membershipRefresh
+      ? "Your university membership needs to be confirmed again before you can participate. Your assurance level is still recorded separately."
+      : level===1
+        ? "Your campus invite code or self-declared details show an affiliation. A current roster match is needed before you can respond to polls or use Student Voice."
+        : level===3
+          ? "Your roster match has been strengthened with institutional proof. You can take part in high-integrity polls where they are available."
+          : "Your details match an approved university roster. A roster match alone does not prove identity where student numbers and surnames are guessable.";
+    $('#assuranceProgressBar').style.width = ({0:"18%",1:"36%",2:"55%",3:"100%"})[level] || "36%";
+    $('#assuranceProgressCurrent').textContent = `L${level}`;
+
+    [1,2,3].forEach(tierLevel=>{
+      const tier = $(`#verificationTierL${tierLevel}`);
+      const badge = tier?.querySelector("[data-tier-badge]");
+      const current = tier?.querySelector("[data-tier-current]");
+      const isCurrent = level===tierLevel;
+      tier?.classList.toggle("tier--active", isCurrent);
+      if(badge) badge.textContent = isCurrent ? "✓" : String(tierLevel);
+      if(current) current.hidden = !isCurrent;
+    });
+
+    const matchBtn = $('#startRosterMatch');
+    const matchHelp = $('#rosterMatchHelp');
+    if(matchBtn){
+      matchBtn.hidden = level!==1 || membershipRefresh;
+      if(!matchBtn.hidden){
+        matchBtn.disabled = false;
+        matchBtn.textContent = "Match my student record";
+      }
+    }
+    if(matchHelp){
+      matchHelp.hidden = level!==1 || membershipRefresh;
+      if(!matchHelp.hidden) matchHelp.textContent = "We will check your current enrolment against the university roster.";
+    }
+    const toL3 = $('#toL3');
+    if(toL3) toL3.hidden = level!==2;
+  }
+
+  function renderPollState(){
     const form = $('#pollForm');
     const btn = $('#submitPoll');
     const success = $('#pollSuccess');
-    const state = loadState();
+    if(!form || !btn || !success) return;
+    const state = participationState();
     if(state.pollDone){
-      // disable and show success
       form.querySelectorAll('input').forEach(i=> i.disabled=true);
-      // check the saved choice
-      const idx = state.pollChoice;
-      const input = form.querySelector(`input[value="${idx}"]`);
+      const input = form.querySelector(`input[value="${state.pollChoice}"]`);
       if(input) input.checked=true;
       btn.disabled = true;
       btn.textContent = "Response recorded";
       success.hidden=false;
-      // hide privacy duplicate? keep
       return;
     }
+    form.querySelectorAll('input').forEach(i=>{
+      i.disabled = false;
+      if(state.pollChoice===null) i.checked = false;
+    });
+    btn.disabled = !form.querySelector('input:checked');
+    btn.textContent = "Submit response";
+    success.hidden = true;
+  }
 
-    form.addEventListener('change', ()=>{
-      const any = form.querySelector('input:checked');
-      btn.disabled = !any;
+  function initPoll(){
+    const form = $('#pollForm');
+    const btn = $('#submitPoll');
+    if(!form || !btn) return;
+    renderPollState();
+
+    function interruptIfGated(trigger){
+      const gate = resolvePollParticipation();
+      if(!gate) return false;
+      openParticipationGate(gate, trigger);
+      return true;
+    }
+
+    form.addEventListener('click', event=>{
+      if(!event.target.matches('input[type="radio"]')) return;
+      if(interruptIfGated(event.target)) event.preventDefault();
+    });
+    form.addEventListener('keydown', event=>{
+      if(!event.target.matches('input[type="radio"]')) return;
+      if([" ","Spacebar","Enter","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(event.key) && interruptIfGated(event.target)){
+        event.preventDefault();
+      }
+    });
+    form.addEventListener('change', event=>{
+      if(interruptIfGated(event.target)){
+        form.querySelectorAll('input').forEach(input=> input.checked=false);
+        return;
+      }
+      btn.disabled = !form.querySelector('input:checked');
     });
 
     btn.addEventListener('click', ()=>{
       const chosen = form.querySelector('input:checked');
       if(!chosen) return;
+      if(interruptIfGated(btn)) return;
       const idx = parseInt(chosen.value,10);
-      // Simulate submit
       btn.disabled = true;
       btn.textContent = "Submitting…";
       setTimeout(()=>{
+        const state = participationState();
         state.pollDone = true;
         state.pollChoice = idx;
         D.student.xp += 5;
         hydrateTenant();
         renderXPRules();
         saveState(state);
-        btn.textContent = "Response recorded";
-        success.hidden=false;
-        form.querySelectorAll('input').forEach(i=> i.disabled=true);
+        renderPollState();
         toast("Response recorded — +5 XP. Your individual response remains private.");
       }, 500);
     });
   }
 
+  function updateParticipationDemoControls(){
+    const state = participationState();
+    const scenario = PARTICIPATION_SCENARIOS[state.participation.demoScenario] || PARTICIPATION_SCENARIOS.assurance;
+    const select = $('#participationDemoState');
+    if(select) select.value = state.participation.demoScenario;
+    const description = $('#participationDemoDescription');
+    if(description) description.textContent = scenario.description;
+  }
+
+  function applyParticipationScenario(name, announce=false){
+    const scenario = PARTICIPATION_SCENARIOS[name] || PARTICIPATION_SCENARIOS.assurance;
+    const state = participationState();
+    state.membership = { ...defaultMembership(), ...scenario.membership };
+    state.participation = { ...defaultParticipation(), ...scenario.participation, demoScenario:name, returnTo:null };
+    state.pollDone = false;
+    state.pollChoice = null;
+    saveState(state);
+    syncStudentTrustState(state);
+    hydrateTenant();
+    renderPollState();
+    syncVerificationUi();
+    updateParticipationDemoControls();
+    const success = $('#verificationSuccess');
+    if(success) success.hidden = true;
+    if(announce) toast(`${scenario.label} selected for this prototype.`);
+  }
+
+  function restoreOriginalParticipationIntent(){
+    const state = participationState();
+    const returnTo = state.participation.returnTo;
+    state.participation.returnTo = null;
+    saveState(state);
+    if(returnTo===POLL_RETURN_ROUTE){
+      pendingReturnFocus = true;
+      location.hash = "#participate";
+      return;
+    }
+    if(returnTo===VOICE_NEW_RETURN_ROUTE){
+      pendingVoiceComposerFocus = true;
+      location.hash = "#voice-new";
+      return;
+    }
+    if(isVoiceDetailReturnIntent(returnTo)){
+      const issueId = voiceIssueIdFromReturnIntent(returnTo);
+      if(getVoiceIssue(issueId)){
+        pendingVoiceDetailFocus = true;
+        location.hash = voiceDetailRoute(issueId);
+      }
+    }
+  }
+
+  function startRosterMatch(){
+    const state = participationState();
+    if(state.membership.assuranceLevel>=2 || state.membership.status!=="active") return;
+    const button = $('#startRosterMatch');
+    const help = $('#rosterMatchHelp');
+    if(button){ button.disabled=true; button.textContent="Checking enrolment…"; }
+    if(help){ help.hidden=false; help.textContent="Checking your current enrolment against the university roster…"; }
+
+    setTimeout(()=>{
+      const updated = participationState();
+      updated.membership.assuranceLevel = 2;
+      updated.membership.status = "active";
+      updated.participation.demoScenario = "eligible";
+      const returnTo = updated.participation.returnTo;
+      const returning = [POLL_RETURN_ROUTE, VOICE_NEW_RETURN_ROUTE].includes(returnTo) || isVoiceDetailReturnIntent(returnTo);
+      saveState(updated);
+      syncStudentTrustState(updated);
+      hydrateTenant();
+      renderPollState();
+      syncVerificationUi();
+      updateParticipationDemoControls();
+      const success = $('#verificationSuccess');
+      const detail = $('#verificationSuccessDetail');
+      if(detail) detail.textContent = returnTo===VOICE_NEW_RETURN_ROUTE || isVoiceDetailReturnIntent(returnTo)
+        ? "Your university membership now matches the current student roster. Returning you to Student Voice…"
+        : returning
+          ? "Your university membership now matches the current student roster. Returning you to the poll…"
+          : "Your university membership now matches the current student roster.";
+      if(success){ success.hidden=false; success.focus({preventScroll:true}); }
+      toast("Student status confirmed.");
+      if(returning) setTimeout(restoreOriginalParticipationIntent, 1100);
+    }, 750);
+  }
+
+  function initParticipationGate(){
+    const initial = participationState();
+    saveState(initial);
+    syncStudentTrustState(initial);
+    syncVerificationUi();
+    updateParticipationDemoControls();
+
+    const dialog = $('#participationGate');
+    dialog?.addEventListener('close', ()=>{
+      const target = gateFocusAfterClose || gateTrigger;
+      gateFocusAfterClose = null;
+      gateTrigger = null;
+      gateReturnIntent = null;
+      if(target && document.contains(target)) setTimeout(()=> target.focus({preventScroll:true}), 0);
+    });
+    document.addEventListener('keydown', event=>{
+      if(event.key==="Escape" && dialog?.open){
+        event.preventDefault();
+        closeParticipationGate();
+      }
+    });
+    $('#participationGatePrimary')?.addEventListener('click', event=>{
+      const action = event.currentTarget.dataset.gateAction;
+      if(action==="verify"){
+        const state = participationState();
+        state.participation.returnTo = gateReturnIntent || POLL_RETURN_ROUTE;
+        saveState(state);
+        dismissGateForNavigation();
+        location.hash = "#verification";
+      } else if(action==="review"){
+        const state = participationState();
+        state.participation.returnTo = null;
+        saveState(state);
+        dismissGateForNavigation();
+        location.hash = "#verification";
+      } else {
+        closeParticipationGate();
+      }
+    });
+    $('#participationGateSecondary')?.addEventListener('click', ()=> closeParticipationGate());
+    $('#startRosterMatch')?.addEventListener('click', startRosterMatch);
+    $('#participationDemoState')?.addEventListener('change', event=> applyParticipationScenario(event.target.value, true));
+    $('#resetParticipationDemo')?.addEventListener('click', ()=> applyParticipationScenario("assurance", true));
+  }
+
+  // Student Voice composer — local prototype state only. Submitted issues are not added to the public issue list.
+  let voiceComposerStep = 1;
+
+  function voiceHeadingForStep(step=voiceComposerStep){
+    return ({
+      1: '#voiceCategoryHeading',
+      2: '#voiceDetailsHeading',
+      3: '#voiceReviewHeading',
+      4: '#voiceConfirmationHeading'
+    })[step];
+  }
+
+  function focusVoiceStepHeading(){
+    const heading = $(voiceHeadingForStep());
+    if(!heading) return;
+    heading.focus({preventScroll:true});
+    heading.scrollIntoView({block:"start", behavior:"auto"});
+  }
+
+  function setVoiceStatus(message){
+    const status = $('#voiceComposerStatus');
+    if(status) status.textContent = message;
+  }
+
+  function updateVoiceStepper(step){
+    $$('.voice-stepper__step').forEach(item=>{
+      const itemStep = Number(item.dataset.voiceProgress);
+      const current = itemStep===step;
+      item.classList.toggle('is-current', current);
+      item.classList.toggle('is-complete', itemStep<step);
+      if(current) item.setAttribute('aria-current', 'step');
+      else item.removeAttribute('aria-current');
+    });
+  }
+
+  function setVoiceStep(step, options={}){
+    const { focus=true, persist=true } = options;
+    const nextStep = [1,2,3,4].includes(Number(step)) ? Number(step) : 1;
+    voiceComposerStep = nextStep;
+    const panels = {
+      1: '#voiceStepCategory',
+      2: '#voiceStepDetails',
+      3: '#voiceStepReview',
+      4: '#voiceStepConfirmation'
+    };
+    Object.entries(panels).forEach(([panelStep, selector])=>{
+      const panel = $(selector);
+      if(panel) panel.hidden = Number(panelStep)!==nextStep;
+    });
+    const stepper = $('#voiceStepper');
+    if(stepper) stepper.hidden = nextStep===4;
+    updateVoiceStepper(nextStep);
+    if(nextStep<=3 && persist){
+      const state = participationState();
+      state.voiceDraft.step = nextStep;
+      saveState(state);
+    }
+    if(nextStep===3) renderVoiceReview();
+    if(nextStep===4) renderVoiceConfirmation();
+    const labels = {
+      1:'Step 1 of 3: Category',
+      2:'Step 2 of 3: Issue details',
+      3:'Step 3 of 3: Review and submit',
+      4:'Issue submitted. Status: Submitted.'
+    };
+    setVoiceStatus(labels[nextStep]);
+    if(focus) setTimeout(focusVoiceStepHeading, 0);
+  }
+
+  function clearVoiceError(errorSelector, inputSelector){
+    const error = $(errorSelector);
+    const input = inputSelector ? $(inputSelector) : null;
+    if(error){ error.textContent = ''; error.hidden = true; }
+    if(input) input.removeAttribute('aria-invalid');
+  }
+
+  function showVoiceError(errorSelector, inputSelector, message){
+    const error = $(errorSelector);
+    const input = inputSelector ? $(inputSelector) : null;
+    if(error){ error.textContent = message; error.hidden = false; }
+    if(input) input.setAttribute('aria-invalid', 'true');
+  }
+
+  function clearVoiceValidation(){
+    clearVoiceError('#voiceCategoryError');
+    clearVoiceError('#voiceTitleError', '#voiceIssueTitle');
+    clearVoiceError('#voiceDescriptionError', '#voiceIssueDescription');
+  }
+
+  function updateVoiceCategoryContinue(){
+    const button = $('#voiceCategoryContinue');
+    const selected = $('#voiceComposerForm input[name="voiceCategory"]:checked');
+    if(button) button.disabled = !selected;
+  }
+
+  function saveVoiceDraft(){
+    const state = participationState();
+    const selected = $('#voiceComposerForm input[name="voiceCategory"]:checked');
+    const title = $('#voiceIssueTitle');
+    const description = $('#voiceIssueDescription');
+    state.voiceDraft.category = selected?.value || '';
+    state.voiceDraft.title = title?.value || '';
+    state.voiceDraft.description = description?.value || '';
+    if([1,2,3].includes(voiceComposerStep)) state.voiceDraft.step = voiceComposerStep;
+    saveState(state);
+    return state.voiceDraft;
+  }
+
+  function validateVoiceCategory(){
+    const selected = $('#voiceComposerForm input[name="voiceCategory"]:checked');
+    if(!selected){
+      showVoiceError('#voiceCategoryError', null, 'Choose a category before continuing.');
+      return false;
+    }
+    clearVoiceError('#voiceCategoryError');
+    saveVoiceDraft();
+    return true;
+  }
+
+  function validateVoiceDetails(){
+    const title = $('#voiceIssueTitle');
+    const description = $('#voiceIssueDescription');
+    const titleValue = title?.value.trim() || '';
+    const descriptionValue = description?.value.trim() || '';
+    let valid = true;
+    if(!titleValue){
+      showVoiceError('#voiceTitleError', '#voiceIssueTitle', 'Enter a short issue title.');
+      valid = false;
+    } else {
+      clearVoiceError('#voiceTitleError', '#voiceIssueTitle');
+    }
+    if(!descriptionValue){
+      showVoiceError('#voiceDescriptionError', '#voiceIssueDescription', 'Describe the campus issue before continuing.');
+      valid = false;
+    } else {
+      clearVoiceError('#voiceDescriptionError', '#voiceIssueDescription');
+    }
+    saveVoiceDraft();
+    if(valid){
+      const state = participationState();
+      state.voiceDraft.title = titleValue;
+      state.voiceDraft.description = descriptionValue;
+      saveState(state);
+    }
+    return valid;
+  }
+
+  function renderVoiceReview(){
+    const draft = participationState().voiceDraft;
+    const category = $('#voiceReviewCategory');
+    const title = $('#voiceReviewTitle');
+    const description = $('#voiceReviewDescription');
+    if(category) category.textContent = draft.category || '—';
+    if(title) title.textContent = draft.title || '—';
+    if(description) description.textContent = draft.description || '—';
+  }
+
+  function renderVoiceConfirmation(){
+    const state = participationState();
+    const submission = state.voiceSubmissions.find(item=>item?.id===state.voiceLastSubmissionId) || state.voiceSubmissions[0];
+    const status = $('#voiceConfirmationStatus');
+    if(status) status.textContent = submission?.status || 'Submitted';
+  }
+
+  function renderVoiceComposer(){
+    const form = $('#voiceComposerForm');
+    if(!form) return;
+    const draft = participationState().voiceDraft;
+    form.querySelectorAll('input[name="voiceCategory"]').forEach(input=>{
+      input.checked = input.value===draft.category;
+    });
+    const title = $('#voiceIssueTitle');
+    const description = $('#voiceIssueDescription');
+    if(title) title.value = draft.title;
+    if(description) description.value = draft.description;
+    clearVoiceValidation();
+    updateVoiceCategoryContinue();
+    setVoiceStep(draft.step, { focus:false, persist:false });
+  }
+
+  function resetVoiceDraft(){
+    const state = participationState();
+    state.voiceDraft = defaultVoiceDraft();
+    saveState(state);
+    voiceComposerStep = 1;
+    clearVoiceValidation();
+  }
+
+  function cancelVoiceComposer(){
+    resetVoiceDraft();
+    location.hash = '#voice';
+  }
+
+  function submitVoiceIssue(){
+    if(!validateVoiceCategory()){
+      setVoiceStep(1);
+      return;
+    }
+    if(!validateVoiceDetails()){
+      setVoiceStep(2);
+      return;
+    }
+    const state = participationState();
+    const draft = state.voiceDraft;
+    state.voiceSubmissionCounter += 1;
+    const submission = {
+      id:`voice-local-${state.voiceSubmissionCounter}`,
+      category:draft.category,
+      title:draft.title,
+      description:draft.description,
+      submittedAt:new Date().toISOString(),
+      status:'Submitted'
+    };
+    state.voiceSubmissions.unshift(submission);
+    state.voiceLastSubmissionId = submission.id;
+    state.voiceDraft = defaultVoiceDraft();
+    saveState(state);
+    setVoiceStep(4);
+  }
+
+  function requestVoiceComposer(trigger){
+    const gate = resolveParticipation(participationState(), 'voice');
+    if(gate){
+      openParticipationGate(gate, trigger, { returnTo:VOICE_NEW_RETURN_ROUTE, context:'voice' });
+      return;
+    }
+    pendingVoiceComposerFocus = true;
+    if(location.hash==='#voice-new') showView('voice-new');
+    else location.hash = '#voice-new';
+  }
+
+  function initVoiceComposer(){
+    const form = $('#voiceComposerForm');
+    if(!form) return;
+    form.addEventListener('submit', event=> event.preventDefault());
+    form.querySelectorAll('input[name="voiceCategory"]').forEach(input=>{
+      input.addEventListener('change', ()=>{
+        clearVoiceError('#voiceCategoryError');
+        saveVoiceDraft();
+        updateVoiceCategoryContinue();
+      });
+    });
+    $('#voiceIssueTitle')?.addEventListener('input', ()=>{
+      saveVoiceDraft();
+      if($('#voiceIssueTitle').value.trim()) clearVoiceError('#voiceTitleError', '#voiceIssueTitle');
+    });
+    $('#voiceIssueDescription')?.addEventListener('input', ()=>{
+      saveVoiceDraft();
+      if($('#voiceIssueDescription').value.trim()) clearVoiceError('#voiceDescriptionError', '#voiceIssueDescription');
+    });
+    $('#voiceCategoryContinue')?.addEventListener('click', ()=>{
+      if(validateVoiceCategory()) setVoiceStep(2);
+    });
+    $('#voiceDetailsBack')?.addEventListener('click', ()=> setVoiceStep(1));
+    $('#voiceDetailsContinue')?.addEventListener('click', ()=>{
+      if(validateVoiceDetails()) setVoiceStep(3);
+    });
+    $('#voiceReviewBack')?.addEventListener('click', ()=> setVoiceStep(2));
+    $('#voiceSubmitIssue')?.addEventListener('click', submitVoiceIssue);
+    $('#voiceCategoryCancel')?.addEventListener('click', cancelVoiceComposer);
+    $('#voiceComposerCancelTop')?.addEventListener('click', cancelVoiceComposer);
+    $('#voiceConfirmationBack')?.addEventListener('click', ()=> location.hash = '#voice');
+  }
+
   // Navigation (hash routing)
-  const views = ["home","discover","participate","play","me","verification","notifications","event","opportunity","voice","privacy","sports"];
+  const views = ["home","discover","participate","play","me","verification","notifications","event","opportunity","voice","voice-new","voice-detail","privacy","sports"];
   const primaryTabs = ["home","discover","participate","play","me"];
+  let pendingReturnFocus = false;
+  let pendingVoiceComposerFocus = false;
+  let pendingVoiceDetailFocus = false;
 
   function showView(name){
     const target = views.includes(name) ? name : "home";
@@ -406,6 +1362,8 @@
         }
       }
     });
+    if(target==="voice-new") renderVoiceComposer();
+    if(target==="voice-detail") renderVoiceDetail();
     // bottom nav active
     const primary = primaryTabs.includes(target) ? target : null;
     $$('.nav-item').forEach(a=>{
@@ -431,13 +1389,56 @@
     // scroll top
     window.scrollTo({top:0, behavior:'auto'});
     const main = $('#main');
-    if(main) main.focus({preventScroll:true});
+    if(target==="participate" && pendingReturnFocus){
+      pendingReturnFocus = false;
+      setTimeout(()=>{
+        const pollHeading = $('#pollQuestion');
+        if(!pollHeading) return;
+        pollHeading.focus({preventScroll:true});
+        pollHeading.scrollIntoView({block:"start", behavior:"auto"});
+      }, 60);
+    } else if(target==="voice-new" && pendingVoiceComposerFocus){
+      pendingVoiceComposerFocus = false;
+      setTimeout(focusVoiceStepHeading, 60);
+    } else if(target==="voice-detail" && pendingVoiceDetailFocus){
+      pendingVoiceDetailFocus = false;
+      setTimeout(focusVoiceDetailTitle, 60);
+    } else if(main) {
+      main.focus({preventScroll:true});
+    }
 
     // analytics-like: no op
   }
 
   function handleHash(){
     const h = location.hash.replace('#','').trim().toLowerCase() || 'home';
+    if(h==="voice-detail" || h.startsWith(VOICE_DETAIL_ROUTE_PREFIX)){
+      let issueId = h.slice(VOICE_DETAIL_ROUTE_PREFIX.length) || participationState().selectedVoiceIssueId;
+      try{ issueId = decodeURIComponent(issueId); }catch(e){ issueId = 'v1'; }
+      if(!selectVoiceIssue(issueId)){
+        history.replaceState(null, '', '#voice');
+        showView('voice');
+        return;
+      }
+      pendingVoiceDetailFocus = true;
+      showView('voice-detail');
+      return;
+    }
+    if(h==="voice-new"){
+      const gate = resolveParticipation(participationState(), 'voice');
+      if(gate){
+        history.replaceState(null, '', '#participate');
+        showView('participate');
+        setTimeout(()=>{
+          openParticipationGate(gate, $('#voiceNewBtn') || document.body, {
+            returnTo:VOICE_NEW_RETURN_ROUTE,
+            context:'voice'
+          });
+        }, 0);
+        return;
+      }
+      pendingVoiceComposerFocus = true;
+    }
     showView(h);
   }
 
@@ -676,34 +1677,59 @@
         localStorage.removeItem('campushub:state');
         // reset in-memory demo state
         D.student.xp = 340;
-        D.student.assurance = "L2 — Roster Match";
-        D.student.assuranceLevel = 2;
         D.voiceIssues[0].supporters = 124;
         D.notifications.forEach((n,i)=> n.unread = i<2);
+        const state = participationState();
+        saveState(state);
+        syncStudentTrustState(state);
         hydrateTenant();
         renderQuiz();
         renderSaves();
         renderVoiceLists();
+        renderVoiceComposer();
+        renderVoiceDetail();
         renderNotifications();
-        // reset poll UI
-        const pollForm = $('#pollForm');
-        if(pollForm){
-          pollForm.querySelectorAll('input').forEach(i=>{ i.disabled=false; i.checked=false; });
-          const btn = $('#submitPoll');
-          if(btn){ btn.disabled=true; btn.textContent='Submit response'; }
-          const succ = $('#pollSuccess');
-          if(succ) succ.hidden=true;
-        }
+        renderPollState();
+        syncVerificationUi();
+        updateParticipationDemoControls();
+        const success = $('#verificationSuccess');
+        if(success) success.hidden = true;
         toast('Demo state reset.');
       },
       resetQuiz(){
-        const s = loadState(); s.quizDone=false; s.quizChoice=null; saveState(s); renderQuiz(); toast('Quiz reset (debug).');
+        const s = participationState(); s.quizDone=false; s.quizChoice=null; saveState(s); renderQuiz(); toast('Quiz reset (debug).');
       },
       resetPoll(){
-        const s = loadState(); s.pollDone=false; s.pollChoice=null; saveState(s); location.reload();
+        const s = participationState(); s.pollDone=false; s.pollChoice=null; saveState(s); location.reload();
+      },
+      resetVoiceDraft(){
+        resetVoiceDraft();
+        if(location.hash==='#voice-new') renderVoiceComposer();
+        toast('Student Voice draft reset (debug).');
+      },
+      setScenario(name){
+        if(name==='voice-canonical' || D.voiceStatusScenarios?.[name]){
+          applyVoiceStatusScenario(name, true);
+          return;
+        }
+        applyParticipationScenario(name, true);
+      },
+      setVoiceStatusScenario(name){
+        applyVoiceStatusScenario(name, true);
+      },
+      setParticipationScenario(name){
+        applyParticipationScenario(name, true);
       }
     };
     if(debugEnabled){
+      const voiceScenario = document.createElement('select');
+      voiceScenario.id = 'debugVoiceScenario';
+      voiceScenario.setAttribute('aria-label', 'Debug Student Voice status scenario');
+      voiceScenario.style.cssText = 'position:fixed; bottom:126px; left:50%; transform:translateX(-50%); z-index:100; max-width:calc(100% - 28px); background:#0f1a13; color:#fff; border:1px solid rgba(255,255,255,.25); border-radius:999px; padding:8px 12px; font-size:12px; font-weight:700; cursor:pointer;';
+      voiceScenario.innerHTML = '<option value="voice-canonical">Voice: Acknowledged</option><option value="voice-under-review">Voice: Under Review</option><option value="voice-action-planned">Voice: Action Planned</option><option value="voice-resolved">Voice: Resolved</option>';
+      voiceScenario.value = participationState().voiceStatusScenario || 'voice-canonical';
+      voiceScenario.addEventListener('change', event=> window.CampusHubDebug.setScenario(event.currentTarget.value));
+      document.body.appendChild(voiceScenario);
       const badge = document.createElement('button');
       badge.textContent = 'Debug: Reset demo';
       badge.style.cssText = 'position:fixed; bottom:80px; left:50%; transform:translateX(-50%); z-index:100; background:#0f1a13; color:#fff; border:0; border-radius:999px; padding:8px 14px; font-size:12px; font-weight:700; cursor:pointer; box-shadow:0 4px 12px rgba(0,0,0,.2);';
@@ -715,6 +1741,9 @@
 
   // Init
   document.addEventListener('DOMContentLoaded', ()=>{
+    const initialParticipationState = participationState();
+    saveState(initialParticipationState);
+    syncStudentTrustState(initialParticipationState);
     hydrateTenant();
     renderDiscover("All","");
     renderVoiceLists();
@@ -725,10 +1754,13 @@
     initPoll();
     initSearch();
     initParticipateTabs();
+    initVoiceComposer();
+    initVoiceDetail();
     initSavesToggles();
     initRSVP();
     initBack();
     initImageFallbacks();
+    initParticipationGate();
     initDebug();
 
     // Notif bell -> notifications view
@@ -746,20 +1778,26 @@
     }));
 
     // L3 handler
-    $('#toL3')?.addEventListener('click', ()=>{
+    $('#toL3')?.addEventListener('click', event=>{
+      const button = event.currentTarget;
+      const state = participationState();
+      if(state.membership.assuranceLevel!==2) return;
+      button.disabled = true;
       toast("Code sent to your roster email — enter it to reach L3 (demo).");
       setTimeout(()=>{
-        D.student.assurance = "L3 — Strong Institutional Proof";
-        D.student.assuranceLevel = 3;
+        const updated = participationState();
+        updated.membership.assuranceLevel = 3;
+        saveState(updated);
+        syncStudentTrustState(updated);
         hydrateTenant();
+        syncVerificationUi();
         toast("Verified — now L3. High-integrity polls unlocked.");
       }, 900);
     });
 
-    // Voice new
-    $('#voiceNewBtn')?.addEventListener('click', ()=>{
-      toast("Student Voice submission — reviewed before publication. Category required.");
-    });
+    // Student Voice entry points reuse the existing participation-gate decision path.
+    $('#voiceNewBtn')?.addEventListener('click', event=> requestVoiceComposer(event.currentTarget));
+    $('#voiceListNewBtn')?.addEventListener('click', event=> requestVoiceComposer(event.currentTarget));
 
     // handle initial hash
     if(location.hash) handleHash(); else showView('home');

@@ -91,6 +91,7 @@ body {
 img { max-width: 100%; display: block; }
 a { color: inherit; }
 button, input { font: inherit; }
+[hidden] { display: none !important; }
 
 /* accessibility */
 :focus-visible { outline: none; box-shadow: var(--focus-ring); border-color: var(--focus) !important; }

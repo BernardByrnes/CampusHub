@@ -214,7 +214,7 @@
         <div id="pane-polls" style="margin-top:12px;">
           <article class="card poll-card card-pad" id="pollCard" aria-labelledby="pollQuestion">
             <div class="kicker">Non-binding student sentiment poll</div>
-            <h2 id="pollQuestion" class="title" style="margin:8px 0 6px; font-size:18px; line-height:1.3;">How would you rate the cleanliness of public restrooms on campus?</h2>
+            <h2 id="pollQuestion" class="title" tabindex="-1" style="margin:8px 0 6px; font-size:18px; line-height:1.3;">How would you rate the cleanliness of public restrooms on campus?</h2>
             <p class="body-sm" style="margin:0;">Your feedback helps the Guild advocate for improvements.</p>
 
             <form id="pollForm" class="poll-options" aria-describedby="pollPrivacy">
@@ -248,6 +248,23 @@
               <a href="#voice" class="section-action" style="white-space:nowrap;">View all →</a>
             </div>
           </div>
+
+          <details class="prototype-controls" id="participationDemoControls">
+            <summary>Prototype test state <span aria-hidden="true">›</span></summary>
+            <div class="prototype-controls__body">
+              <label class="prototype-controls__label" for="participationDemoState">Participation scenario</label>
+              <select id="participationDemoState" class="prototype-controls__select">
+                <option value="assurance">L1 — Roster Match required</option>
+                <option value="eligible">Eligible L2 experience</option>
+                <option value="membership">Membership needs refreshing</option>
+                <option value="module">Student Voice unavailable</option>
+                <option value="resource">Poll has closed</option>
+                <option value="audience">Different student group</option>
+              </select>
+              <p id="participationDemoDescription" class="meta" style="margin:8px 0 0;">The primary interruption-and-return journey.</p>
+              <button id="resetParticipationDemo" class="btn btn--small" type="button" style="margin-top:10px;">Reset primary journey</button>
+            </div>
+          </details>
         </div>
 
         <!-- Voice pane -->
@@ -423,13 +440,18 @@
           <div><h1 class="view-title" style="font-size:18px;">Verification &amp; membership</h1><p class="view-sub" style="margin-top:2px;">Honest assurance — evidence, not aspiration.</p></div>
         </div>
 
-        <article class="card card-pad" style="background:#f6faf7; border-color:#cfe3d4;">
-          <div class="kicker">Current assurance</div>
+        <article class="card card-pad" id="verificationStatusCard" style="background:#f6faf7; border-color:#cfe3d4;">
+          <div class="kicker" id="verificationStatusKicker">Current assurance</div>
           <div style="margin-top:6px; font-size:18px; font-weight:800; color: var(--brand);" data-field="assuranceTitle">L2 — Roster Match</div>
-          <p class="body-sm">Your details match an approved university roster. A roster match alone does not prove identity where student numbers and surnames are guessable.</p>
-          <div class="progress" style="margin-top:10px;"><div class="progress-bar" style="width:55%;"></div></div>
-          <div class="meta" style="margin-top:6px; display:flex; justify-content:space-between;"><span>L0</span><span style="font-weight:700; color: var(--brand);">L2</span><span>L3</span></div>
+          <p class="body-sm" id="verificationStatusDescription">Your details match an approved university roster. A roster match alone does not prove identity where student numbers and surnames are guessable.</p>
+          <div class="progress" style="margin-top:10px;"><div class="progress-bar" id="assuranceProgressBar" style="width:55%;"></div></div>
+          <div class="meta" style="margin-top:6px; display:flex; justify-content:space-between;"><span>L0</span><span id="assuranceProgressCurrent" style="font-weight:700; color: var(--brand);">L2</span><span>L3</span></div>
         </article>
+
+        <div id="verificationSuccess" class="verification-success" hidden role="status" aria-live="polite" tabindex="-1">
+          <strong>Student status confirmed.</strong>
+          <span id="verificationSuccessDetail">Your university membership now matches the current student roster.</span>
+        </div>
 
         <div class="timeline" style="margin-top:10px;">
           <div class="tier tier--active">
@@ -437,23 +459,29 @@
             <div><h3 class="tier-title">L0 — Registered</h3><p class="tier-desc">Authenticated account. Completed.</p></div>
             <span class="pill pill--brand" style="margin-left:auto; align-self:center;">Done</span>
           </div>
-          <div class="tier">
-            <div class="tier-badge">1</div>
+          <div class="tier" id="verificationTierL1">
+            <div class="tier-badge" data-tier-badge="1">1</div>
             <div><h3 class="tier-title">L1 — Weak Affiliation</h3><p class="tier-desc">Campus invite code or self-declared info. Not sufficient for polls or Voice.</p></div>
+            <span class="pill pill--brand" data-tier-current="1" style="margin-left:auto; align-self:center;" hidden>You are here</span>
           </div>
-          <div class="tier tier--active">
-            <div class="tier-badge">✓</div>
+          <div class="tier tier--active" id="verificationTierL2">
+            <div class="tier-badge" data-tier-badge="2">✓</div>
             <div><h3 class="tier-title">L2 — Roster Match</h3><p class="tier-desc">You are on the current university roster. You can respond to polls (where L2 is permitted) and use Student Voice.</p></div>
-            <span class="pill pill--brand" style="margin-left:auto; align-self:center;">You are here</span>
+            <div style="margin-left:auto; align-self:center; text-align:right;">
+              <span class="pill pill--brand" data-tier-current="2">You are here</span>
+              <button id="startRosterMatch" class="btn btn--primary btn--small" type="button" hidden>Match my student record</button>
+              <p id="rosterMatchHelp" class="meta" hidden style="margin:6px 0 0; max-width:190px; font-size:11px;">We will check your current enrolment against the university roster.</p>
+            </div>
           </div>
-          <div class="tier">
-            <div class="tier-badge">3</div>
+          <div class="tier" id="verificationTierL3">
+            <div class="tier-badge" data-tier-badge="3">3</div>
             <div>
               <h3 class="tier-title">L3 — Strong Institutional Proof</h3>
               <p class="tier-desc">Roster match plus OTP to a roster-supplied contact, or institutional identity tied to current enrolment. Required for high-integrity polls.</p>
               <button id="toL3" class="btn btn--primary btn--small" style="margin-top:8px;">Strengthen to L3</button>
               <p class="meta" style="margin-top:6px; font-size:11px;">We will send a code to the email/phone your university supplied on the roster.</p>
             </div>
+            <span class="pill pill--brand" data-tier-current="3" style="margin-left:auto; align-self:center;" hidden>You are here</span>
           </div>
         </div>
 
@@ -609,14 +637,164 @@
         <div class="card card-pad" style="background:#f0f7ff; border-color:#c9ddf1;">
           <p class="body-sm" style="margin:0;">Student Voice submissions are reviewed before publication and must stay within the permitted campus issue categories. Your identity is visible only to authorised handlers and is not shared publicly.</p>
         </div>
+        <button id="voiceListNewBtn" class="btn btn--primary" type="button" style="width:100%; margin-top:10px;">Submit a new issue</button>
         <div id="voiceAllList" class="stack-8" style="margin-top:10px;"></div>
         <div class="card card-pad" style="margin-top:10px;">
-          <h3 class="section-title" style="font-size:12px;"> permitted categories</h3>
+          <h3 class="section-title" style="font-size:12px;">Permitted categories</h3>
           <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;">
-            <span class="pill">Water &amp; Sanitation</span><span class="pill">Transport</span><span class="pill">Wi-Fi</span><span class="pill">Library</span><span class="pill">Lighting</span><span class="pill">Campus facilities</span>
+            <span class="pill">Wi-Fi</span><span class="pill">Water &amp; Sanitation</span><span class="pill">Facilities</span><span class="pill">Lighting</span><span class="pill">Library</span><span class="pill">Transport</span><span class="pill">Academic Facilities</span><span class="pill">Campus Services</span>
           </div>
-          
         </div>
+      </section>
+
+      <!-- STUDENT VOICE: NEW ISSUE -->
+      <section id="view-voice-new" data-view="voice-new" class="view" role="tabpanel" aria-label="Raise a campus issue" hidden>
+        <div class="view-head voice-composer-head" style="display:flex; align-items:center; gap:10px;">
+          <button class="icon-btn" id="voiceComposerCancelTop" type="button" aria-label="Cancel new issue" style="width:36px; height:36px;">‹</button>
+          <div><div class="view-title" style="font-size:18px;">Student Voice</div><p class="view-sub" style="margin-top:2px;">A structured route for everyday campus-service issues.</p></div>
+        </div>
+
+        <form id="voiceComposerForm" novalidate>
+          <ol class="voice-stepper" id="voiceStepper" aria-label="Issue submission progress">
+            <li class="voice-stepper__step is-current" data-voice-progress="1"><span class="voice-stepper__number">1</span><span>Category</span></li>
+            <li class="voice-stepper__step" data-voice-progress="2"><span class="voice-stepper__number">2</span><span>Details</span></li>
+            <li class="voice-stepper__step" data-voice-progress="3"><span class="voice-stepper__number">3</span><span>Review</span></li>
+          </ol>
+
+          <p class="sr-only" id="voiceComposerStatus" aria-live="polite"></p>
+
+          <section class="voice-composer-panel" id="voiceStepCategory" aria-labelledby="voiceCategoryHeading">
+            <div class="kicker kicker--info">Step 1 of 3</div>
+            <h1 class="voice-composer-title" id="voiceCategoryHeading" tabindex="-1">Raise a campus issue</h1>
+            <p class="body-sm voice-composer-intro">Choose the area that best matches the issue you want to raise.</p>
+
+            <fieldset class="voice-category-fieldset" aria-describedby="voiceCategoryHelp voiceCategoryError">
+              <legend class="sr-only">Choose an issue category</legend>
+              <p class="voice-field-help" id="voiceCategoryHelp">Select one permitted campus issue category.</p>
+              <div class="voice-category-grid">
+                <label class="voice-category"><input type="radio" name="voiceCategory" value="Wi-Fi" /><span>Wi-Fi</span></label>
+                <label class="voice-category"><input type="radio" name="voiceCategory" value="Water &amp; Sanitation" /><span>Water &amp; Sanitation</span></label>
+                <label class="voice-category"><input type="radio" name="voiceCategory" value="Facilities" /><span>Facilities</span></label>
+                <label class="voice-category"><input type="radio" name="voiceCategory" value="Lighting" /><span>Lighting</span></label>
+                <label class="voice-category"><input type="radio" name="voiceCategory" value="Library" /><span>Library</span></label>
+                <label class="voice-category"><input type="radio" name="voiceCategory" value="Transport" /><span>Transport</span></label>
+                <label class="voice-category"><input type="radio" name="voiceCategory" value="Academic Facilities" /><span>Academic Facilities</span></label>
+                <label class="voice-category"><input type="radio" name="voiceCategory" value="Campus Services" /><span>Campus Services</span></label>
+              </div>
+            </fieldset>
+            <p class="voice-validation" id="voiceCategoryError" role="alert" hidden></p>
+            <div class="voice-composer-actions">
+              <button class="btn" id="voiceCategoryCancel" type="button">Cancel</button>
+              <button class="btn btn--primary" id="voiceCategoryContinue" type="button" disabled>Continue</button>
+            </div>
+          </section>
+
+          <section class="voice-composer-panel" id="voiceStepDetails" aria-labelledby="voiceDetailsHeading" hidden>
+            <div class="kicker kicker--info">Step 2 of 3</div>
+            <h1 class="voice-composer-title" id="voiceDetailsHeading" tabindex="-1">Issue details</h1>
+            <p class="body-sm voice-composer-intro">Keep the information factual and focused on the campus issue.</p>
+
+            <div class="voice-field">
+              <label class="voice-field-label" for="voiceIssueTitle">Issue title</label>
+              <input class="voice-field-input" id="voiceIssueTitle" name="voiceIssueTitle" type="text" maxlength="120" autocomplete="off" aria-describedby="voiceIssueTitleHelp voiceTitleError" placeholder="Water supply frequently unavailable in Lumumba Hall" />
+              <p class="voice-field-help" id="voiceIssueTitleHelp">A short, clear summary of the issue.</p>
+              <p class="voice-validation" id="voiceTitleError" role="alert" hidden></p>
+            </div>
+
+            <div class="voice-field">
+              <label class="voice-field-label" for="voiceIssueDescription">Describe the issue</label>
+              <textarea class="voice-field-input voice-field-input--textarea" id="voiceIssueDescription" name="voiceIssueDescription" rows="6" maxlength="1000" aria-describedby="voiceIssueDescriptionHelp voiceDescriptionError" placeholder="Describe what is happening, where it is happening and how it affects students."></textarea>
+              <p class="voice-field-help" id="voiceIssueDescriptionHelp">Describe what is happening, where it is happening and how it affects students.</p>
+              <p class="voice-validation" id="voiceDescriptionError" role="alert" hidden></p>
+            </div>
+
+            <aside class="voice-guidance" aria-label="Student Voice guidance">
+              <strong>Helpful guidance</strong>
+              <p>Do not include allegations about named individuals or urgent safety matters. Student Voice is for campus services and facilities issues. For urgent safety or personal-support concerns, use the appropriate university or emergency support channel.</p>
+            </aside>
+
+            <div class="voice-composer-actions">
+              <button class="btn" id="voiceDetailsBack" type="button">Back</button>
+              <button class="btn btn--primary" id="voiceDetailsContinue" type="button">Continue to review</button>
+            </div>
+          </section>
+
+          <section class="voice-composer-panel" id="voiceStepReview" aria-labelledby="voiceReviewHeading" hidden>
+            <div class="kicker kicker--info">Step 3 of 3</div>
+            <h1 class="voice-composer-title" id="voiceReviewHeading" tabindex="-1">Review and submit</h1>
+            <p class="body-sm voice-composer-intro">Check your issue before sending it for review.</p>
+
+            <dl class="voice-review" aria-label="Issue review summary">
+              <div class="voice-review__row"><dt>Category</dt><dd id="voiceReviewCategory"></dd></div>
+              <div class="voice-review__row"><dt>Issue</dt><dd id="voiceReviewTitle"></dd></div>
+              <div class="voice-review__row"><dt>Details</dt><dd id="voiceReviewDescription"></dd></div>
+            </dl>
+
+            <aside class="voice-identity-disclosure" aria-label="Identity and privacy">
+              <div class="kicker kicker--info">Identity &amp; privacy</div>
+              <p><strong>Your identity is not shown publicly.</strong></p>
+              <p>Other students will not see who submitted this issue. Your identity may be accessed only by authorised CampusHub identity handlers when required for moderation, safety or accountability, and that access is recorded.</p>
+              <p>Normal University/Guild Student Voice views do not reveal your identity.</p>
+            </aside>
+
+            <p class="voice-review-note">Student Voice submissions are reviewed before publication and must stay within the permitted campus issue categories.</p>
+            <div class="voice-composer-actions">
+              <button class="btn" id="voiceReviewBack" type="button">Back to edit</button>
+              <button class="btn btn--primary" id="voiceSubmitIssue" type="button">Submit issue</button>
+            </div>
+          </section>
+
+          <section class="voice-composer-panel voice-confirmation" id="voiceStepConfirmation" aria-labelledby="voiceConfirmationHeading" hidden>
+            <div class="voice-confirmation__icon" aria-hidden="true">✓</div>
+            <div class="kicker">Issue submitted</div>
+            <h1 class="voice-composer-title" id="voiceConfirmationHeading" tabindex="-1">Your issue has been submitted for review.</h1>
+            <p class="body-sm voice-composer-intro">Student Voice submissions are reviewed before publication.</p>
+            <div class="voice-confirmation__status">
+              <span>Status</span>
+              <strong class="status-chip chip-submitted" id="voiceConfirmationStatus">Submitted</strong>
+            </div>
+            <button class="btn btn--primary" id="voiceConfirmationBack" type="button">Back to Student Voice</button>
+          </section>
+        </form>
+      </section>
+
+      <!-- STUDENT VOICE: ISSUE DETAIL -->
+      <section id="view-voice-detail" data-view="voice-detail" class="view" role="tabpanel" aria-label="Student Voice issue detail" hidden>
+        <div class="view-head" style="display:flex; align-items:center; gap:10px;">
+          <button class="icon-btn" id="voiceDetailBack" type="button" aria-label="Back to Student Voice" style="width:36px; height:36px;">‹</button>
+          <div><div class="view-title" style="font-size:18px;">Student Voice</div><p class="view-sub" style="margin-top:2px;">Public issue status and updates.</p></div>
+        </div>
+
+        <article class="card card-pad voice-detail-summary" aria-labelledby="voiceDetailTitle">
+          <div class="kicker kicker--info" id="voiceDetailKicker">Student Voice</div>
+          <p class="voice-detail-category" id="voiceDetailCategory"></p>
+          <h1 class="voice-detail-title" id="voiceDetailTitle" tabindex="-1"></h1>
+          <p class="body-sm voice-detail-description" id="voiceDetailDescription"></p>
+
+          <div class="voice-detail-overview">
+            <div class="voice-detail-supporters"><strong id="voiceDetailSupporterCount"></strong><span>supporters</span></div>
+            <span class="status-chip" id="voiceDetailStatus"></span>
+          </div>
+          <div class="voice-detail-submitted"><span>Submitted</span><time id="voiceDetailSubmitted"></time></div>
+          <p class="voice-detail-awaiting" id="voiceDetailAwaiting" hidden>Awaiting review</p>
+          <p class="voice-detail-privacy">Submitter identity is not shown publicly.</p>
+
+          <div class="voice-detail-support-action" id="voiceDetailSupportAction">
+            <button class="btn btn--primary" id="voiceSupportButton" type="button">Support this issue</button>
+            <p class="voice-detail-support-feedback" id="voiceSupportFeedback" aria-live="polite"></p>
+          </div>
+          <p class="voice-detail-resolved-note" id="voiceResolvedSupportNote" hidden>No new support action required.</p>
+        </article>
+
+        <section class="voice-detail-section" aria-labelledby="voiceHistoryHeading">
+          <div class="section-head"><h2 class="section-title" id="voiceHistoryHeading">Status history</h2></div>
+          <ol class="voice-timeline" id="voiceTimeline"></ol>
+        </section>
+
+        <section class="voice-detail-section" id="voiceOfficialUpdatesSection" aria-labelledby="voiceOfficialUpdatesHeading" hidden>
+          <div class="section-head"><h2 class="section-title" id="voiceOfficialUpdatesHeading">Official updates</h2></div>
+          <div class="voice-official-updates" id="voiceOfficialUpdates"></div>
+        </section>
       </section>
 
       <!-- PRIVACY -->
@@ -660,6 +838,33 @@
       </section>
 
     </main>
+
+    <dialog class="participation-gate" id="participationGate" aria-labelledby="participationGateTitle" aria-describedby="participationGateReason participationGateState">
+      <div class="participation-gate__panel">
+        <div class="participation-gate__status" aria-hidden="true">i</div>
+        <div class="participation-gate__content">
+          <div class="kicker kicker--info" id="participationGateKicker">Participation requirement</div>
+          <h2 class="participation-gate__title" id="participationGateTitle">Verify your student status</h2>
+          <p class="body-sm participation-gate__reason" id="participationGateReason"></p>
+        </div>
+
+        <div class="participation-gate__state" id="participationGateState">
+          <div id="participationGateCurrentRow">
+            <span class="participation-gate__state-label" id="participationGateCurrentLabel">Your current status</span>
+            <strong id="participationGateCurrentValue">L1 — Weak Affiliation</strong>
+          </div>
+          <div id="participationGateRequiredRow">
+            <span class="participation-gate__state-label" id="participationGateRequiredLabel">Required</span>
+            <strong id="participationGateRequiredValue">L2 — Roster Match</strong>
+          </div>
+        </div>
+
+        <div class="participation-gate__actions">
+          <button class="btn btn--primary" id="participationGatePrimary" type="button">Verify student status</button>
+          <button class="btn" id="participationGateSecondary" type="button">Not now</button>
+        </div>
+      </div>
+    </dialog>
 
     <!-- Bottom Nav -->
     <nav class="bottom-nav" aria-label="Primary">
