@@ -48,16 +48,35 @@ window.CampusHubDemo = {
     href: "#notifications"
   },
 
-  heroStory: {
-    id: "innovation-week",
-    kicker: "Innovation Week",
-    title: "Makerere Innovation Week opens Monday",
-    body: "32 student teams will showcase projects across Main Campus. Exhibitions run 09:00 — 17:00 in Freedom Square.",
-    image: "assets/images/hero-innovation.webp",
-    imageAlt: "Students collaborating on a campus project",
-    cta: "Read story",
-    href: "#discover"
-  },
+  publications: [
+    {
+      id: "innovation-week",
+      kicker: "Innovation Week",
+      title: "Makerere Innovation Week opens Monday",
+      excerpt: "32 student teams will showcase projects across Main Campus.",
+      body: "32 student teams will showcase projects across Main Campus.\n\nExhibitions run 09:00 — 17:00 in Freedom Square.",
+      date: "25 May 2026",
+      source: "CampusHub editorial",
+      image: "assets/images/hero-innovation.webp",
+      imageAlt: "Students collaborating on a campus project",
+      visibility: "MEMBERS",
+      cta: "Read story",
+      href: "#news/innovation-week"
+    },
+    {
+      id: "cocis-innovation-lab",
+      kicker: "Campus Story",
+      title: "New Innovation Lab Opens at CoCIS",
+      excerpt: "The College of Computing and Information Sciences launches a state-of-the-art innovation lab.",
+      body: "The College of Computing and Information Sciences launches a state-of-the-art innovation lab.\n\nThe new space strengthens the college's support for student innovation on campus.",
+      date: "19 May 2026",
+      source: "CoCIS",
+      image: "assets/images/campus-cocis.webp",
+      imageAlt: "Modern academic building with glass facade",
+      visibility: "MEMBERS",
+      href: "#news/cocis-innovation-lab"
+    }
+  ],
 
   sportsResult: {
     id: "mubs-mak",
@@ -106,18 +125,6 @@ window.CampusHubDemo = {
     description: "Join leading researchers, Guild leaders and student innovators for a debate on AI opportunities, ethics and skills for Africa's next decade.",
     rsvpState: null, // 'going' | 'interested' | null
     href: "#events/guild-debate"
-  },
-
-  campusStory: {
-    id: "cocis-innovation-lab",
-    kicker: "Campus Story",
-    title: "New Innovation Lab Opens at CoCIS",
-    body: "The College of Computing and Information Sciences launches a state-of-the-art innovation lab.",
-    date: "19 May 2026",
-    source: "CoCIS",
-    image: "assets/images/campus-cocis.webp",
-    imageAlt: "Modern academic building with glass facade",
-    href: "#discover"
   },
 
   poll: {
@@ -351,12 +358,20 @@ window.CampusHubDemo = {
   discoverItems: [] // populated at runtime from other entities
 };
 
+// Compatibility aliases keep existing Home/Discover consumers on the same records.
+(function(){
+  const d = window.CampusHubDemo;
+  const publicationById = id => d.publications.find(publication => publication.id === id);
+  d.heroStory = publicationById("innovation-week");
+  d.campusStory = publicationById("cocis-innovation-lab");
+})();
+
 // Build discoverItems index
 (function(){
   const d = window.CampusHubDemo;
   d.discoverItems = [
     { id:d.featuredEvent.id, kind:"Events", kicker:"Upcoming Event", title:d.featuredEvent.title, meta:`${d.featuredEvent.date} • ${d.featuredEvent.time}`, venue:d.featuredEvent.venue, image:d.featuredEvent.image, imageAlt:d.featuredEvent.imageAlt, href:d.featuredEvent.href },
-    { id:d.campusStory.id, kind:"News", kicker:"Campus Story", title:d.campusStory.title, body:d.campusStory.body, meta:`${d.campusStory.date} • ${d.campusStory.source}`, image:d.campusStory.image, imageAlt:d.campusStory.imageAlt, href:"#discover" },
+    { id:d.campusStory.id, kind:"News", kicker:d.campusStory.kicker, title:d.campusStory.title, body:d.campusStory.excerpt, meta:`${d.campusStory.date} • ${d.campusStory.source}`, image:d.campusStory.image, imageAlt:d.campusStory.imageAlt, href:d.campusStory.href },
     { id:d.opportunity.id, kind:"Opportunities", kicker:"Verified Opportunity", title:d.opportunity.title, provider:d.opportunity.provider, body:d.opportunity.summary, deadline:d.opportunity.deadline, href:d.opportunity.href, verified:true },
     { id:d.sportsResult.id, kind:"Sports", kicker:"Sports Result", title:`${d.sportsResult.homeTeam} ${d.sportsResult.homeScore} — ${d.sportsResult.awayScore} ${d.sportsResult.awayTeam}`, provider:`${d.sportsResult.sport} • ${d.sportsResult.competition}`, meta:`${d.sportsResult.date} • ${d.sportsResult.status}`, href:d.sportsResult.href, isResult:true, score:`${d.sportsResult.homeScore} — ${d.sportsResult.awayScore}` }
   ];

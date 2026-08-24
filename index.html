@@ -87,7 +87,7 @@
               <span class="hero-kicker" data-field="heroKicker">Innovation Week</span>
               <h2 class="hero-title" data-field="heroTitle">Makerere Innovation Week opens Monday</h2>
               <p class="hero-desc" data-field="heroBody">32 student teams will showcase projects across Main Campus. Exhibitions run 09:00 — 17:00 in Freedom Square.</p>
-              <a class="hero-link" href="#discover" data-testid="hero-read">Read story <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></a>
+              <a class="hero-link" href="#news/innovation-week" data-testid="hero-read">Read story <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></a>
             </div>
           </div>
         </article>
@@ -196,6 +196,30 @@
         </div>
 
         <div id="discoverList" class="stack-10" aria-live="polite"></div>
+      </section>
+
+      <!-- NEWS / PUBLICATION DETAIL -->
+      <section id="view-news" data-view="news" class="view" role="tabpanel" aria-labelledby="newsDetailTitle" hidden>
+        <div class="view-head" style="display:flex; align-items:center; gap:10px;">
+          <button class="icon-btn" data-back aria-label="Back" style="width:36px; height:36px;">‹</button>
+          <div class="view-title" style="font-size:18px;">News</div>
+        </div>
+
+        <article aria-labelledby="newsDetailTitle">
+          <div class="kicker kicker--info" id="newsDetailKicker">Campus Story</div>
+          <h1 id="newsDetailTitle" tabindex="-1" style="margin:6px 0 8px; font-size:24px; font-weight:800; line-height:1.18;"></h1>
+          <div class="meta" style="display:flex; gap:6px; align-items:center;">
+            <time id="newsDetailDate"></time>
+            <span aria-hidden="true">•</span>
+            <span id="newsDetailSource"></span>
+          </div>
+
+          <div class="detail-hero" id="newsDetailMedia" style="margin-top:14px;">
+            <img id="newsDetailImage" src="assets/images/hero-innovation.webp" alt="Students collaborating on a campus project" width="900" height="500" loading="lazy" decoding="async" />
+          </div>
+
+          <div id="newsDetailBody" class="body-sm" style="margin-top:16px; font-size:15px; line-height:1.6; color:var(--text-strong);"></div>
+        </article>
       </section>
 
       <!-- PARTICIPATE -->

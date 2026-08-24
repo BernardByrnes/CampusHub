@@ -16,6 +16,7 @@
     events: { view: "event", parent: "discover", resolve: id => findCanonicalEntity("featuredEvent", id) },
     opportunities: { view: "opportunity", parent: "discover", resolve: id => findCanonicalEntity("opportunity", id) },
     sports: { view: "sports", parent: "discover", resolve: id => findCanonicalEntity("sportsResult", id) },
+    news: { view: "news", parent: "discover", resolve: findPublication },
     "voice-detail": { view: "voice-detail", parent: "participate", resolve: id => D.voiceIssues.find(issue => issue.id.toLowerCase() === id.toLowerCase()) || null }
   });
   const VOICE_CATEGORIES = Object.freeze([
@@ -72,6 +73,11 @@
     const entity = D[key];
     if(!entity || !entityId) return null;
     return entity.id.toLowerCase() === entityId.toLowerCase() ? entity : null;
+  }
+
+  function findPublication(entityId){
+    if(!entityId || !Array.isArray(D.publications)) return null;
+    return D.publications.find(publication => publication.id.toLowerCase() === entityId.toLowerCase()) || null;
   }
 
   function parseHashRoute(hash=location.hash){
@@ -136,6 +142,31 @@
     setEntityField('[data-field="sportsDateLong"]', `${sports.date} • ${sports.status}`);
   }
 
+  function renderPublicationEntity(publication){
+    if(!publication) return;
+    setEntityField('#newsDetailKicker', publication.kicker);
+    setEntityField('#newsDetailTitle', publication.title);
+    setEntityField('#newsDetailDate', publication.date);
+    setEntityField('#newsDetailSource', publication.source);
+
+    const body = $('#newsDetailBody');
+    if(body){
+      const paragraphs = (Array.isArray(publication.body) ? publication.body : String(publication.body || publication.excerpt || "").split(/\n\s*\n/))
+        .map(paragraph => String(paragraph).trim())
+        .filter(Boolean);
+      body.innerHTML = paragraphs.map(paragraph => `<p>${escapeHtml(paragraph)}</p>`).join("");
+    }
+
+    const media = $('#newsDetailMedia');
+    const image = $('#newsDetailImage');
+    if(media) media.hidden = !publication.image;
+    if(image && publication.image){
+      image.src = publication.image;
+      image.alt = publication.imageAlt || "";
+      image.hidden = false;
+    }
+  }
+
   // Populate tenant header
   function hydrateTenant(){
     $('[data-field="tenantCampus"]').textContent = D.tenant.campusLabel;
@@ -150,6 +181,8 @@
     $('[data-field="heroBody"]').textContent = D.heroStory.body;
     $('#heroImg').src = D.heroStory.image;
     $('#heroImg').alt = D.heroStory.imageAlt;
+    const heroLink = $('[data-testid="hero-read"]');
+    if(heroLink) heroLink.href = D.heroStory.href;
     // Entity surfaces share the canonical records used by detail routes.
     renderSportsEntity(D.sportsResult);
     renderOpportunityEntity(D.opportunity);
@@ -229,7 +262,7 @@
               <div class="kicker">${escapeHtml(item.kicker)}</div>
               <div class="title" style="margin-top:6px; font-size:16px;">${escapeHtml(item.title)}</div>
               <p class="body-sm" style="margin:6px 0 0;">${escapeHtml(item.body)}</p>
-              <div class="meta" style="margin-top:8px;">${escapeHtml(item.meta)} <a href="#discover" class="section-action" style="margin-left:8px;">Read more →</a></div>
+              <div class="meta" style="margin-top:8px;">${escapeHtml(item.meta)} <a href="${escapeHtml(item.href)}" class="section-action" style="margin-left:8px;">Read more →</a></div>
             </div>
             <div class="cover" style="width:42%; max-width:170px; flex:0 0 42%;">
               <img src="${item.image}" alt="${escapeHtml(item.imageAlt)}" width="300" height="220" loading="lazy" decoding="async" />
@@ -406,6 +439,13 @@
 
   function focusVoiceDetailTitle(){
     const title = $('#voiceDetailTitle');
+    if(!title) return;
+    title.focus({preventScroll:true});
+    title.scrollIntoView({block:"start", behavior:"auto"});
+  }
+
+  function focusNewsDetailTitle(){
+    const title = $('#newsDetailTitle');
     if(!title) return;
     title.focus({preventScroll:true});
     title.scrollIntoView({block:"start", behavior:"auto"});
@@ -1395,7 +1435,7 @@
   }
 
   // Navigation (hash routing)
-  const views = ["home","discover","participate","play","me","verification","notifications","event","opportunity","voice","voice-new","voice-detail","privacy","sports"];
+  const views = ["home","discover","participate","play","me","verification","notifications","event","opportunity","voice","voice-new","voice-detail","privacy","sports","news"];
   const primaryTabs = ["home","discover","participate","play","me"];
   const parentPrimaryTabs = Object.freeze({
     event: "discover",
@@ -1404,6 +1444,7 @@
     voice: "participate",
     "voice-new": "participate",
     "voice-detail": "participate",
+    news: "discover",
     verification: "me",
     privacy: "me",
     notifications: "home"
@@ -1411,6 +1452,7 @@
   let pendingReturnFocus = false;
   let pendingVoiceComposerFocus = false;
   let pendingVoiceDetailFocus = false;
+  let pendingNewsDetailFocus = false;
 
   function showView(name){
     const target = views.includes(name) ? name : "home";
@@ -1467,6 +1509,9 @@
     } else if(target==="voice-detail" && pendingVoiceDetailFocus){
       pendingVoiceDetailFocus = false;
       setTimeout(focusVoiceDetailTitle, 60);
+    } else if(target==="news" && pendingNewsDetailFocus){
+      pendingNewsDetailFocus = false;
+      setTimeout(focusNewsDetailTitle, 60);
     } else if(main) {
       main.focus({preventScroll:true});
     }
@@ -1495,6 +1540,10 @@
       if(route.definition.view === "event") renderEventEntity(route.entity);
       if(route.definition.view === "opportunity") renderOpportunityEntity(route.entity);
       if(route.definition.view === "sports") renderSportsEntity(route.entity);
+      if(route.definition.view === "news"){
+        renderPublicationEntity(route.entity);
+        pendingNewsDetailFocus = true;
+      }
       if(route.definition.view === "voice-detail"){
         if(!selectVoiceIssue(route.entity.id)){
           history.replaceState(null, "", "#voice");
@@ -1674,6 +1723,7 @@
   // Back buttons
   let historyStack = ["home"];
   function initBack(){
+    historyStack = [location.hash.replace(/^#/, '') || 'home'];
     $$('[data-back]').forEach(b=> b.addEventListener('click', ()=>{
       const prev = historyStack[historyStack.length-2] || 'home';
       location.hash = `#${prev}`;
