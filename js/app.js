@@ -515,7 +515,7 @@
       status.className = `status-chip ${voiceStatusChipClass(selected.status, selected.statusVariant)}`;
     }
 
-    const canSupport = selected.isPublic && selected.status!=="Resolved";
+    const canSupport = selected.isPublic;
     if(supportAction) supportAction.hidden = !canSupport;
     if(supportButton){
       supportButton.disabled = selected.isSupported;
@@ -560,13 +560,12 @@
   function supportSelectedVoiceIssue(trigger){
     const state = participationState();
     const issue = getVoiceIssue(state.selectedVoiceIssueId, state);
-    if(!issue || !issue.isPublic || issue.status==="Resolved" || issue.isSupported) return;
-    const gate = resolveParticipation(state, 'voice');
-    if(gate){
-      openParticipationGate(gate, trigger, {
+    if(!issue || !issue.isPublic || issue.isSupported) return;
+    const decision = evaluateParticipationAction('voice-support', { state, issue });
+    if(openCanonicalParticipationGate(decision, trigger, {
         returnTo:voiceDetailReturnIntent(issue.id),
         context:'voice'
-      });
+      })){
       return;
     }
     state.supportedVoiceIssues.push(issue.id);
@@ -752,8 +751,10 @@
     return {
       tenantLifecycle:"active",
       moduleEnabled:true,
+      pollModuleEnabled:true,
       resourceStatus:"active",
       audienceEligible:true,
+      voiceAudienceEligible: D.demoConfig?.voiceParticipation?.audienceEligible !== false,
       verifiedAttributes:true,
       storyPrerequisites:true,
       returnTo:null,
@@ -824,23 +825,99 @@
     D.student.assurance = assuranceLabel(state.membership.assuranceLevel);
   }
 
-  // One primary actionable reason is selected. Later checks never surface until earlier checks pass.
-  function resolveParticipation(state=participationState(), target="poll"){
-    const p = state.participation;
-    const m = state.membership;
-    if(p.tenantLifecycle!=="active") return "tenant";
-    if(target==="voice" && !p.moduleEnabled) return "module";
-    if(target==="poll" && p.resourceStatus!=="active") return "resource";
-    if(m.status!=="active") return "membership";
-    if(m.assuranceLevel<2) return "assurance";
-    if(target==="poll" && !p.audienceEligible) return "audience";
-    if(!p.verifiedAttributes) return "attributes";
-    if(!p.storyPrerequisites) return "prerequisite";
-    return null;
+  const ASSURANCE_CODES = Object.freeze(["L0", "L1", "L2", "L3"]);
+  const CANONICAL_GATE_PRESENTATION = Object.freeze({
+    "tenant-inactive":"tenant",
+    "module-unavailable":"module",
+    "poll-closed":"resource",
+    "resource-unavailable":"resource",
+    "membership-refresh":"membership",
+    "assurance-required":"assurance",
+    "audience-ineligible":"audience",
+    "attributes-required":"attributes",
+    "prerequisites-unmet":"prerequisite"
+  });
+
+  let lastParticipationDecision = null;
+
+  function cloneParticipationDecision(decision){
+    if(!decision) return null;
+    if(decision.allowed) return { allowed:true };
+    return {
+      allowed:false,
+      reason: { ...decision.reason }
+    };
   }
 
-  function resolvePollParticipation(state=participationState()){
-    return resolveParticipation(state, "poll");
+  function assuranceCode(level){
+    if(!Number.isInteger(level) || level<0 || level>3){
+      throw new TypeError("Invalid prototype assurance level for canonical participation evaluation.");
+    }
+    return ASSURANCE_CODES[level];
+  }
+
+  function requiredAssuranceFor(resourceContext){
+    if(resourceContext==="poll") return D.poll?.requiredAssurance;
+    if(["voice-submission", "voice-support"].includes(resourceContext)){
+      return D.demoConfig?.voiceParticipation?.requiredAssurance;
+    }
+    throw new TypeError(`Unsupported migrated participation context: ${resourceContext}.`);
+  }
+
+  // Adapter only: collect resource facts; the canonical evaluator owns all precedence.
+  function buildCanonicalParticipationInput(resourceContext, state=participationState(), options={}){
+    const p = state.participation;
+    const issue = options.issue || null;
+    let moduleEnabled;
+    let resourceActionable;
+    let audienceEligible;
+
+    if(resourceContext==="poll"){
+      moduleEnabled = p.pollModuleEnabled;
+      resourceActionable = Boolean(D.poll && D.poll.status==="open" && p.resourceStatus==="active");
+      audienceEligible = p.audienceEligible;
+    } else if(resourceContext==="voice-submission"){
+      moduleEnabled = p.moduleEnabled;
+      resourceActionable = true;
+      audienceEligible = p.voiceAudienceEligible;
+    } else if(resourceContext==="voice-support"){
+      moduleEnabled = p.moduleEnabled;
+      resourceActionable = Boolean(issue && issue.isPublic);
+      audienceEligible = p.voiceAudienceEligible;
+    } else {
+      throw new TypeError(`Unsupported migrated participation context: ${resourceContext}.`);
+    }
+
+    return {
+      resourceContext,
+      tenantLifecycle:p.tenantLifecycle,
+      moduleEnabled,
+      resourceActionable,
+      membershipState:state.membership.status,
+      currentAssurance:assuranceCode(state.membership.assuranceLevel),
+      requiredAssurance:requiredAssuranceFor(resourceContext),
+      audienceEligible,
+      verifiedAttributesPresent:p.verifiedAttributes,
+      storyPrerequisitesMet:p.storyPrerequisites
+    };
+  }
+
+  function evaluateParticipationAction(resourceContext, options={}){
+    const state = options.state || participationState();
+    const input = buildCanonicalParticipationInput(resourceContext, state, options);
+    const decision = window.CampusHubParticipation.evaluate(input);
+    lastParticipationDecision = cloneParticipationDecision(decision);
+    return decision;
+  }
+
+  // Presentation compatibility only. This does not decide eligibility.
+  function openCanonicalParticipationGate(decision, trigger, options={}){
+    if(decision?.allowed) return false;
+    const variant = decision?.reason?.variant;
+    const presentationKey = CANONICAL_GATE_PRESENTATION[variant];
+    if(!presentationKey) throw new Error(`No gate presentation mapping for canonical variant: ${variant}.`);
+    openParticipationGate(presentationKey, trigger, options);
+    return true;
   }
 
   function gateCopy(key, state, context="poll"){
@@ -1034,40 +1111,28 @@
     if(!form || !btn) return;
     renderPollState();
 
-    function interruptIfGated(trigger){
-      const gate = resolvePollParticipation();
-      if(!gate) return false;
-      openParticipationGate(gate, trigger);
-      return true;
-    }
-
-    form.addEventListener('click', event=>{
-      if(!event.target.matches('input[type="radio"]')) return;
-      if(interruptIfGated(event.target)) event.preventDefault();
-    });
-    form.addEventListener('keydown', event=>{
-      if(!event.target.matches('input[type="radio"]')) return;
-      if([" ","Spacebar","Enter","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(event.key) && interruptIfGated(event.target)){
-        event.preventDefault();
-      }
-    });
     form.addEventListener('change', event=>{
-      if(interruptIfGated(event.target)){
-        form.querySelectorAll('input').forEach(input=> input.checked=false);
-        return;
-      }
+      if(!event.target.matches('input[type="radio"]')) return;
       btn.disabled = !form.querySelector('input:checked');
     });
 
     btn.addEventListener('click', ()=>{
       const chosen = form.querySelector('input:checked');
       if(!chosen) return;
-      if(interruptIfGated(btn)) return;
+      const decision = evaluateParticipationAction('poll');
+      if(openCanonicalParticipationGate(decision, btn, {
+        returnTo:POLL_RETURN_ROUTE,
+        context:'poll'
+      })) return;
       const idx = parseInt(chosen.value,10);
       btn.disabled = true;
       btn.textContent = "Submitting…";
       setTimeout(()=>{
         const state = participationState();
+        if(state.pollDone){
+          renderPollState();
+          return;
+        }
         state.pollDone = true;
         state.pollChoice = idx;
         const pollXp = Number(D.demoConfig?.xp?.pollParticipation) || 0;
@@ -1415,6 +1480,15 @@
     }
     const state = participationState();
     const draft = state.voiceDraft;
+    const decision = evaluateParticipationAction('voice-submission', { state });
+    if(openCanonicalParticipationGate(decision, $('#voiceSubmitIssue'), {
+      returnTo:VOICE_NEW_RETURN_ROUTE,
+      context:'voice'
+    })){
+      saveVoiceDraft();
+      setVoiceStep(3, { focus:false, persist:true });
+      return;
+    }
     state.voiceSubmissionCounter += 1;
     const submission = {
       id:`voice-local-${state.voiceSubmissionCounter}`,
@@ -1432,9 +1506,8 @@
   }
 
   function requestVoiceComposer(trigger){
-    const gate = resolveParticipation(participationState(), 'voice');
-    if(gate){
-      openParticipationGate(gate, trigger, { returnTo:VOICE_NEW_RETURN_ROUTE, context:'voice' });
+    const decision = evaluateParticipationAction('voice-submission');
+    if(openCanonicalParticipationGate(decision, trigger, { returnTo:VOICE_NEW_RETURN_ROUTE, context:'voice' })){
       return;
     }
     pendingVoiceComposerFocus = true;
@@ -1599,16 +1672,13 @@
 
     const h = route.view || "home";
     if(h==="voice-new"){
-      const gate = resolveParticipation(participationState(), 'voice');
-      if(gate){
+      const decision = evaluateParticipationAction('voice-submission');
+      if(openCanonicalParticipationGate(decision, $('#voiceNewBtn') || document.body, {
+          returnTo:VOICE_NEW_RETURN_ROUTE,
+          context:'voice'
+        })){
         history.replaceState(null, '', '#participate');
         showView('participate');
-        setTimeout(()=>{
-          openParticipationGate(gate, $('#voiceNewBtn') || document.body, {
-            returnTo:VOICE_NEW_RETURN_ROUTE,
-            context:'voice'
-          });
-        }, 0);
         return;
       }
       pendingVoiceComposerFocus = true;
@@ -1879,6 +1949,9 @@
         resetVoiceDraft();
         if(location.hash==='#voice-new') renderVoiceComposer();
         toast('Student Voice draft reset (debug).');
+      },
+      getLastGateDecision(){
+        return cloneParticipationDecision(lastParticipationDecision);
       },
       setScenario(name){
         if(name==='voice-canonical' || D.voiceStatusScenarios?.[name]){

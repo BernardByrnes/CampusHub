@@ -17,6 +17,10 @@ window.CampusHubDemo = {
   demoConfig: {
     xp: {
       pollParticipation: 5
+    },
+    voiceParticipation: {
+      requiredAssurance: "L2",
+      audienceEligible: true
     }
   },
 
@@ -136,6 +140,7 @@ window.CampusHubDemo = {
     closes: "Closes 25 May 2026",
     eligible: true,
     status: "open",
+    requiredAssurance: "L2",
     privacyNote: "Your individual response is private.",
     trustNote: "CampusHub does not provide Guild or university users with a way to see how a named student responded to a poll.",
     hasVoted: false,
