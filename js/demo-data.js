@@ -146,6 +146,7 @@ window.CampusHubDemo = {
     id: "poll-campus-improvements",
     kicker: "Quick Poll",
     title: "What should be improved most around Main Campus?",
+    meta: "Non-binding sentiment poll • Closes 25 May 2026",
     cta: "Respond",
     href: "#participate"
   },

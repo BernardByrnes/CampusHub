@@ -183,6 +183,36 @@
     $('#heroImg').alt = D.heroStory.imageAlt;
     const heroLink = $('[data-testid="hero-read"]');
     if(heroLink) heroLink.href = D.heroStory.href;
+    // Home composition uses the same canonical records as the destination views.
+    const homePoll = D.quickPollForHome;
+    if(homePoll){
+      setEntityField('[data-field="homePollKicker"]', homePoll.kicker);
+      setEntityField('[data-field="homePollTitle"]', homePoll.title);
+      setEntityField('[data-field="homePollMeta"]', homePoll.meta || "Non-binding student sentiment poll");
+      const pollLink = $('#homePoll [data-testid="home-poll-respond"]');
+      if(pollLink){
+        pollLink.href = homePoll.href;
+        pollLink.textContent = homePoll.cta;
+      }
+    }
+    const homeEvent = D.featuredEvent;
+    if(homeEvent){
+      setEntityField('[data-field="homeEventKicker"]', homeEvent.kicker);
+      setEntityField('[data-field="homeEventTitle"]', homeEvent.title);
+      setEntityField('[data-field="homeEventDate"]', `${homeEvent.date} • ${homeEvent.time}`);
+      setEntityField('[data-field="homeEventVenue"]', homeEvent.venue);
+      const eventLink = $('#homeEvent [data-testid="home-event-link"]');
+      if(eventLink) eventLink.href = homeEvent.href;
+    }
+    const homeVoice = D.voiceIssues.find(issue => issue.id === "voice-water-halls") || D.voiceIssues[0];
+    if(homeVoice){
+      setEntityField('[data-field="homeVoiceCategory"]', homeVoice.category);
+      setEntityField('[data-field="homeVoiceTitle"]', homeVoice.title);
+      setEntityField('[data-field="homeVoiceSupporters"]', `${homeVoice.supporters} supporters`);
+      setEntityField('[data-field="homeVoiceStatus"]', homeVoice.status);
+      const voiceLink = $('#homeVoice [data-testid="home-voice-link"]');
+      if(voiceLink) voiceLink.href = `#voice-detail/${encodeURIComponent(homeVoice.id)}`;
+    }
     // Entity surfaces share the canonical records used by detail routes.
     renderSportsEntity(D.sportsResult);
     renderOpportunityEntity(D.opportunity);
@@ -212,6 +242,17 @@
       $('#xpBar').style.width = Math.max(8, Math.min(100, prog)) + '%';
     }
     $('[data-field="quizQ"]').textContent = D.quiz.question;
+    setEntityField('[data-field="homeQuizQuestion"]', D.quiz.question);
+    setEntityField('[data-field="homeQuizXpParticipation"]', `+${D.quiz.xpParticipation || 5} XP`);
+    setEntityField('[data-field="homeQuizXpBonus"]', `+${D.quiz.xpBonus || 5} XP`);
+    setEntityField('[data-field="homeLevel"]', `Level ${D.student.level}`);
+    setEntityField('[data-field="homeXp"]', `${D.student.xp} XP`);
+    setEntityField('[data-field="homeStreak"]', `${D.student.streak} day streak`);
+    const homePlayLink = $('#homePlaySummary [data-testid="home-play-link"]');
+    if(homePlayLink){
+      homePlayLink.href = "#play";
+      homePlayLink.setAttribute("aria-label", `Open Play: Level ${D.student.level}, ${D.student.xp} XP, ${D.student.streak} day streak`);
+    }
   }
 
   // Discover rendering
