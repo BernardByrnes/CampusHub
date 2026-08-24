@@ -20,6 +20,8 @@ Desktop.ini
 # Dependencies, build output, logs, and caches
 node_modules/
 coverage/
+playwright-report/
+test-results/
 .cache/
 .tmp/
 temp/
