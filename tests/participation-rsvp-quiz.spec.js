@@ -6,10 +6,10 @@ async function goTo(page, hash) {
   await page.goto(`/${hash}`);
 }
 
-async function resetDemo(page, scenario = 'eligible') {
+async function resetDemo(page, scenario = null) {
   await page.evaluate(nextScenario => {
     window.CampusHubDebug.resetDemo();
-    window.CampusHubDebug.setParticipationScenario(nextScenario);
+    if(nextScenario) window.CampusHubDebug.setScenario(nextScenario);
   }, scenario);
 }
 
@@ -48,7 +48,7 @@ test.describe('Phase 6C RSVP and Daily Quiz GSC-14 integration', () => {
   });
 
   test('allows mutually exclusive RSVP changes with zero XP', async ({ page }) => {
-    await resetDemo(page, 'eligible');
+    await resetDemo(page);
     await goTo(page, '#events/guild-debate');
     const startingXp = await page.evaluate(() => window.CampusHubDemo.student.xp);
 
@@ -75,7 +75,7 @@ test.describe('Phase 6C RSVP and Daily Quiz GSC-14 integration', () => {
   });
 
   test('gates RSVP on membership refresh without changing RSVP or XP', async ({ page }) => {
-    await resetDemo(page, 'membership');
+    await resetDemo(page, 'membership-refresh');
     await goTo(page, '#events/guild-debate');
     const startingXp = await page.evaluate(() => window.CampusHubDemo.student.xp);
 
@@ -90,7 +90,7 @@ test.describe('Phase 6C RSVP and Daily Quiz GSC-14 integration', () => {
   });
 
   test('returns the first canonical RSVP failure when several facts fail', async ({ page }) => {
-    await resetDemo(page, 'eligible');
+    await resetDemo(page);
     await page.evaluate(key => {
       const state = JSON.parse(localStorage.getItem(key));
       state.membership.status = 'refresh';
@@ -112,7 +112,7 @@ test.describe('Phase 6C RSVP and Daily Quiz GSC-14 integration', () => {
   });
 
   test('keeps RSVP and Daily Quiz available when Voice is disabled', async ({ page }) => {
-    await resetDemo(page, 'module');
+    await resetDemo(page, 'voice-disabled');
     await goTo(page, '#events/guild-debate');
     await page.locator('#rsvpGoing').click();
     await expect(page.locator('#rsvpGoing')).toHaveAttribute('aria-pressed', 'true');
@@ -127,7 +127,7 @@ test.describe('Phase 6C RSVP and Daily Quiz GSC-14 integration', () => {
   });
 
   test('does not inherit Poll audience denial for RSVP or Daily Quiz', async ({ page }) => {
-    await resetDemo(page, 'audience');
+    await resetDemo(page, 'audience-ineligible');
     await goTo(page, '#events/guild-debate');
     await page.locator('#rsvpGoing').click();
     await expect(page.locator('#rsvpGoing')).toHaveAttribute('aria-pressed', 'true');
@@ -141,7 +141,7 @@ test.describe('Phase 6C RSVP and Daily Quiz GSC-14 integration', () => {
   });
 
   test('honors the configured L0 baseline instead of imposing an L2 requirement', async ({ page }) => {
-    await resetDemo(page, 'eligible');
+    await resetDemo(page);
     await page.evaluate(key => {
       const state = JSON.parse(localStorage.getItem(key));
       state.membership.assuranceLevel = 0;
@@ -162,7 +162,7 @@ test.describe('Phase 6C RSVP and Daily Quiz GSC-14 integration', () => {
   });
 
   test('awards correct-answer Quiz XP once and persists completion across reload', async ({ page }) => {
-    await resetDemo(page, 'eligible');
+    await resetDemo(page);
     await goTo(page, '#play');
     const startingXp = await page.evaluate(() => window.CampusHubDemo.student.xp);
 
@@ -191,7 +191,7 @@ test.describe('Phase 6C RSVP and Daily Quiz GSC-14 integration', () => {
   });
 
   test('awards only participation XP for an incorrect Quiz answer and reveals the answer after submit', async ({ page }) => {
-    await resetDemo(page, 'eligible');
+    await resetDemo(page);
     await goTo(page, '#play');
     const startingXp = await page.evaluate(() => window.CampusHubDemo.student.xp);
 
@@ -206,7 +206,7 @@ test.describe('Phase 6C RSVP and Daily Quiz GSC-14 integration', () => {
   });
 
   test('gates Daily Quiz on membership without grading, recording, or awarding XP', async ({ page }) => {
-    await resetDemo(page, 'membership');
+    await resetDemo(page, 'membership-refresh');
     await goTo(page, '#play');
     const startingXp = await page.evaluate(() => window.CampusHubDemo.student.xp);
 
@@ -227,7 +227,7 @@ test.describe('Phase 6C RSVP and Daily Quiz GSC-14 integration', () => {
   });
 
   test('uses tenant-day identity so stale completion does not block the current Quiz', async ({ page }) => {
-    await resetDemo(page, 'eligible');
+    await resetDemo(page);
     await page.evaluate(key => {
       const state = JSON.parse(localStorage.getItem(key));
       state.quizDone = true;
@@ -258,7 +258,7 @@ test.describe('Phase 6C RSVP and Daily Quiz GSC-14 integration', () => {
   });
 
   test('prevents a second same-tenant-day Quiz award after navigation and a stale action', async ({ page }) => {
-    await resetDemo(page, 'eligible');
+    await resetDemo(page);
     await goTo(page, '#play');
     await page.locator('#quizOptions input[value="0"]').check();
     await page.locator('#quizSubmit').click();
@@ -282,7 +282,7 @@ test.describe('Phase 6C RSVP and Daily Quiz GSC-14 integration', () => {
   });
 
   test('keeps Event Detail and Play usable without horizontal overflow at all focused widths', async ({ page }) => {
-    await resetDemo(page, 'eligible');
+    await resetDemo(page);
     for (const viewport of [
       { width:320, height:844 },
       { width:390, height:844 },

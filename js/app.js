@@ -32,44 +32,36 @@
     "Campus Services"
   ]);
 
-  const PARTICIPATION_SCENARIOS = {
-    assurance: {
-      label: "L1 — Roster Match required",
-      description: "The primary interruption-and-return journey.",
+  const CANONICAL_PARTICIPATION_SCENARIOS = Object.freeze({
+    "assurance-required": {
       membership: { assuranceLevel: 1, status: "active" },
-      participation: { moduleEnabled: true, resourceStatus: "active", audienceEligible: true }
+      participation: { resourceStatus: "active", audienceEligible: true, moduleEnabled: true }
     },
-    eligible: {
-      label: "Eligible L2 experience",
-      description: "The unchanged eligible poll experience at L2 — Roster Match.",
-      membership: { assuranceLevel: 2, status: "active" },
-      participation: { moduleEnabled: true, resourceStatus: "active", audienceEligible: true }
-    },
-    membership: {
-      label: "Membership needs refreshing",
-      description: "Membership state is the primary reason, even when assurance is already L2.",
+    "membership-refresh": {
       membership: { assuranceLevel: 2, status: "refresh" },
-      participation: { moduleEnabled: true, resourceStatus: "active", audienceEligible: true }
+      participation: { resourceStatus: "active", audienceEligible: true, moduleEnabled: true }
     },
-    module: {
-      label: "Student Voice unavailable",
-      description: "Open Student Voice and choose “Submit a new issue” to preview this gate; available polls remain usable.",
+    "poll-closed": {
       membership: { assuranceLevel: 2, status: "active" },
-      participation: { moduleEnabled: false, resourceStatus: "active", audienceEligible: true }
+      participation: { resourceStatus: "closed", audienceEligible: true, moduleEnabled: true }
     },
-    resource: {
-      label: "Poll has closed",
-      description: "The resource is no longer actionable, so verification is not suggested.",
+    "audience-ineligible": {
       membership: { assuranceLevel: 2, status: "active" },
-      participation: { moduleEnabled: true, resourceStatus: "closed", audienceEligible: true }
+      participation: { resourceStatus: "active", audienceEligible: false, moduleEnabled: true }
     },
-    audience: {
-      label: "Different student group",
-      description: "The poll is active, but is open to another eligible campus group.",
+    "voice-disabled": {
       membership: { assuranceLevel: 2, status: "active" },
-      participation: { moduleEnabled: true, resourceStatus: "active", audienceEligible: false }
+      participation: { resourceStatus: "active", audienceEligible: true, moduleEnabled: false }
     }
-  };
+  });
+  const LEGACY_PARTICIPATION_SCENARIO_ALIASES = Object.freeze({
+    eligible: "normal",
+    assurance: "assurance-required",
+    membership: "membership-refresh",
+    resource: "poll-closed",
+    audience: "audience-ineligible",
+    module: "voice-disabled"
+  });
 
   function findCanonicalEntity(key, entityId){
     const entity = D[key];
@@ -564,9 +556,9 @@
     const issue = getVoiceIssue(state.selectedVoiceIssueId, state);
     if(!issue || !issue.isPublic || issue.isSupported) return;
     const decision = evaluateParticipationAction('voice-support', { state, issue });
-    if(openCanonicalParticipationGate(decision, trigger, {
+    if(openParticipationGate(decision, trigger, {
         returnTo:voiceDetailReturnIntent(issue.id),
-        context:'voice'
+        returnAction:'voice-support'
       })){
       return;
     }
@@ -644,13 +636,14 @@
   }
 
   // Quiz — participation + accuracy model (v1.2): +5 for taking part, +5 bonus if correct, max +10
+  let pendingQuizChoice = null;
   function renderQuiz(){
     const opts = D.quiz.options;
     const wrap = $('#quizOptions');
     const saved = participationState();
     const participation = quizParticipationForCurrentDay(saved, D.quiz);
     const done = Boolean(participation);
-    const selectedChoice = participation ? participation.optionIndex : null;
+    const selectedChoice = participation ? participation.optionIndex : pendingQuizChoice;
     const xpPart = D.quiz.xpParticipation || 5;
     const xpBonus = D.quiz.xpBonus || 5;
     wrap.innerHTML = opts.map((o,i)=> `
@@ -664,6 +657,7 @@
     const fb = $('#quizFeedback');
     const note = $('#quizCompleteNote');
     if(done){
+      pendingQuizChoice = null;
       btn.hidden = true;
       fb.hidden = false;
       if(note) note.hidden = false;
@@ -679,10 +673,11 @@
       btn.hidden = false;
       fb.hidden = true;
       if(note) note.hidden = true;
-      btn.disabled = true;
+      btn.disabled = selectedChoice === null || selectedChoice === undefined;
       // enable submit when choice made
       wrap.onchange = ()=> {
         const c = wrap.querySelector('input[name="quiz"]:checked');
+        pendingQuizChoice = c ? parseInt(c.value, 10) : null;
         btn.disabled = !c;
       };
     }
@@ -690,11 +685,12 @@
       const c = wrap.querySelector('input[name="quiz"]:checked');
       if(!c) return;
       const choice = parseInt(c.value,10);
+      pendingQuizChoice = choice;
       const state = participationState();
       const decision = evaluateParticipationAction('daily-quiz', { state, quiz:D.quiz });
-      if(openCanonicalParticipationGate(decision, btn, {
+      if(openParticipationGate(decision, btn, {
         returnTo:QUIZ_RETURN_ROUTE,
-        context:'quiz'
+        returnAction:'quiz-submit'
       })) return;
       // A stale or double-fired action must not award again for this quiz tenant-day.
       if(quizParticipationForCurrentDay(state, D.quiz)){
@@ -713,6 +709,7 @@
       };
       D.student.xp += earned;
       state.xp = D.student.xp;
+      pendingQuizChoice = null;
       saveState(state);
       hydrateTenant();
       renderXPRules();
@@ -781,7 +778,8 @@
       verifiedAttributes:true,
       storyPrerequisites:true,
       returnTo:null,
-      demoScenario:"eligible"
+      returnAction:null,
+      demoScenario:"normal"
     };
   }
 
@@ -837,8 +835,13 @@
     Object.keys(participationDefaults).forEach(key=>{
       if(state.participation[key]===undefined) state.participation[key] = participationDefaults[key];
     });
-    if(!PARTICIPATION_SCENARIOS[state.participation.demoScenario]) state.participation.demoScenario = "assurance";
+    const storedScenario = state.participation.demoScenario;
+    const migratedScenario = LEGACY_PARTICIPATION_SCENARIO_ALIASES[storedScenario] || storedScenario;
+    state.participation.demoScenario = migratedScenario === "normal" || CANONICAL_PARTICIPATION_SCENARIOS[migratedScenario]
+      ? migratedScenario
+      : "normal";
     if(typeof state.participation.returnTo!=="string") state.participation.returnTo = null;
+    if(typeof state.participation.returnAction!=="string") state.participation.returnAction = null;
     ensureVoiceState(state);
 
     if(state.quizParticipation && typeof state.quizParticipation!=="object") state.quizParticipation = null;
@@ -873,18 +876,6 @@
   }
 
   const ASSURANCE_CODES = Object.freeze(["L0", "L1", "L2", "L3"]);
-  const CANONICAL_GATE_PRESENTATION = Object.freeze({
-    "tenant-inactive":"tenant",
-    "module-unavailable":"module",
-    "poll-closed":"resource",
-    "resource-unavailable":"resource",
-    "membership-refresh":"membership",
-    "assurance-required":"assurance",
-    "audience-ineligible":"audience",
-    "attributes-required":"attributes",
-    "prerequisites-unmet":"prerequisite"
-  });
-
   let lastParticipationDecision = null;
 
   function cloneParticipationDecision(decision){
@@ -975,82 +966,167 @@
     return decision;
   }
 
-  // Presentation compatibility only. This does not decide eligibility.
-  function openCanonicalParticipationGate(decision, trigger, options={}){
-    if(decision?.allowed) return false;
-    const variant = decision?.reason?.variant;
-    const presentationKey = CANONICAL_GATE_PRESENTATION[variant];
-    if(!presentationKey) throw new Error(`No gate presentation mapping for canonical variant: ${variant}.`);
-    openParticipationGate(presentationKey, trigger, options);
-    return true;
-  }
-
-  function gateCopy(key, state, context="poll"){
-    const currentAssurance = assuranceLabel(state.membership.assuranceLevel);
-    const copy = {
-      tenant: {
-        kicker:"Participation update", title:"Participation is not available right now",
-        reason:"This campus is not currently accepting participation. You can still read campus information.",
-        primary:"Back to Participate", action:"return"
-      },
-      module: {
-        kicker:"Participation update", title:"Student Voice is not available",
-        reason:"Student Voice has not been enabled for this campus. You can still participate in available polls.",
-        primary:"Back to Participate", action:"return"
-      },
-      resource: {
-        kicker:"Poll update", title:"This poll has closed",
-        reason:"Responses are no longer being accepted.",
-        primary:"Back to polls", action:"return"
-      },
-      membership: {
-        kicker:"Membership update", title:"Membership needs refreshing",
-        reason:"Your university membership needs to be confirmed again before you can participate. You can still read campus information.",
-        currentLabel:"Membership status", currentValue:"Needs refreshing",
-        primary:"Review membership", secondary:"Not now", action:"review"
-      },
-      assurance: {
-        kicker:"Participation requirement", title:"Verify your student status",
-        reason:context==="voice"
-          ? "Student Voice is available to students whose university membership has been matched to the current student roster."
-          : "This poll is available to students whose university membership has been matched to the current student roster.",
-        currentLabel:"Your current status", currentValue:currentAssurance,
-        requiredLabel:"Required", requiredValue:"L2 — Roster Match",
-        primary:"Verify student status", secondary:"Not now", action:"verify"
-      },
-      audience: {
-        kicker:"Poll eligibility", title:"This poll is for a different student group",
-        reason:"This poll is currently open to another eligible campus group.",
-        primary:"Back to polls", action:"return"
-      },
-      attributes: {
-        kicker:"Participation requirement", title:"Your student details need updating",
-        reason:"Some details needed for this poll are not available yet. You can review your membership information.",
-        primary:"Review membership", secondary:"Not now", action:"review"
-      },
-      prerequisite: {
-        kicker:"Participation requirement", title:"One more step is needed",
-        reason:"Please complete the required step for this poll before responding.",
-        primary:"Back to polls", action:"return"
-      }
-    };
-    return copy[key] || copy.assurance;
-  }
-
   let gateTrigger = null;
   let gateFocusAfterClose = null;
-  let gateReturnIntent = null;
+  let gateContinuation = null;
+  let gateNavigationHash = null;
 
-  function openParticipationGate(key, trigger, options={}){
+  function returnRouteHash(resourceContext, returnTo){
+    if(isVoiceDetailReturnIntent(returnTo)) return voiceDetailRoute(voiceIssueIdFromReturnIntent(returnTo));
+    if(returnTo===VOICE_NEW_RETURN_ROUTE) return "#voice-new";
+    if(returnTo===RSVP_RETURN_ROUTE) return `#${RSVP_RETURN_ROUTE}`;
+    if(returnTo===QUIZ_RETURN_ROUTE) return `#${QUIZ_RETURN_ROUTE}`;
+    if(returnTo===POLL_RETURN_ROUTE) return "#participate";
+    return resourceContext === "voice-submission" ? "#voice" : resourceContext === "voice-support" ? "#voice" : resourceContext === "rsvp" ? `#${RSVP_RETURN_ROUTE}` : resourceContext === "daily-quiz" ? `#${QUIZ_RETURN_ROUTE}` : "#participate";
+  }
+
+  function isKnownContinuationRoute(returnTo){
+    if([POLL_RETURN_ROUTE, RSVP_RETURN_ROUTE, QUIZ_RETURN_ROUTE, VOICE_NEW_RETURN_ROUTE].includes(returnTo)) return true;
+    if(!isVoiceDetailReturnIntent(returnTo)) return false;
+    const issueId = voiceIssueIdFromReturnIntent(returnTo);
+    return Boolean(issueId && getVoiceIssue(issueId));
+  }
+
+  function gateAssuranceBody(resourceContext){
+    return ({
+      poll: "This poll is available to students whose university membership has been matched to the current student roster.",
+      "voice-submission": "Raising an issue is available to students whose university membership has been matched to the current student roster.",
+      "voice-support": "Supporting an issue is available to students whose university membership has been matched to the current student roster.",
+      rsvp: "This RSVP is available to students whose university membership has been matched to the current student roster.",
+      "daily-quiz": "The Daily Quiz is available to students whose university membership has been matched to the current student roster."
+    })[resourceContext] || "This action is available to students whose university membership has been matched to the current student roster.";
+  }
+
+  function gatePresentationForDecision(decision, state, options={}){
+    const reason = decision?.reason;
+    const resourceContext = reason?.resourceContext;
+    const variant = reason?.variant;
+    if(!reason || !resourceContext || !variant) throw new TypeError("A denied canonical GateDecision is required for gate presentation.");
+    const returnTo = options.returnTo || ({
+      poll:POLL_RETURN_ROUTE,
+      "voice-submission":VOICE_NEW_RETURN_ROUTE,
+      "voice-support":voiceDetailReturnIntent(state.selectedVoiceIssueId || D.voiceIssues[0]?.id),
+      rsvp:RSVP_RETURN_ROUTE,
+      "daily-quiz":QUIZ_RETURN_ROUTE
+    })[resourceContext];
+    const base = {
+      title:"Participation update",
+      currentLabel:"Your current status",
+      currentValue:null,
+      requiredLabel:"Required",
+      requiredValue:null,
+      secondary:"Not now",
+      action:"navigate",
+      navigationHash:returnRouteHash(resourceContext, returnTo)
+    };
+    if(variant === "assurance-required"){
+      return {
+        ...base,
+        kicker:"Verify your student status",
+        title:"Verify your student status",
+        reason:gateAssuranceBody(resourceContext),
+        currentValue:assuranceLabel(state.membership.assuranceLevel),
+        requiredValue:assuranceLabel(ASSURANCE_CODES.indexOf(requiredAssuranceFor(resourceContext, options))),
+        primary:"Verify student status",
+        action:"verify",
+        navigationHash:null
+      };
+    }
+    if(variant === "membership-refresh"){
+      return {
+        ...base,
+        kicker:"Membership needs refreshing",
+        title:"Membership needs refreshing",
+        reason:"Your roster match is from a previous term. Refresh it to keep taking part.",
+        currentLabel:"Membership status",
+        currentValue:"Needs refreshing",
+        requiredLabel:"Required",
+        requiredValue:"Current membership",
+        primary:"Refresh membership",
+        action:"refresh",
+        navigationHash:null
+      };
+    }
+    if(variant === "poll-closed"){
+      return {
+        ...base,
+        kicker:"Poll has closed",
+        title:"Poll has closed",
+        reason:"This poll closed on 25 May 2026. Results appear once privacy thresholds are met.",
+        primary:"See other polls"
+      };
+    }
+    if(variant === "audience-ineligible"){
+      return {
+        ...base,
+        kicker:"Different student group",
+        title:"Different student group",
+        reason:"This poll is open to a specific student group. Your current membership does not include that group.",
+        primary:"See open polls"
+      };
+    }
+    if(variant === "module-unavailable"){
+      return {
+        ...base,
+        kicker:"Student Voice unavailable",
+        title:"Student Voice unavailable",
+        reason:"New issues are paused while published issues are reviewed. You can still follow existing issues.",
+        primary:"View issues",
+        navigationHash:"#voice"
+      };
+    }
+    if(variant === "tenant-inactive"){
+      return {
+        ...base,
+        kicker:"Participation paused",
+        title:"Participation is paused",
+        reason:"Participation is temporarily paused for this campus. You can still read campus information.",
+        primary:"Back to Participate"
+      };
+    }
+    if(variant === "resource-unavailable"){
+      return {
+        ...base,
+        kicker:"Resource unavailable",
+        title:"This resource is unavailable",
+        reason:"This action is not available right now. You can continue with other campus information.",
+        primary:resourceContext === "voice-support" ? "View issues" : resourceContext === "rsvp" ? "See event" : resourceContext === "daily-quiz" ? "Back to Play" : "See other polls"
+      };
+    }
+    if(variant === "attributes-required"){
+      return {
+        ...base,
+        kicker:"Details need updating",
+        title:"Your student details need updating",
+        reason:"Some details needed for this action are not available yet. You can continue with other campus information.",
+        primary:"Back to Participate"
+      };
+    }
+    if(variant === "prerequisites-unmet"){
+      return {
+        ...base,
+        kicker:"One more step is needed",
+        title:"One more step is needed",
+        reason:"Please complete the required step before continuing.",
+        primary:resourceContext === "daily-quiz" ? "Back to Play" : "Back to Participate"
+      };
+    }
+    throw new TypeError(`No presentation for canonical GateDecision variant: ${variant}.`);
+  }
+
+  function openParticipationGate(decision, trigger, options={}){
     const dialog = $('#participationGate');
     if(!dialog) return;
+    if(decision?.allowed) return false;
     const state = participationState();
-    const returnTo = options.returnTo || POLL_RETURN_ROUTE;
-    const context = options.context || "poll";
-    const copy = gateCopy(key, state, context);
+    const resourceContext = decision?.reason?.resourceContext;
+    const returnTo = options.returnTo || ({ poll:POLL_RETURN_ROUTE, "voice-submission":VOICE_NEW_RETURN_ROUTE, "voice-support":voiceDetailReturnIntent(state.selectedVoiceIssueId || D.voiceIssues[0]?.id), rsvp:RSVP_RETURN_ROUTE, "daily-quiz":QUIZ_RETURN_ROUTE })[resourceContext];
+    if(!isKnownContinuationRoute(returnTo)) throw new TypeError(`Unknown internal participation continuation route: ${returnTo}`);
+    const copy = gatePresentationForDecision(decision, state, { ...options, returnTo });
     gateTrigger = trigger || document.activeElement;
     gateFocusAfterClose = null;
-    gateReturnIntent = copy.action==="verify" ? returnTo : null;
+    gateContinuation = { returnTo, returnAction: options.returnAction || resourceContext };
+    gateNavigationHash = copy.navigationHash;
 
     $('#participationGateKicker').textContent = copy.kicker;
     $('#participationGateTitle').textContent = copy.title;
@@ -1080,14 +1156,16 @@
       if(typeof dialog.showModal==="function") dialog.showModal();
       else dialog.setAttribute("open", "");
     }
-    setTimeout(()=> primary.focus(), 0);
+    setTimeout(()=> $('#participationGateTitle')?.focus({preventScroll:true}), 0);
+    return true;
   }
 
   function closeParticipationGate(focusTarget=gateTrigger){
     const dialog = $('#participationGate');
     if(!dialog) return;
     gateFocusAfterClose = focusTarget;
-    gateReturnIntent = null;
+    gateContinuation = null;
+    gateNavigationHash = null;
     if(dialog.open && typeof dialog.close==="function") dialog.close();
     else dialog.removeAttribute("open");
   }
@@ -1096,7 +1174,8 @@
     const dialog = $('#participationGate');
     gateTrigger = null;
     gateFocusAfterClose = null;
-    gateReturnIntent = null;
+    gateContinuation = null;
+    gateNavigationHash = null;
     if(dialog?.open && typeof dialog.close==="function") dialog.close();
     else dialog?.removeAttribute("open");
   }
@@ -1134,15 +1213,17 @@
     const matchBtn = $('#startRosterMatch');
     const matchHelp = $('#rosterMatchHelp');
     if(matchBtn){
-      matchBtn.hidden = level!==1 || membershipRefresh;
+      matchBtn.hidden = !(membershipRefresh || level===1);
       if(!matchBtn.hidden){
         matchBtn.disabled = false;
-        matchBtn.textContent = "Match my student record";
+        matchBtn.textContent = membershipRefresh ? "Refresh membership" : "Match my student record";
       }
     }
     if(matchHelp){
-      matchHelp.hidden = level!==1 || membershipRefresh;
-      if(!matchHelp.hidden) matchHelp.textContent = "We will check your current enrolment against the university roster.";
+      matchHelp.hidden = !(membershipRefresh || level===1);
+      if(!matchHelp.hidden) matchHelp.textContent = membershipRefresh
+        ? "We will refresh your current membership against the university roster."
+        : "We will check your current enrolment against the university roster.";
     }
   }
 
@@ -1185,9 +1266,9 @@
       const chosen = form.querySelector('input:checked');
       if(!chosen) return;
       const decision = evaluateParticipationAction('poll');
-      if(openCanonicalParticipationGate(decision, btn, {
+      if(openParticipationGate(decision, btn, {
         returnTo:POLL_RETURN_ROUTE,
-        context:'poll'
+        returnAction:'poll-submit'
       })) return;
       const idx = parseInt(chosen.value,10);
       btn.disabled = true;
@@ -1212,20 +1293,12 @@
     });
   }
 
-  function updateParticipationDemoControls(){
-    const state = participationState();
-    const scenario = PARTICIPATION_SCENARIOS[state.participation.demoScenario] || PARTICIPATION_SCENARIOS.assurance;
-    const select = $('#participationDemoState');
-    if(select) select.value = state.participation.demoScenario;
-    const description = $('#participationDemoDescription');
-    if(description) description.textContent = scenario.description;
-  }
-
-  function applyParticipationScenario(name, announce=false){
-    const scenario = PARTICIPATION_SCENARIOS[name] || PARTICIPATION_SCENARIOS.assurance;
+  function applyCanonicalParticipationScenario(name, announce=false){
+    const scenario = CANONICAL_PARTICIPATION_SCENARIOS[name];
+    if(!scenario) throw new TypeError(`Unknown canonical participation scenario: ${name}`);
     const state = participationState();
     state.membership = { ...defaultMembership(), ...scenario.membership };
-    state.participation = { ...defaultParticipation(), ...scenario.participation, demoScenario:name, returnTo:null };
+    state.participation = { ...defaultParticipation(), ...scenario.participation, demoScenario:name, returnTo:null, returnAction:null };
     state.pollDone = false;
     state.pollChoice = null;
     saveState(state);
@@ -1233,16 +1306,18 @@
     hydrateTenant();
     renderPollState();
     syncVerificationUi();
-    updateParticipationDemoControls();
+    renderQuiz();
     const success = $('#verificationSuccess');
     if(success) success.hidden = true;
-    if(announce) toast(`${scenario.label} selected for this prototype.`);
+    if(announce) toast(`${name} selected for this prototype.`);
   }
 
   function restoreOriginalParticipationIntent(){
     const state = participationState();
     const returnTo = state.participation.returnTo;
+    const returnAction = state.participation.returnAction;
     state.participation.returnTo = null;
+    state.participation.returnAction = null;
     saveState(state);
     if(returnTo===POLL_RETURN_ROUTE){
       pendingReturnFocus = true;
@@ -1251,14 +1326,18 @@
     }
     if(returnTo===VOICE_NEW_RETURN_ROUTE){
       pendingVoiceComposerFocus = true;
+      pendingVoiceComposerAction = returnAction || "voice-composer-entry";
       location.hash = "#voice-new";
       return;
     }
     if(returnTo===RSVP_RETURN_ROUTE){
+      pendingRsvpFocus = true;
+      pendingRsvpAction = returnAction || "rsvp";
       location.hash = `#${RSVP_RETURN_ROUTE}`;
       return;
     }
     if(returnTo===QUIZ_RETURN_ROUTE){
+      pendingQuizFocus = true;
       location.hash = `#${QUIZ_RETURN_ROUTE}`;
       return;
     }
@@ -1266,6 +1345,7 @@
       const issueId = voiceIssueIdFromReturnIntent(returnTo);
       if(getVoiceIssue(issueId)){
         pendingVoiceDetailFocus = true;
+        pendingVoiceDetailAction = returnAction || "voice-support";
         location.hash = voiceDetailRoute(issueId);
       }
     }
@@ -1273,17 +1353,18 @@
 
   function startRosterMatch(){
     const state = participationState();
-    if(state.membership.assuranceLevel>=2 || state.membership.status!=="active") return;
+    const refreshing = state.membership.status === "refresh";
+    if(!refreshing && state.membership.assuranceLevel!==1) return;
     const button = $('#startRosterMatch');
     const help = $('#rosterMatchHelp');
-    if(button){ button.disabled=true; button.textContent="Checking enrolment…"; }
-    if(help){ help.hidden=false; help.textContent="Checking your current enrolment against the university roster…"; }
+    if(button){ button.disabled=true; button.textContent=refreshing ? "Refreshing…" : "Checking enrolment…"; }
+    if(help){ help.hidden=false; help.textContent=refreshing ? "Refreshing your current membership against the university roster…" : "Checking your current enrolment against the university roster…"; }
 
     setTimeout(()=>{
       const updated = participationState();
-      updated.membership.assuranceLevel = 2;
+      if(updated.membership.status !== "refresh") updated.membership.assuranceLevel = 2;
       updated.membership.status = "active";
-      updated.participation.demoScenario = "eligible";
+      updated.participation.demoScenario = "normal";
       const returnTo = updated.participation.returnTo;
       const returning = [POLL_RETURN_ROUTE, VOICE_NEW_RETURN_ROUTE, RSVP_RETURN_ROUTE, QUIZ_RETURN_ROUTE].includes(returnTo) || isVoiceDetailReturnIntent(returnTo);
       saveState(updated);
@@ -1291,10 +1372,13 @@
       hydrateTenant();
       renderPollState();
       syncVerificationUi();
-      updateParticipationDemoControls();
+      renderQuiz();
       const success = $('#verificationSuccess');
       const detail = $('#verificationSuccessDetail');
-      if(detail) detail.textContent = returnTo===VOICE_NEW_RETURN_ROUTE || isVoiceDetailReturnIntent(returnTo)
+      const refreshedCopy = "Your membership has been refreshed. Returning you to the original action…";
+      if(detail) detail.textContent = refreshing
+        ? (returning ? refreshedCopy : "Your membership has been refreshed.")
+        : returnTo===VOICE_NEW_RETURN_ROUTE || isVoiceDetailReturnIntent(returnTo)
         ? "Your university membership now matches the current student roster. Returning you to Student Voice…"
         : returnTo===RSVP_RETURN_ROUTE
           ? "Your university membership now matches the current student roster. Returning you to the event…"
@@ -1304,7 +1388,7 @@
           ? "Your university membership now matches the current student roster. Returning you to the poll…"
           : "Your university membership now matches the current student roster.";
       if(success){ success.hidden=false; success.focus({preventScroll:true}); }
-      toast("Student status confirmed.");
+      toast(refreshing ? "Membership refreshed." : "Student status confirmed.");
       if(returning) setTimeout(restoreOriginalParticipationIntent, 1100);
     }, 750);
   }
@@ -1314,14 +1398,14 @@
     saveState(initial);
     syncStudentTrustState(initial);
     syncVerificationUi();
-    updateParticipationDemoControls();
 
     const dialog = $('#participationGate');
     dialog?.addEventListener('close', ()=>{
       const target = gateFocusAfterClose || gateTrigger;
       gateFocusAfterClose = null;
       gateTrigger = null;
-      gateReturnIntent = null;
+      gateContinuation = null;
+      gateNavigationHash = null;
       if(target && document.contains(target)) setTimeout(()=> target.focus({preventScroll:true}), 0);
     });
     document.addEventListener('keydown', event=>{
@@ -1332,26 +1416,23 @@
     });
     $('#participationGatePrimary')?.addEventListener('click', event=>{
       const action = event.currentTarget.dataset.gateAction;
-      if(action==="verify"){
+      if(action==="verify" || action==="refresh"){
         const state = participationState();
-        state.participation.returnTo = gateReturnIntent || POLL_RETURN_ROUTE;
+        state.participation.returnTo = gateContinuation?.returnTo || POLL_RETURN_ROUTE;
+        state.participation.returnAction = gateContinuation?.returnAction || null;
         saveState(state);
         dismissGateForNavigation();
         location.hash = "#verification";
-      } else if(action==="review"){
-        const state = participationState();
-        state.participation.returnTo = null;
-        saveState(state);
+      } else if(action==="navigate"){
+        const hash = gateNavigationHash || "#participate";
         dismissGateForNavigation();
-        location.hash = "#verification";
+        location.hash = hash;
       } else {
         closeParticipationGate();
       }
     });
     $('#participationGateSecondary')?.addEventListener('click', ()=> closeParticipationGate());
     $('#startRosterMatch')?.addEventListener('click', startRosterMatch);
-    $('#participationDemoState')?.addEventListener('change', event=> applyParticipationScenario(event.target.value, true));
-    $('#resetParticipationDemo')?.addEventListener('click', ()=> applyParticipationScenario("assurance", true));
   }
 
   // Student Voice composer — local prototype state only. Submitted issues are not added to the public issue list.
@@ -1559,9 +1640,9 @@
     const state = participationState();
     const draft = state.voiceDraft;
     const decision = evaluateParticipationAction('voice-submission', { state });
-    if(openCanonicalParticipationGate(decision, $('#voiceSubmitIssue'), {
+    if(openParticipationGate(decision, $('#voiceSubmitIssue'), {
       returnTo:VOICE_NEW_RETURN_ROUTE,
-      context:'voice'
+      returnAction:'voice-submit'
     })){
       saveVoiceDraft();
       setVoiceStep(3, { focus:false, persist:true });
@@ -1585,7 +1666,7 @@
 
   function requestVoiceComposer(trigger){
     const decision = evaluateParticipationAction('voice-submission');
-    if(openCanonicalParticipationGate(decision, trigger, { returnTo:VOICE_NEW_RETURN_ROUTE, context:'voice' })){
+    if(openParticipationGate(decision, trigger, { returnTo:VOICE_NEW_RETURN_ROUTE, returnAction:'voice-composer-entry' })){
       return;
     }
     pendingVoiceComposerFocus = true;
@@ -1643,7 +1724,12 @@
   });
   let pendingReturnFocus = false;
   let pendingVoiceComposerFocus = false;
+  let pendingVoiceComposerAction = null;
   let pendingVoiceDetailFocus = false;
+  let pendingVoiceDetailAction = null;
+  let pendingRsvpFocus = false;
+  let pendingRsvpAction = null;
+  let pendingQuizFocus = false;
   let pendingNewsDetailFocus = false;
 
   function showView(name){
@@ -1662,6 +1748,7 @@
     });
     if(target==="voice-new") renderVoiceComposer();
     if(target==="voice-detail") renderVoiceDetail();
+    if(target==="verification") syncVerificationUi();
     // Secondary screens inherit the active primary destination.
     const primary = primaryTabs.includes(target) ? target : (parentPrimaryTabs[target] || null);
     $$('.nav-item').forEach(a=>{
@@ -1690,17 +1777,30 @@
     if(target==="participate" && pendingReturnFocus){
       pendingReturnFocus = false;
       setTimeout(()=>{
-        const pollHeading = $('#pollQuestion');
-        if(!pollHeading) return;
-        pollHeading.focus({preventScroll:true});
-        pollHeading.scrollIntoView({block:"start", behavior:"auto"});
+        const pollOption = $('#pollForm input[type="radio"]:not(:disabled)') || $('#pollForm input[type="radio"]');
+        if(pollOption) pollOption.focus({preventScroll:true});
       }, 60);
     } else if(target==="voice-new" && pendingVoiceComposerFocus){
       pendingVoiceComposerFocus = false;
-      setTimeout(focusVoiceStepHeading, 60);
+      const action = pendingVoiceComposerAction;
+      pendingVoiceComposerAction = null;
+      setTimeout(()=>{
+        if(action === "voice-submit") $('#voiceSubmitIssue')?.focus({preventScroll:true});
+        else focusVoiceStepHeading();
+      }, 60);
     } else if(target==="voice-detail" && pendingVoiceDetailFocus){
       pendingVoiceDetailFocus = false;
-      setTimeout(focusVoiceDetailTitle, 60);
+      const action = pendingVoiceDetailAction;
+      pendingVoiceDetailAction = null;
+      setTimeout(()=> action === "voice-support" ? $('#voiceSupportButton')?.focus({preventScroll:true}) : focusVoiceDetailTitle(), 60);
+    } else if(target==="event" && pendingRsvpFocus){
+      pendingRsvpFocus = false;
+      const action = pendingRsvpAction;
+      pendingRsvpAction = null;
+      setTimeout(()=> $(action === "rsvp-interested" ? '#rsvpInterested' : '#rsvpGoing')?.focus({preventScroll:true}), 60);
+    } else if(target==="play" && pendingQuizFocus){
+      pendingQuizFocus = false;
+      setTimeout(()=> $('#quizSubmit')?.focus({preventScroll:true}), 60);
     } else if(target==="news" && pendingNewsDetailFocus){
       pendingNewsDetailFocus = false;
       setTimeout(focusNewsDetailTitle, 60);
@@ -1751,9 +1851,9 @@
     const h = route.view || "home";
     if(h==="voice-new"){
       const decision = evaluateParticipationAction('voice-submission');
-      if(openCanonicalParticipationGate(decision, $('#voiceNewBtn') || document.body, {
+      if(openParticipationGate(decision, $('#voiceNewBtn') || document.body, {
           returnTo:VOICE_NEW_RETURN_ROUTE,
-          context:'voice'
+          returnAction:'voice-composer-entry'
         })){
         history.replaceState(null, '', '#participate');
         showView('participate');
@@ -1842,9 +1942,9 @@
     function attemptRsvp(trigger, nextState, successMessage){
       const currentState = participationState();
       const decision = evaluateParticipationAction('rsvp', { state:currentState, event });
-      if(openCanonicalParticipationGate(decision, trigger, {
+      if(openParticipationGate(decision, trigger, {
         returnTo:RSVP_RETURN_ROUTE,
-        context:'rsvp'
+        returnAction:trigger?.id === 'rsvpInterested' ? 'rsvp-interested' : 'rsvp-going'
       })) return;
       currentState.rsvp = nextState;
       state = currentState;
@@ -2039,6 +2139,17 @@
         D.voiceIssues[0].supporters = 124;
         D.notifications.forEach((n,i)=> n.unread = i<2);
         const state = participationState();
+        state.membership = { ...defaultMembership() };
+        state.participation = { ...defaultParticipation(), demoScenario:"normal", returnTo:null, returnAction:null };
+        state.pollDone = false;
+        state.pollChoice = null;
+        state.quizDone = false;
+        state.quizChoice = null;
+        state.quizParticipation = null;
+        pendingQuizChoice = null;
+        state.rsvp = null;
+        state.xp = 340;
+        lastParticipationDecision = null;
         saveState(state);
         syncStudentTrustState(state);
         hydrateTenant();
@@ -2050,13 +2161,12 @@
         renderNotifications();
         renderPollState();
         syncVerificationUi();
-        updateParticipationDemoControls();
         const success = $('#verificationSuccess');
         if(success) success.hidden = true;
         toast('Demo state reset.');
       },
       resetQuiz(){
-        const s = participationState(); s.quizDone=false; s.quizChoice=null; s.quizParticipation=null; saveState(s); renderQuiz(); toast('Quiz reset (debug).');
+        const s = participationState(); s.quizDone=false; s.quizChoice=null; s.quizParticipation=null; pendingQuizChoice=null; saveState(s); renderQuiz(); toast('Quiz reset (debug).');
       },
       resetPoll(){
         const s = participationState(); s.pollDone=false; s.pollChoice=null; saveState(s); location.reload();
@@ -2074,13 +2184,13 @@
           applyVoiceStatusScenario(name, true);
           return;
         }
-        applyParticipationScenario(name, true);
+        if(!Object.prototype.hasOwnProperty.call(CANONICAL_PARTICIPATION_SCENARIOS, name)){
+          throw new TypeError(`Unknown CampusHub canonical scenario: ${name}`);
+        }
+        applyCanonicalParticipationScenario(name, true);
       },
       setVoiceStatusScenario(name){
         applyVoiceStatusScenario(name, true);
-      },
-      setParticipationScenario(name){
-        applyParticipationScenario(name, true);
       }
     };
     if(debugEnabled){

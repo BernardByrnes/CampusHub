@@ -6,10 +6,10 @@ async function goTo(page, hash) {
   await page.goto(`/${hash}`);
 }
 
-async function resetDemo(page, scenario = 'eligible') {
+async function resetDemo(page, scenario = null) {
   await page.evaluate(nextScenario => {
     window.CampusHubDebug.resetDemo();
-    window.CampusHubDebug.setParticipationScenario(nextScenario);
+    if(nextScenario) window.CampusHubDebug.setScenario(nextScenario);
   }, scenario);
 }
 
@@ -52,7 +52,7 @@ test.describe('Phase 6B Poll and Student Voice GSC-14 integration', () => {
   });
 
   test('allows an L2 Poll response, awards configured XP once, and persists completion state', async ({ page }) => {
-    await resetDemo(page, 'eligible');
+    await resetDemo(page);
     await goTo(page, '#participate');
 
     const startingXp = await page.evaluate(() => window.CampusHubDemo.student.xp);
@@ -84,7 +84,7 @@ test.describe('Phase 6B Poll and Student Voice GSC-14 integration', () => {
   });
 
   test('lets an L1 student select a Poll option but gates only on Submit response', async ({ page }) => {
-    await resetDemo(page, 'assurance');
+    await resetDemo(page, 'assurance-required');
     await goTo(page, '#participate');
     const startingXp = await page.evaluate(() => window.CampusHubDemo.student.xp);
 
@@ -107,7 +107,7 @@ test.describe('Phase 6B Poll and Student Voice GSC-14 integration', () => {
   });
 
   test('uses the canonical poll-closed decision without mutating Poll state', async ({ page }) => {
-    await resetDemo(page, 'resource');
+    await resetDemo(page, 'poll-closed');
     await goTo(page, '#participate');
     await page.locator('#pollForm input[type="radio"]').first().check();
     const startingXp = await page.evaluate(() => window.CampusHubDemo.student.xp);
@@ -123,7 +123,7 @@ test.describe('Phase 6B Poll and Student Voice GSC-14 integration', () => {
   });
 
   test('uses the canonical audience denial for an ineligible Poll audience', async ({ page }) => {
-    await resetDemo(page, 'audience');
+    await resetDemo(page, 'audience-ineligible');
     await goTo(page, '#participate');
     await page.locator('#pollForm input[type="radio"]').first().check();
 
@@ -137,7 +137,7 @@ test.describe('Phase 6B Poll and Student Voice GSC-14 integration', () => {
   });
 
   test('keeps Poll usable when the Student Voice module is disabled', async ({ page }) => {
-    await resetDemo(page, 'module');
+    await resetDemo(page, 'voice-disabled');
     await goTo(page, '#voice');
     await page.locator('#voiceListNewBtn').click();
     await expectGateDecision(page, {
@@ -156,7 +156,7 @@ test.describe('Phase 6B Poll and Student Voice GSC-14 integration', () => {
   });
 
   test('gates L1 Voice composer entry with voice-submission context and no draft mutation', async ({ page }) => {
-    await resetDemo(page, 'assurance');
+    await resetDemo(page, 'assurance-required');
     await goTo(page, '#voice');
     const before = await readState(page);
 
@@ -174,7 +174,7 @@ test.describe('Phase 6B Poll and Student Voice GSC-14 integration', () => {
   });
 
   test('gates a direct #voice-new route through the same canonical decision', async ({ page }) => {
-    await resetDemo(page, 'assurance');
+    await resetDemo(page, 'assurance-required');
     await goTo(page, '#voice-new');
 
     await expectGateDecision(page, {
@@ -187,7 +187,7 @@ test.describe('Phase 6B Poll and Student Voice GSC-14 integration', () => {
   });
 
   test('re-checks Voice eligibility at final Submit issue and preserves the Review draft', async ({ page }) => {
-    await resetDemo(page, 'eligible');
+    await resetDemo(page);
     await goTo(page, '#voice');
     await page.locator('#voiceListNewBtn').click();
     await expect(page.locator('#view-voice-new')).toBeVisible();
@@ -225,7 +225,7 @@ test.describe('Phase 6B Poll and Student Voice GSC-14 integration', () => {
   });
 
   test('allows Voice submission internally without publishing or awarding XP', async ({ page }) => {
-    await resetDemo(page, 'eligible');
+    await resetDemo(page);
     await goTo(page, '#voice');
     await page.locator('#voiceListNewBtn').click();
     const startingXp = await page.evaluate(() => window.CampusHubDemo.student.xp);
@@ -252,7 +252,7 @@ test.describe('Phase 6B Poll and Student Voice GSC-14 integration', () => {
   });
 
   test('supports a published Voice issue exactly once without XP', async ({ page }) => {
-    await resetDemo(page, 'eligible');
+    await resetDemo(page);
     await goTo(page, '#voice-detail/voice-water-halls');
     const startingCount = Number(await page.locator('#voiceDetailSupporterCount').textContent());
     const startingXp = await page.evaluate(() => window.CampusHubDemo.student.xp);
@@ -271,7 +271,7 @@ test.describe('Phase 6B Poll and Student Voice GSC-14 integration', () => {
   });
 
   test('gates L1 Voice support without changing support state or XP', async ({ page }) => {
-    await resetDemo(page, 'assurance');
+    await resetDemo(page, 'assurance-required');
     await goTo(page, '#voice-detail/voice-water-halls');
     const startingCount = Number(await page.locator('#voiceDetailSupporterCount').textContent());
     const startingXp = await page.evaluate(() => window.CampusHubDemo.student.xp);
@@ -288,7 +288,7 @@ test.describe('Phase 6B Poll and Student Voice GSC-14 integration', () => {
   });
 
   test('keeps Poll and Voice surfaces usable without horizontal overflow at the focused widths', async ({ page }) => {
-    await resetDemo(page, 'eligible');
+    await resetDemo(page);
     for (const viewport of [
       { width:320, height:844 },
       { width:390, height:844 },

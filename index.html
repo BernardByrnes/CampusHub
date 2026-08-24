@@ -306,22 +306,6 @@
             </div>
           </div>
 
-          <details class="prototype-controls" id="participationDemoControls">
-            <summary>Prototype test state <span aria-hidden="true">›</span></summary>
-            <div class="prototype-controls__body">
-              <label class="prototype-controls__label" for="participationDemoState">Participation scenario</label>
-              <select id="participationDemoState" class="prototype-controls__select">
-                <option value="assurance">L1 — Roster Match required</option>
-                <option value="eligible">Eligible L2 experience</option>
-                <option value="membership">Membership needs refreshing</option>
-                <option value="module">Student Voice unavailable</option>
-                <option value="resource">Poll has closed</option>
-                <option value="audience">Different student group</option>
-              </select>
-              <p id="participationDemoDescription" class="meta" style="margin:8px 0 0;">The primary interruption-and-return journey.</p>
-              <button id="resetParticipationDemo" class="btn btn--small" type="button" style="margin-top:10px;">Reset primary journey</button>
-            </div>
-          </details>
         </div>
 
         <!-- Voice pane -->
@@ -894,12 +878,12 @@
 
     </main>
 
-    <dialog class="participation-gate" id="participationGate" aria-labelledby="participationGateTitle" aria-describedby="participationGateReason participationGateState">
+    <dialog class="participation-gate" id="participationGate" role="dialog" aria-modal="true" aria-labelledby="participationGateTitle" aria-describedby="participationGateReason participationGateState">
       <div class="participation-gate__panel">
         <div class="participation-gate__status" aria-hidden="true">i</div>
         <div class="participation-gate__content">
           <div class="kicker kicker--info" id="participationGateKicker">Participation requirement</div>
-          <h2 class="participation-gate__title" id="participationGateTitle">Verify your student status</h2>
+          <h2 class="participation-gate__title" id="participationGateTitle" tabindex="-1">Verify your student status</h2>
           <p class="body-sm participation-gate__reason" id="participationGateReason"></p>
         </div>
 
