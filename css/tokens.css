@@ -1,37 +1,56 @@
 /* CampusHub Design Tokens — tenant-overridable */
 :root {
-  /* tenant */
-  --tenant-primary: #115e2b;
-  --tenant-primary-soft: #e6f2e9;
-  --tenant-primary-border: #a8d0b4;
-  --tenant-inline: var(--tenant-primary);
+  /* canonical tenant palette — swap this family for another university */
+  --tenant: #146B3A;
+  --tenant-strong: #0E5A2F;
+  --tenant-soft: #EAF3ED;
+  --tenant-softer: #F3F8F4;
+  --tenant-border: #CFE3D6;
 
-  /* neutrals — warm white direction */
-  --bg: #fbfcf9;
-  --surface: #ffffff;
-  --surface-muted: #f3f5f1;
-  --border: #e6e8e3;
-  --border-strong: #d6d9d2;
-  --text: #162019;
-  --text-strong: #0f1a13;
-  --text-muted: #5f6b62;
-  --text-faint: #8a9490;
-  --muted-bg: #f0f3ef;
+  /* canonical text palette */
+  --ink: #101828;
+  --body: #475467;
+  --muted: #667085;
+  --faint: #98A2B3;
 
-  /* semantic */
-  --brand: var(--tenant-primary);
-  --brand-soft: var(--tenant-primary-soft);
-  --brand-border: var(--tenant-primary-border);
-  --info: #1d5a8a;
-  --info-soft: #e6eff7;
-  --play: #c07a15;
-  --play-soft: #fdf1dc;
-  --danger: #b42318;
-  --success: #1a5c2e;
+  /* canonical surfaces and borders */
+  --page: #F6F6F4;
+  --surface: #FFFFFF;
+  --surface-muted: #F9FAFB;
+  --surface-sunken: #F2F4F7;
+  --border: #EAECF0;
+  --border-strong: #D0D5DD;
+
+  /* canonical semantic palette */
+  --info: #175CD3;
+  --info-soft: #EFF4FE;
+  --info-border: #D5E2FA;
+  --play: #B54708;
+  --play-soft: #FDF1E2;
+  --play-border: #F3D8B4;
+  --danger: #D92D20;
+  --danger-soft: #FEF3F2;
+  --success: #067647;
+  --success-soft: #ECFDF3;
+
+  /* compatibility aliases — existing consumers can migrate incrementally */
+  --tenant-primary: var(--tenant);
+  --tenant-primary-soft: var(--tenant-soft);
+  --tenant-primary-border: var(--tenant-border);
+  --tenant-inline: var(--tenant);
+  --bg: var(--page);
+  --text: var(--body);
+  --text-strong: var(--ink);
+  --text-muted: var(--muted);
+  --text-faint: var(--faint);
+  --muted-bg: var(--surface-sunken);
+  --brand: var(--tenant);
+  --brand-soft: var(--tenant-soft);
+  --brand-border: var(--tenant-border);
 
   /* focus */
-  --focus: #1d5a8a;
-  --focus-ring: 0 0 0 3px rgba(29,90,138,.18);
+  --focus: var(--info);
+  --focus-ring: 0 0 0 3px rgba(23,92,211,.24);
 
   /* radii */
   --radius-sm: 8px;
@@ -62,13 +81,18 @@
   --leading-normal: 1.5;
 
   /* layout */
-  --content-max: 440px;
+  --content-max: 430px;
+  --content-gutter: 16px;
+  --content-gutter-small: 14px;
+  --stack-gap: 12px;
+  --section-gap: 20px;
+  --search-h: 48px;
   --header-h: 64px;
-  --nav-h: 72px;
+  --nav-h: 64px;
 
   /* shadows — extremely restrained */
-  --shadow-sm: 0 1px 2px rgba(16, 24, 16, .06);
-  --shadow-card: 0 1px 6px rgba(16, 24, 16, .06);
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, .04);
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, .04);
 
   /* z */
   --z-header: 20;
@@ -82,7 +106,7 @@ html { -webkit-text-size-adjust: 100%; }
 html, body { margin: 0; padding: 0; }
 body {
   font-family: var(--font-sans);
-  background: var(--bg);
+  background: var(--page);
   color: var(--text);
   line-height: var(--leading-normal);
   -webkit-font-smoothing: antialiased;
@@ -105,4 +129,4 @@ button, input { font: inherit; }
 .skip-link:focus { left: 12px; top: 12px; width:auto; height:auto; padding:10px 14px; background: var(--surface); border:1px solid var(--border); border-radius: var(--radius-sm); z-index: 9999; }
 
 /* scrollbar */
-* { scrollbar-width: thin; scrollbar-color: #c9cec7 transparent; }
+* { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
