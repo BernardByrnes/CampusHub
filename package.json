@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check:js": "node --check js/demo-data.js && node --check js/app.js",
+    "check:js": "node --check js/demo-data.js && node --check js/participation-evaluator.js && node --check js/app.js",
     "test": "playwright test",
     "test:headed": "playwright test --headed",
     "test:report": "playwright show-report"
