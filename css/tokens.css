@@ -86,13 +86,27 @@
   --content-gutter-small: 14px;
   --stack-gap: 12px;
   --section-gap: 20px;
+  --card-pad: 16px;
+  --card-radius: 16px;
+  --dialog-radius: 16px;
+  --inner-radius: 12px;
+  --field-radius: 12px;
+  --option-min-h: 52px;
+  --control-min-h: 44px;
+  --control-small-h: 36px;
+  --touch-target-min-h: 44px;
+  --filter-chip-h: 38px;
+  --icon-tile-size: 40px;
+  --icon-tile-icon-size: 20px;
   --search-h: 48px;
   --header-h: 64px;
   --nav-h: 64px;
 
   /* shadows — extremely restrained */
   --shadow-sm: 0 1px 2px rgba(16, 24, 40, .04);
-  --shadow-card: 0 1px 2px rgba(16, 24, 40, .04);
+  --card-shadow: 0 1px 2px rgba(16, 24, 40, .04);
+  --dialog-shadow: 0 12px 32px rgba(16,24,40,.16);
+  --shadow-card: var(--card-shadow);
 
   /* z */
   --z-header: 20;
