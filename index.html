@@ -1,0 +1,697 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="light" />
+<meta name="description" content="CampusHub — The digital home of student life. Makerere University Guild." />
+<title>CampusHub — Makerere University Guild</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/tokens.css" />
+<link rel="stylesheet" href="css/components.css" />
+<link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<div class="app">
+  <div class="shell" id="shell">
+    <!-- Header -->
+    <header class="app-header" role="banner">
+      <div class="header-row">
+        <div class="brand" aria-label="Makerere University Guild">
+          <div class="brand-mark" aria-hidden="true">
+            <img src="assets/logos/makerere-crest.svg" alt="" width="38" height="38" style="width:38px;height:38px;display:block;border-radius:8px;" onerror="this.style.display='none'; this.nextElementSibling.style.display='grid';" />
+            <span style="display:none; width:38px;height:38px; border-radius:10px; background: var(--brand-soft); border:1px solid var(--brand-border); display:none; place-items:center; font-weight:800; font-size:11px; letter-spacing:.06em; color: var(--brand);">MUK</span>
+          </div>
+          <div class="brand-text">
+            <div class="brand-title">
+              <span id="tenantName">Makerere University Guild</span>
+              <span class="verified" aria-label="Verified tenant" title="Verified">&#10003;</span>
+            </div>
+            <div class="brand-sub" id="tenantSub">
+              <span data-field="tenantCampus">Main Campus</span>
+              <span aria-hidden="true">•</span>
+              <span data-field="tenantYear">Academic Year 2026/2027</span>
+            </div>
+          </div>
+        </div>
+        <button class="icon-btn" id="notifBtn" aria-label="Notifications, 2 unread">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7-6 5-6 9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path d="M4 8h16"/></svg>
+          <span class="badge" id="notifBadge" aria-hidden="true">2</span>
+        </button>
+      </div>
+
+      <!-- Search - injected per-view visibility; keep live but hide on some views -->
+      <div class="search-wrap" id="searchWrap" role="search">
+        <label class="visually-hidden" for="globalSearch">Search</label>
+        <div class="search">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <input id="globalSearch" type="search" placeholder="Search events, opportunities, sports, news..." autocomplete="off" />
+        </div>
+        <button class="filter-btn" type="button" aria-label="Filters">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 6h18"/><path d="M7 12h10"/><path d="M10 18h4"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="14" cy="18" r="2"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="main" id="main" tabindex="-1">
+
+      <!-- HOME -->
+      <section id="view-home" data-view="home" class="view is-active" role="tabpanel" aria-labelledby="tab-home">
+        <!-- Priority Notice -->
+        <article class="card priority card-pad" id="homePriority" role="note" aria-label="Priority Notice">
+          <div class="row">
+            <div class="announce-icon" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 11l5-1 7-3c1.3-.5 2.5.4 2 1.8L15.5 13 16 21l-5-4-6.5 1z"/><circle cx="20" cy="8" r="1.8" fill="currentColor" stroke="none"/><path d="M19 11l1 1" /><path d="M20 13l0.5 1" /></svg>
+            </div>
+            <div style="flex:1; min-width:0;">
+              <div class="kicker">Priority Notice</div>
+              <h2 class="title" style="margin:6px 0 6px; font-size:16px;" data-field="priorityTitle">Wednesday Classes Rescheduled</h2>
+              <p class="body-sm" style="margin:0;" data-field="priorityBody">Due to the Guild General Assembly, all teaching on Wednesday, 21 May 2026 will start at 2:00 PM.</p>
+              <div class="meta" style="margin-top:8px;" data-field="priorityMeta">19 May 2026 • Office of the Academic Registrar</div>
+            </div>
+            <div style="align-self:center;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>
+            </div>
+          </div>
+        </article>
+
+        <!-- Hero — single editorial story (CORRECTED: no carousel) -->
+        <article class="card hero" style="margin-top:10px;" aria-label="Innovation Week story">
+          <div class="hero-media" id="heroMedia">
+            <img id="heroImg" src="assets/images/hero-innovation.webp" alt="Students collaborating on a campus project" width="800" height="500" decoding="async" fetchpriority="high" />
+            <div class="hero-grad" aria-hidden="true"></div>
+            <div class="hero-body">
+              <span class="hero-kicker" data-field="heroKicker">Innovation Week</span>
+              <h2 class="hero-title" data-field="heroTitle">Makerere Innovation Week opens Monday</h2>
+              <p class="hero-desc" data-field="heroBody">32 student teams will showcase projects across Main Campus. Exhibitions run 09:00 — 17:00 in Freedom Square.</p>
+              <a class="hero-link" href="#discover" data-testid="hero-read">Read story <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></a>
+            </div>
+          </div>
+        </article>
+
+        <!-- Sports result — canonical -->
+        <article class="card list-card" id="homeSports" style="margin-top:10px;">
+          <div class="row" style="justify-content:space-between;">
+            <div class="row" style="flex:1;">
+              <div class="icon-tile icon-tile--neutral" aria-hidden="true">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M7.5 4.5c2 2 3 5.5 3 7.5s-1 5.5-3 7.5"/><path d="M16.5 4.5c-2 2-3 5.5-3 7.5s1 5.5 3 7.5"/></svg>
+              </div>
+              <div style="min-width:0;">
+                <div class="kicker">Sports Result</div>
+                <div class="title" style="margin-top:4px;" data-field="sportsTitle">MUBS 1 — 2 Makerere University</div>
+                <div class="meta" style="margin-top:2px;"><span data-field="sportsLeague">Football (Men) • University League</span></div>
+                <div class="meta" data-field="sportsMeta">17 May 2026 • Final</div>
+              </div>
+            </div>
+            <div style="display:flex; flex-direction:column; align-items:center; gap:6px; min-width:86px;">
+              <div class="vs" aria-hidden="true">
+                <span class="crest">MUBS</span>
+                <span class="crest" style="background: var(--brand-soft); border-color: var(--brand-border); color: var(--brand);">MUK</span>
+              </div>
+              <a href="#sports" class="btn btn--ghost" style="font-size:12px; padding:4px 8px; min-height:28px;">View details</a>
+            </div>
+          </div>
+        </article>
+
+        <!-- Opportunity -->
+        <article class="card list-card" id="homeOpp">
+          <div class="row">
+            <div class="icon-tile icon-tile--brand" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 12h18"/></svg>
+            </div>
+            <div style="flex:1; min-width:0;">
+              <div class="kicker">Verified Opportunity</div>
+              <div class="title" style="margin-top:4px;" data-field="oppTitle">Research Assistant — Climate Resilience</div>
+              <div class="meta" style="margin-top:4px;" data-field="oppProvider">Makerere University — Department of Geography</div>
+              <div class="meta" style="margin-top:4px; font-weight:600;" data-field="oppDeadline">Apply by 30 May 2026</div>
+            </div>
+            <a href="#opportunity" aria-label="View opportunity" style="align-self:center; color: var(--text-muted);">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M9 18l6-6-6-6"/></svg>
+            </a>
+          </div>
+        </article>
+
+        <!-- Quick Poll — CORRECTED: no Student Voice hybrid -->
+        <article class="card list-card" id="homePoll">
+          <div class="row">
+            <div class="icon-tile" aria-hidden="true" style="background:#fef3f2; border-color:#fecdc9; color:#b42318;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M3 12h4"/><path d="M9 8h4"/><path d="M15 14h4"/><path d="M5 12a2 2 0 1 1 0 .001"/><path d="M11 8a2 2 0 1 1 0 .001"/><path d="M17 14a2 2 0 1 1 0 .001"/></svg>
+            </div>
+            <div style="flex:1; min-width:0;">
+              <div class="kicker">Quick Poll</div>
+              <div class="title" style="margin-top:4px;">What should be improved most around Main Campus?</div>
+              <div class="meta" style="margin-top:4px;">Non-binding sentiment • Closes 25 May 2026</div>
+            </div>
+            <a href="#participate" class="btn btn--primary btn--small" style="align-self:center; background: var(--brand);">Respond</a>
+          </div>
+        </article>
+
+        <!-- Student Voice snippet — separate from poll -->
+        <article class="card list-card" id="homeVoice">
+          <div style="display:flex; justify-content:space-between; gap:12px; align-items:flex-start;">
+            <div style="flex:1; min-width:0;">
+              <div class="kicker">Student Voice</div>
+              <div class="title" style="margin-top:6px; font-size:14px;">Irregular water supply in Halls</div>
+              <div class="inline-meta" style="margin-top:6px;"><span>124 supporters</span><span aria-hidden="true">•</span><span class="status-chip chip-acknowledged" style="padding:2px 8px; font-size:11px;">Acknowledged</span></div>
+            </div>
+            <a href="#voice" class="btn btn--ghost" style="white-space:nowrap;">View issue →</a>
+          </div>
+        </article>
+
+        <!-- Daily Quiz — CONSISTENT +10 XP, not 120 -->
+        <article class="card list-card" id="homeQuiz" style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+          <div class="row" style="flex:1;">
+            <div class="icon-tile icon-tile--play" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 3h12v5a6 6 0 0 1-6 6 6 6 0 0 1-6-6V3z"/><path d="M6 8h-2a3 3 0 0 0 3 3"/><path d="M18 8h2a3 3 0 0 1-3 3"/><path d="M12 14v4"/><path d="M9 18h6"/></svg>
+            </div>
+            <div style="min-width:0;">
+              <div class="kicker kicker--play">Daily Quiz</div>
+              <div class="title" style="margin-top:4px; font-size:14px;">Which lake is the largest in East Africa?</div>
+              <div class="meta" style="margin-top:4px;"><span style="font-weight:700; color: var(--play);">+10 XP</span><span aria-hidden="true"> • </span>Answer &amp; learn</div>
+            </div>
+          </div>
+          <a href="#play" class="btn" style="background:#fdf1dc; border-color:#f2d5a8; color:#8a5a12; white-space:nowrap;">Play <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></a>
+        </article>
+
+        <div class="divider" role="separator"></div>
+        <p class="meta" style="text-align:center;">KNOW is the product. PARTICIPATE creates value. PLAY amplifies engagement.</p>
+      </section>
+
+      <!-- DISCOVER -->
+      <section id="view-discover" data-view="discover" class="view" role="tabpanel" aria-labelledby="tab-discover" hidden>
+        <div class="view-head">
+          <h1 class="view-title">Discover</h1>
+          <p class="view-sub">News, events, opportunities and sports from across your campus.</p>
+        </div>
+
+        <div class="filters" role="tablist" aria-label="Discover filters" id="discoverFilters">
+          <button class="filter-chip" role="tab" aria-selected="true" data-filter="All">All</button>
+          <button class="filter-chip" role="tab" aria-selected="false" data-filter="Events">Events</button>
+          <button class="filter-chip" role="tab" aria-selected="false" data-filter="Opportunities">Opportunities</button>
+          <button class="filter-chip" role="tab" aria-selected="false" data-filter="Sports">Sports</button>
+          <button class="filter-chip" role="tab" aria-selected="false" data-filter="News">News</button>
+        </div>
+
+        <div id="discoverList" class="stack-10" aria-live="polite"></div>
+      </section>
+
+      <!-- PARTICIPATE -->
+      <section id="view-participate" data-view="participate" class="view" role="tabpanel" aria-labelledby="tab-participate" hidden>
+        <div class="view-head">
+          <h1 class="view-title">Participate</h1>
+          <p class="view-sub">Share your views through campus polls and Student Voice.</p>
+        </div>
+
+        <div class="segmented" role="tablist" aria-label="Participate sections">
+          <button class="seg-btn" role="tab" aria-selected="true" data-seg="polls" id="seg-polls">Polls</button>
+          <button class="seg-btn" role="tab" aria-selected="false" data-seg="voice" id="seg-voice">Student Voice</button>
+        </div>
+
+        <!-- Polls pane -->
+        <div id="pane-polls" style="margin-top:12px;">
+          <article class="card poll-card card-pad" id="pollCard" aria-labelledby="pollQuestion">
+            <div class="kicker">Non-binding student sentiment poll</div>
+            <h2 id="pollQuestion" class="title" style="margin:8px 0 6px; font-size:18px; line-height:1.3;">How would you rate the cleanliness of public restrooms on campus?</h2>
+            <p class="body-sm" style="margin:0;">Your feedback helps the Guild advocate for improvements.</p>
+
+            <form id="pollForm" class="poll-options" aria-describedby="pollPrivacy">
+              <label class="poll-option"><input type="radio" name="poll" value="0" /> <span>Very good</span></label>
+              <label class="poll-option"><input type="radio" name="poll" value="1" /> <span>Good</span></label>
+              <label class="poll-option"><input type="radio" name="poll" value="2" /> <span>Average</span></label>
+              <label class="poll-option"><input type="radio" name="poll" value="3" /> <span>Poor</span></label>
+              <label class="poll-option"><input type="radio" name="poll" value="4" /> <span>Very poor</span></label>
+            </form>
+
+            <div class="poll-footer">
+              <div id="pollPrivacy" class="meta" style="display:flex; align-items:center; gap:6px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1.5" fill="currentColor" stroke="none"/></svg>
+                <span>Your individual response is private.</span>
+              </div>
+              <button id="submitPoll" class="btn btn--primary" type="button" disabled>Submit response</button>
+            </div>
+            <p class="meta" style="margin-top:8px; font-size:11px;">CampusHub does not provide Guild or university users with a way to see how a named student responded to a poll.</p>
+            <div id="pollSuccess" hidden style="margin-top:10px; padding:10px 12px; background:#e6f2e9; border:1px solid #cfe3d4; border-radius:10px; color: var(--brand); font-size:13px; font-weight:600;">
+              Thank you — your response has been recorded. You earned +5 XP.
+            </div>
+          </article>
+
+          <div class="card card-pad" style="margin-top:10px;">
+            <div class="row" style="justify-content:space-between;">
+              <div>
+                <div class="kicker">Student Voice</div>
+                <div style="font-weight:700; margin-top:4px;">Raise issues. Get heard. Drive change.</div>
+                <div class="body-sm" style="margin-top:6px;">Student Voice submissions are reviewed before publication and must stay within the permitted campus issue categories.</div>
+              </div>
+              <a href="#voice" class="section-action" style="white-space:nowrap;">View all →</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Voice pane -->
+        <div id="pane-voice" hidden style="margin-top:12px;">
+          <div class="card card-pad" style="background:#f0f7ff; border-color:#c9ddf1;">
+            <div class="row">
+              <div class="icon-tile icon-tile--info" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M21 11.5a8.5 8.5 0 0 1-12.5 7.5L3 21l2-5.5A8.5 8.5 0 0 1 21 11.5z"/><circle cx="12" cy="12" r="1"/><circle cx="8.5" cy="12" r="1"/><circle cx="15.5" cy="12" r="1"/></svg>
+              </div>
+              <div>
+                <div class="title" style="font-size:14px;">Student Voice</div>
+                <div class="body-sm">Student Voice issues are reviewed before publication. Public comments are not part of Student Voice.</div>
+              </div>
+            </div>
+          </div>
+
+          <div id="voiceList" class="stack-8" style="margin-top:10px;"></div>
+
+          <div class="card card-pad" style="margin-top:10px; background:#fcfcfa;">
+            <div class="row">
+              <div style="width:28px; height:28px; border-radius:999px; border:1px solid var(--border); display:grid; place-items:center; flex:0 0 auto;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg>
+              </div>
+              <div class="body-sm" style="font-size:12px;">Your identity is visible only to authorised handlers and is not shared publicly.</div>
+            </div>
+          </div>
+
+          <button id="voiceNewBtn" class="btn btn--primary" style="width:100%; margin-top:10px;">Submit a new issue</button>
+        </div>
+      </section>
+
+      <!-- PLAY -->
+      <section id="view-play" data-view="play" class="view" role="tabpanel" aria-labelledby="tab-play" hidden>
+        <div class="view-head">
+          <h1 class="view-title">Play</h1>
+          <p class="view-sub">Your Daily Quiz, XP, level and streak.</p>
+        </div>
+
+        <!-- Level card -->
+        <article class="card card-pad">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+            <div>
+              <div class="kicker kicker--play">Your progress</div>
+              <div style="margin-top:6px; display:flex; align-items:baseline; gap:8px;">
+                <span style="font-size:28px; font-weight:800;" data-field="levelDisplay">Level 4</span>
+                <span class="pill pill--play" data-field="levelTitle">Campus Regular</span>
+              </div>
+              <div class="meta" style="margin-top:4px;"><span data-field="xpCount">340</span> XP • <span data-field="xpNext">160 XP to Level 5</span></div>
+            </div>
+            <div class="icon-tile icon-tile--play" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 21h8"/><path d="M12 17a5 5 0 0 0 5-5c0-1-1-2-1-2H8s-1 1-1 2a5 5 0 0 0 5 5z"/><path d="M6 8V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v3"/></svg></div>
+          </div>
+          <div class="progress" style="margin-top:12px;" aria-hidden="true"><div class="progress-bar" id="xpBar" style="width:42%;"></div></div>
+        </article>
+
+        <!-- Streak -->
+        <article class="card card-pad" style="margin-top:10px;">
+          <div class="row" style="justify-content:space-between;">
+            <div>
+              <div class="kicker">Streak</div>
+              <div style="font-size:22px; font-weight:800; margin-top:4px;"><span data-field="streakDays">3</span> days</div>
+              <div class="meta">Active on Monday, Tuesday and Wednesday</div>
+            </div>
+            <div class="icon-tile" aria-hidden="true" style="background:#f7f3e8; border-color:#efe2c2; color:#8a6a12;">⟡</div>
+          </div>
+          <div class="streak-days" aria-label="Streak days">
+            <div class="day-pill is-done">Mon</div>
+            <div class="day-pill is-done">Tue</div>
+            <div class="day-pill is-today">Wed</div>
+            <div class="day-pill">Thu</div>
+            <div class="day-pill">Fri</div>
+            <div class="day-pill">Sat</div>
+            <div class="day-pill">Sun</div>
+          </div>
+          <p class="meta" style="margin-top:8px; font-size:11px;">Your streak pauses automatically during university recess.</p>
+        </article>
+
+        <!-- Daily Quiz -->
+        <article class="card card-pad" style="margin-top:10px;" id="quizCard">
+          <div class="kicker kicker--play">Daily Campus Quiz</div>
+          <h2 style="margin:8px 0 6px; font-size:16px; font-weight:800; line-height:1.3;" data-field="quizQ">Which lake is the largest in East Africa?</h2>
+          <p class="meta"><span style="font-weight:700; color: var(--play);">+5 XP</span> for taking part • <span style="font-weight:700; color: var(--play);">+5 XP</span> bonus if correct • One attempt per day</p>
+
+          <div id="quizOptions" class="stack-8" style="margin-top:12px;" role="radiogroup" aria-label="Quiz options">
+            <!-- injected -->
+          </div>
+
+          <div style="display:flex; gap:8px; margin-top:12px;">
+            <button id="quizSubmit" class="btn btn--primary" disabled style="flex:1;">Submit answer</button>
+          </div>
+          <div id="quizFeedback" hidden class="card-pad" style="margin-top:10px; border-radius:10px; border:1px solid #cfe3d4; background:#e6f2e9; font-size:13px;"></div>
+          <p id="quizCompleteNote" hidden class="meta" style="margin-top:8px; font-size:11px; text-align:center;">Today’s quiz is complete. A new quiz will be available tomorrow.</p>
+        </article>
+
+        <!-- XP rules -->
+        <article class="card card-pad" style="margin-top:10px;">
+          <h3 class="section-title" style="font-size:12px;">How XP works</h3>
+          <div id="xpRules" class="stack-8" style="margin-top:8px;"></div>
+          <div class="divider"></div>
+          <p class="meta" style="font-size:11px;">Your XP comes from completed CampusHub activities and cannot be spent.</p>
+        </article>
+      </section>
+
+      <!-- ME / PROFILE -->
+      <section id="view-me" data-view="me" class="view" role="tabpanel" aria-labelledby="tab-me" hidden>
+        <div class="view-head">
+          <h1 class="view-title">Me</h1>
+          <p class="view-sub">Manage your account, membership and preferences.</p>
+        </div>
+
+        <article class="card card-pad">
+          <div class="row">
+            <div class="avatar" aria-hidden="true">NG</div>
+            <div style="flex:1; min-width:0;">
+              <div class="title" data-field="studentName">Nakato Grace</div>
+              <div class="meta" data-field="studentProg">BSc Computer Science • Year 3</div>
+              <div class="meta" data-field="studentCampus">Main Campus • Mary Stuart Hall</div>
+              <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
+                <span class="pill pill--brand" data-field="assuranceBadge">L2 — Roster Match</span>
+                <span class="pill">Level 4 • 340 XP</span>
+              </div>
+            </div>
+          </div>
+          <div class="divider"></div>
+          <div style="display:flex; gap:8px;">
+            <a href="#verification" class="btn btn--soft btn--small" style="flex:1;">Verification &amp; membership</a>
+            <a href="#privacy" class="btn btn--small" style="flex:1;">Privacy</a>
+          </div>
+        </article>
+
+        <div class="section-head"><h2 class="section-title">Account</h2></div>
+        <div class="list">
+          <div class="card" style="padding:0; overflow:clip;">
+            <div style="padding:12px 14px; border-bottom:1px solid var(--border);">
+              <div style="font-size:11px; letter-spacing:.08em; text-transform:uppercase; font-weight:800; color: var(--text-muted);">Provided by your university</div>
+              <div style="margin-top:8px; display:grid; gap:6px; font-size:13px;">
+                <div style="display:flex; justify-content:space-between; gap:12px;"><span class="meta">Student number</span><span style="font-weight:600;" data-field="studentNo">21/U/04218</span></div>
+                <div style="display:flex; justify-content:space-between; gap:12px;"><span class="meta">Faculty</span><span style="font-weight:600; text-align:right;" data-field="studentFaculty">College of Computing &amp; Info. Sci.</span></div>
+                <div style="display:flex; justify-content:space-between; gap:12px;"><span class="meta">Enrolment status</span><span style="font-weight:600; color: var(--brand);">Current</span></div>
+              </div>
+            </div>
+            <div style="padding:12px 14px;">
+              <div style="font-size:11px; letter-spacing:.08em; text-transform:uppercase; font-weight:800; color: var(--text-muted);">Provided by you</div>
+              <div style="margin-top:8px; display:grid; gap:6px; font-size:13px;">
+                <div style="display:flex; justify-content:space-between; gap:12px;"><span class="meta">Display name</span><span style="font-weight:600;">Nakato Grace</span></div>
+                <div style="display:flex; justify-content:space-between; gap:12px;"><span class="meta">Personal email</span><span style="font-weight:600;">n.grace@…</span></div>
+                <div style="display:flex; justify-content:space-between; gap:12px;"><span class="meta">Phone</span><span style="font-weight:600;">+256 7•• ••• 321</span></div>
+                <div style="display:flex; justify-content:space-between; gap:12px;"><span class="meta">Notification prefs</span><a href="#me" class="section-action" style="font-size:12px;">Manage</a></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="list" style="margin-top:10px;">
+          <a class="list-row" href="#me" data-save-link><span><span class="row-label">Saves</span><span class="row-meta" style="display:block;" data-field="savesMeta">6 saved • Events, opportunities, news</span></span><span>›</span></a>
+          <a class="list-row" href="#me" data-rsvp-link><span><span class="row-label">RSVPs</span><span class="row-meta" style="display:block;">3 upcoming • 1 interested</span></span><span>›</span></a>
+          <a class="list-row" href="#play"><span><span class="row-label">Play</span><span class="row-meta" style="display:block;">Level 4 • Streak 3 days</span></span><span>›</span></a>
+          <a class="list-row" href="#notifications"><span><span class="row-label">Notifications</span><span class="row-meta" style="display:block;">2 unread • Grouped by Today / Yesterday</span></span><span>›</span></a>
+          <a class="list-row" href="#privacy"><span><span class="row-label">Privacy &amp; transparency</span><span class="row-meta" style="display:block;">What we collect • Who can see what</span></span><span>›</span></a>
+          <a class="list-row" href="#me"><span><span class="row-label">Sessions &amp; security</span><span class="row-meta" style="display:block;">Review devices • End sessions</span></span><span>›</span></a>
+          <a class="list-row" href="#me"><span><span class="row-label">Help &amp; support</span><span class="row-meta" style="display:block;">Guild contacts • Report a problem</span></span><span>›</span></a>
+        </div>
+
+        <div id="meSaves" class="card card-pad" style="margin-top:10px;">
+          <h3 class="section-title" style="font-size:12px;">Your saves</h3>
+          <div id="savesList" class="stack-8" style="margin-top:8px;"></div>
+        </div>
+      </section>
+
+      <!-- VERIFICATION -->
+      <section id="view-verification" data-view="verification" class="view" role="tabpanel" aria-label="Verification and membership" hidden>
+        <div class="view-head" style="display:flex; gap:10px; align-items:center;">
+          <button class="icon-btn" data-back aria-label="Back" style="width:36px; height:36px;">‹</button>
+          <div><h1 class="view-title" style="font-size:18px;">Verification &amp; membership</h1><p class="view-sub" style="margin-top:2px;">Honest assurance — evidence, not aspiration.</p></div>
+        </div>
+
+        <article class="card card-pad" style="background:#f6faf7; border-color:#cfe3d4;">
+          <div class="kicker">Current assurance</div>
+          <div style="margin-top:6px; font-size:18px; font-weight:800; color: var(--brand);" data-field="assuranceTitle">L2 — Roster Match</div>
+          <p class="body-sm">Your details match an approved university roster. A roster match alone does not prove identity where student numbers and surnames are guessable.</p>
+          <div class="progress" style="margin-top:10px;"><div class="progress-bar" style="width:55%;"></div></div>
+          <div class="meta" style="margin-top:6px; display:flex; justify-content:space-between;"><span>L0</span><span style="font-weight:700; color: var(--brand);">L2</span><span>L3</span></div>
+        </article>
+
+        <div class="timeline" style="margin-top:10px;">
+          <div class="tier tier--active">
+            <div class="tier-badge">✓</div>
+            <div><h3 class="tier-title">L0 — Registered</h3><p class="tier-desc">Authenticated account. Completed.</p></div>
+            <span class="pill pill--brand" style="margin-left:auto; align-self:center;">Done</span>
+          </div>
+          <div class="tier">
+            <div class="tier-badge">1</div>
+            <div><h3 class="tier-title">L1 — Weak Affiliation</h3><p class="tier-desc">Campus invite code or self-declared info. Not sufficient for polls or Voice.</p></div>
+          </div>
+          <div class="tier tier--active">
+            <div class="tier-badge">✓</div>
+            <div><h3 class="tier-title">L2 — Roster Match</h3><p class="tier-desc">You are on the current university roster. You can respond to polls (where L2 is permitted) and use Student Voice.</p></div>
+            <span class="pill pill--brand" style="margin-left:auto; align-self:center;">You are here</span>
+          </div>
+          <div class="tier">
+            <div class="tier-badge">3</div>
+            <div>
+              <h3 class="tier-title">L3 — Strong Institutional Proof</h3>
+              <p class="tier-desc">Roster match plus OTP to a roster-supplied contact, or institutional identity tied to current enrolment. Required for high-integrity polls.</p>
+              <button id="toL3" class="btn btn--primary btn--small" style="margin-top:8px;">Strengthen to L3</button>
+              <p class="meta" style="margin-top:6px; font-size:11px;">We will send a code to the email/phone your university supplied on the roster.</p>
+            </div>
+          </div>
+        </div>
+
+        <details class="details" style="margin-top:10px;">
+          <summary>What each level can do <span aria-hidden="true">›</span></summary>
+          <div class="details-body">
+            <ul style="margin:0; padding-left:18px;">
+              <li>L0: read public content only.</li>
+              <li>L1: save, follow, RSVP, Daily Quiz.</li>
+              <li>L2: polls (where L2 permitted) + Student Voice.</li>
+              <li>L3: full participation including high-integrity polls.</li>
+            </ul>
+          </div>
+        </details>
+        <details class="details">
+          <summary>Why OTP provenance matters <span aria-hidden="true">›</span></summary>
+          <div class="details-body">
+            OTP to an address you typed proves you control that address — not that you are that student. Only OTP to a roster-supplied channel upgrades assurance.
+          </div>
+        </details>
+        <details class="details">
+          <summary>Membership &amp; campus <span aria-hidden="true">›</span></summary>
+          <div class="details-body">
+            <p style="margin:0;">Membership: <strong>Makerere University — Main Campus</strong> • Academic Year 2026/2027. You belong to one campus at a time; history is preserved by tenant.</p>
+          </div>
+        </details>
+        <p class="meta" style="margin-top:10px; font-size:11px; text-align:center;">Verification is confirmed using your current enrolment details and, where needed, contact information held by your institution.</p>
+      </section>
+
+      <!-- NOTIFICATIONS -->
+      <section id="view-notifications" data-view="notifications" class="view" role="tabpanel" aria-labelledby="notifTitle" hidden>
+        <div class="view-head" style="display:flex; align-items:center; gap:10px;">
+          <button class="icon-btn" data-back aria-label="Back" style="width:36px; height:36px;">‹</button>
+          <div style="flex:1;"><h1 id="notifTitle" class="view-title" style="font-size:18px;">Notifications</h1><p class="view-sub" style="margin-top:2px;">Calm, operational — grouped by time.</p></div>
+          <button id="markAllRead" class="btn btn--small">Mark all read</button>
+        </div>
+        <div id="notifList"></div>
+      </section>
+
+      <!-- EVENT DETAIL -->
+      <section id="view-event" data-view="event" class="view" role="tabpanel" aria-label="Event detail" hidden>
+        <div class="view-head" style="display:flex; align-items:center; gap:10px;">
+          <button class="icon-btn" data-back aria-label="Back" style="width:36px; height:36px;">‹</button>
+          <div><h1 class="view-title" style="font-size:18px;">Event</h1></div>
+          <button id="eventSave" class="btn btn--small save-btn" style="margin-left:auto;" aria-pressed="false">Save</button>
+        </div>
+
+        <div class="detail-hero">
+          <img id="eventImg" src="assets/images/event-debate.webp" alt="University building exterior in daylight" width="900" height="500" loading="lazy" decoding="async" />
+        </div>
+        <div style="margin-top:10px;">
+          <div class="kicker kicker--info">Upcoming Event</div>
+          <h2 style="margin:6px 0 8px; font-size:20px; font-weight:800; line-height:1.2;" data-field="eventTitle">Guild Public Debate: The Future of AI in Africa</h2>
+          <div class="stack-8" style="font-size:13px; color: var(--text-muted);">
+            <div style="display:flex; gap:8px; align-items:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg> <span data-field="eventDate">Thu, 22 May 2026 • 2:00 PM — 4:30 PM</span></div>
+            <div style="display:flex; gap:8px; align-items:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg> <span data-field="eventVenue">Senate Building Auditorium</span></div>
+            <div style="display:flex; gap:8px; align-items:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> <span data-field="eventOrg">Makerere University Guild — Debate Union</span></div>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:8px; margin-top:12px;">
+          <button id="rsvpGoing" class="btn btn--primary" style="flex:1;">Going</button>
+          <button id="rsvpInterested" class="btn" style="flex:1;">Interested</button>
+        </div>
+        <p id="rsvpState" class="meta" style="margin-top:8px; display:none;"></p>
+
+        <article class="card card-pad" style="margin-top:12px;">
+          <h3 class="section-title" style="font-size:12px;">About</h3>
+          <p class="body-sm" style="margin-top:8px;">Join leading researchers, Guild leaders and student innovators for a debate on AI opportunities, ethics and skills for Africa's next decade. Open to all verified members (L1+). Please arrive by 1:45 PM for seating.</p>
+          <div class="divider"></div>
+          <div class="meta">No attendee directory or check-in available. Organiser is distinct from a clubs system.</div>
+        </article>
+      </section>
+
+      <!-- SPORTS DETAIL — lightweight result screen (fixes #event routing bug) -->
+      <section id="view-sports" data-view="sports" class="view" role="tabpanel" aria-label="Sports result detail" hidden>
+        <div class="view-head" style="display:flex; align-items:center; gap:10px;">
+          <button class="icon-btn" data-back aria-label="Back" style="width:36px; height:36px;">‹</button>
+          <div><h1 class="view-title" style="font-size:18px;">Sports</h1><p class="view-sub" style="margin-top:2px;">University League • Final result</p></div>
+        </div>
+        <article class="card card-pad">
+          <div class="kicker">Sports Result</div>
+          <h2 style="margin:6px 0 8px; font-size:19px; font-weight:800; line-height:1.2;" data-field="sportsTitle2">MUBS 1 — 2 Makerere University</h2>
+          <div class="meta" data-field="sportsLeague2">Football (Men) • University League</div>
+          <div style="display:flex; align-items:center; gap:16px; margin-top:14px; justify-content:center;">
+            <span class="crest" style="width:56px; height:56px;">MUBS</span>
+            <span class="score" style="font-size:18px;" data-field="sportsScore">1 — 2</span>
+            <span class="crest" style="width:56px; height:56px; background:var(--brand-soft); border-color:var(--brand-border); color:var(--brand);">MUK</span>
+          </div>
+          <div class="inline-meta" style="margin-top:14px; justify-content:center;"><span class="pill pill--brand">Final</span><span class="pill" data-field="sportsMeta2">17 May 2026 • MUBS Arena</span></div>
+          <div class="divider"></div>
+          <div class="stack-8" style="font-size:13px; color: var(--text-muted);">
+            <div style="display:flex; gap:8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/></svg> <span data-field="sportsDateLong">17 May 2026</span></div>
+            <div style="display:flex; gap:8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg> <span>MUBS Arena</span></div>
+            <div style="display:flex; gap:8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18"/></svg> <span>University League — Men’s Football</span></div>
+          </div>
+          <p class="meta" style="margin-top:12px; text-align:center;">Simple result view. No line-ups, brackets, predictor or fan comments in this prototype.</p>
+        </article>
+      </section>
+
+      <!-- OPPORTUNITY DETAIL -->
+      <section id="view-opportunity" data-view="opportunity" class="view" role="tabpanel" aria-label="Opportunity detail" hidden>
+        <div class="view-head" style="display:flex; align-items:center; gap:10px;">
+          <button class="icon-btn" data-back aria-label="Back" style="width:36px; height:36px;">‹</button>
+          <div><h1 class="view-title" style="font-size:18px;">Opportunity</h1></div>
+          <button id="oppSave" class="btn btn--small save-btn" style="margin-left:auto;" aria-pressed="false">Save</button>
+        </div>
+
+        <article class="card card-pad">
+          <div class="kicker">Verified Opportunity</div>
+          <h2 style="margin:6px 0 8px; font-size:19px; font-weight:800; line-height:1.2;" data-field="oppDetailTitle">Research Assistant — Climate Resilience</h2>
+          <div style="display:flex; gap:8px; align-items:center; font-size:13px; color: var(--text-muted);">
+            <span class="crest" style="width:32px; height:32px; font-size:9px;">MUK</span>
+            <span data-field="oppProvider2">Makerere University — Department of Geography</span>
+          </div>
+          <div class="inline-meta" style="margin-top:10px;">
+            <span class="pill pill--brand">Verified</span>
+            <span class="pill">Research</span>
+            <span class="pill">Part-time</span>
+          </div>
+          <div class="stack-8" style="margin-top:12px; font-size:13px;">
+            <div style="display:flex; gap:8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/></svg> <span><strong>Deadline:</strong> <span data-field="oppDeadline2">30 May 2026</span></span></div>
+            <div style="display:flex; gap:8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg> <span>Main Campus • Department of Geography</span></div>
+            <div style="display:flex; gap:8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2" y="7" width="20" height="10" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg> <span><strong>Stipend:</strong> UGX 600,000 / month</span></div>
+          </div>
+        </article>
+
+        <article class="card card-pad" style="margin-top:10px;">
+          <h3 class="section-title" style="font-size:12px;">Description</h3>
+          <p class="body-sm" style="margin-top:8px;">Support ongoing research on climate adaptation strategies in East Africa. You will assist with field data collection, literature reviews and community engagement activities across two study sites.</p>
+          <h3 class="section-title" style="font-size:12px; margin-top:14px;">Eligibility</h3>
+          <p class="body-sm" style="margin-top:8px;">Open to Year 2+ Geography, Environmental Science and related programmes. L2 verification required.</p>
+          <h3 class="section-title" style="font-size:12px; margin-top:14px;">Requirements</h3>
+          <ul class="body-sm" style="margin:8px 0 0; padding-left:18px;">
+            <li>CV (1 page)</li>
+            <li>Brief motivation (250 words)</li>
+            <li>Academic transcript (unofficial accepted)</li>
+          </ul>
+          <div style="margin-top:12px; padding:10px 12px; background:#fff7e6; border:1px solid #f2d5a8; border-radius:10px; font-size:12px; color:#6b4a12;">
+            <strong>External destination:</strong> Application is on an external university system. Verify the URL before submitting personal documents.
+          </div>
+          <a href="#" class="btn btn--primary" style="width:100%; margin-top:12px;" data-external>Apply on university portal</a>
+          <p class="meta" style="text-align:center; margin-top:6px; font-size:11px;">No social interactions on listings.</p>
+        </article>
+      </section>
+
+      <!-- STUDENT VOICE LISTING -->
+      <section id="view-voice" data-view="voice" class="view" role="tabpanel" aria-label="Student Voice" hidden>
+        <div class="view-head" style="display:flex; align-items:center; gap:10px;">
+          <button class="icon-btn" data-back aria-label="Back" style="width:36px; height:36px;">‹</button>
+          <div><h1 class="view-title" style="font-size:18px;">Student Voice</h1><p class="view-sub" style="margin-top:2px;">Reviewed before publication • Permitted categories only</p></div>
+        </div>
+        <div class="card card-pad" style="background:#f0f7ff; border-color:#c9ddf1;">
+          <p class="body-sm" style="margin:0;">Student Voice submissions are reviewed before publication and must stay within the permitted campus issue categories. Your identity is visible only to authorised handlers and is not shared publicly.</p>
+        </div>
+        <div id="voiceAllList" class="stack-8" style="margin-top:10px;"></div>
+        <div class="card card-pad" style="margin-top:10px;">
+          <h3 class="section-title" style="font-size:12px;"> permitted categories</h3>
+          <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;">
+            <span class="pill">Water &amp; Sanitation</span><span class="pill">Transport</span><span class="pill">Wi-Fi</span><span class="pill">Library</span><span class="pill">Lighting</span><span class="pill">Campus facilities</span>
+          </div>
+          
+        </div>
+      </section>
+
+      <!-- PRIVACY -->
+      <section id="view-privacy" data-view="privacy" class="view" role="tabpanel" aria-label="Privacy and transparency" hidden>
+        <div class="view-head" style="display:flex; align-items:center; gap:10px;">
+          <button class="icon-btn" data-back aria-label="Back" style="width:36px; height:36px;">‹</button>
+          <div><h1 class="view-title" style="font-size:18px;">Privacy &amp; transparency</h1><p class="view-sub" style="margin-top:2px;">Plain language, before you register.</p></div>
+        </div>
+        <article class="card card-pad prose">
+          <h2>What we collect</h2>
+          <p>Account contact (email/phone), display name, and — when you verify — the roster attributes your university supplies (student number, faculty, programme, campus, year). We do not collect date of birth for advertising.</p>
+
+          <h2>Who can see what</h2>
+          <ul>
+            <li><strong>Other students:</strong> display name and campus only — no contact details, no poll answers, no Voice identity.</li>
+            <li><strong>Guild administrators:</strong> aggregated counts and trends — not how a named student responded to a poll.</li>
+            <li><strong>University officials:</strong> constrained official view — counts, category-level Voice statistics — no individual answers or Voice submitter identity.</li>
+            <li><strong>Sponsors:</strong> never receive student personal data.</li>
+          </ul>
+
+          <h2>Poll privacy</h2>
+          <p>CampusHub does not provide Guild or university users with a way to see how a named student responded to a poll. Results are shown only when privacy thresholds are met.</p>
+
+          <h2>Student Voice identity</h2>
+          <p>Your identity is visible only to authorised handlers and is not shared publicly. Every access is audited. Student Voice is not anonymous — it is accountable.</p>
+
+          <h2>University official access</h2>
+          <p>Limited to official notices where the licence grants it, plus the constrained analytics view. No individual poll answers, no Voice submitter identity, no member contact exports, no audit-log editing.</p>
+
+          <h2>Sponsors</h2>
+          <p>Prohibited categories (betting, predatory lending and others) never appear. No assurance-level or behavioural targeting. Sponsors never receive student personal data.</p>
+
+          <h2>Your rights</h2>
+          <p>You can request your data and request deletion. Deletion preserves auditable history where required and removes public availability. We cannot remotely delete files already downloaded to unmanaged devices.</p>
+
+          <div style="display:flex; gap:8px; margin-top:14px;">
+            <button class="btn btn--soft btn--small" style="flex:1;">Request my data</button>
+            <button class="btn btn--small" style="flex:1;">Request deletion</button>
+          </div>
+        </article>
+      </section>
+
+    </main>
+
+    <!-- Bottom Nav -->
+    <nav class="bottom-nav" aria-label="Primary">
+      <div class="nav-list">
+        <a class="nav-item" href="#home" id="tab-home" aria-current="page" data-nav="home">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5L12 4l9 7.5V20a1 1 0 0 1-1 1h-5v-5H9v5H4a1 1 0 0 1-1-1v-8.5z"/><path d="M9 21v-5h6v5" fill="currentColor" stroke="none" opacity=".95"/></svg>
+          <span>Home</span>
+        </a>
+        <a class="nav-item" href="#discover" id="tab-discover" data-nav="discover">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v8"/><path d="M8 12h8"/><path d="M14.5 9.5l-5 5"/><circle cx="12" cy="12" r="2.2" fill="none"/></svg>
+          <span>Discover</span>
+        </a>
+        <a class="nav-item" href="#participate" id="tab-participate" data-nav="participate">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="9" cy="7" r="3.2"/><path d="M3 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2"/><circle cx="18" cy="8" r="2.4"/><path d="M18 12.5a4 4 0 0 0-2-.5"/></svg>
+          <span>Participate</span>
+        </a>
+        <a class="nav-item" href="#play" id="tab-play" data-nav="play">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M6 3h12v5a6 6 0 0 1-6 6 6 6 0 0 1-6-6V3z"/><path d="M6 8H4a3 3 0 0 0 3 3"/><path d="M18 8h2a3 3 0 0 1-3 3"/><path d="M12 14v5"/><path d="M9 19h6"/></svg>
+          <span>Play</span>
+        </a>
+        <a class="nav-item" href="#me" id="tab-me" data-nav="me">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>
+          <span>Me</span>
+        </a>
+      </div>
+    </nav>
+
+    <div class="toast-wrap" id="toastWrap" aria-live="polite" aria-atomic="true"></div>
+  </div>
+</div>
+
+<script src="js/demo-data.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

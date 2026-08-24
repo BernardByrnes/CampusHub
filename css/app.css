@@ -1,0 +1,40 @@
+/* App-specific tweaks that layer over components */
+.main > section[role="tabpanel"],
+.main > div[data-view] { display:none; }
+.main > section[role="tabpanel"].is-active,
+.main > div[data-view].is-active { display:block; }
+
+.view { animation: fadeIn .18s ease; }
+@keyframes fadeIn { from{opacity:.6; transform: translateY(2px)} to{opacity:1; transform:none} }
+@media (prefers-reduced-motion: reduce){ .view{animation:none} }
+
+/* Discover image cards */
+.cover { aspect-ratio: 1.35; border-radius: 10px; overflow:hidden; background: var(--muted-bg); border:1px solid var(--border); }
+.cover img { width:100%; height:100%; object-fit:cover; }
+
+/* Event detail hero */
+.detail-hero { border-radius: var(--radius-xl); overflow:hidden; border:1px solid var(--border); background:#0e1a12; }
+.detail-hero img { width:100%; height:auto; aspect-ratio:16/9; object-fit:cover; }
+.detail-hero--text { padding:0; border:0; background: transparent; }
+
+/* Privacy typography */
+.prose h2 { font-size:15px; margin:18px 0 6px; color: var(--text-strong); }
+.prose h3 { font-size:13px; letter-spacing:.06em; text-transform:uppercase; color: var(--text-strong); margin:16px 0 8px; }
+.prose p, .prose li { font-size:13px; color: var(--text-muted); line-height:1.6; }
+.prose ul { padding-left: 18px; margin: 8px 0; }
+
+/* Save toggle */
+.save-btn[aria-pressed="true"] { background: var(--brand-soft); border-color: var(--brand-border); color: var(--brand); }
+
+/* Quiz options */
+.quiz-opt { display:flex; gap:10px; align-items:center; padding:12px; border:1px solid var(--border); border-radius:12px; background:#fff; cursor:pointer; }
+.quiz-opt:has(input:checked) { border-color: var(--brand); background:#eef6f0; }
+.quiz-opt input { width:18px; height:18px; accent-color: var(--brand); }
+.quiz-opt.correct { border-color: #1a5c2e; background:#e6f2e9; }
+.quiz-opt.wrong { border-color:#d92d20; background:#fef3f2; }
+
+/* Streak day pills */
+.streak-days { display:flex; gap:6px; margin-top:8px; }
+.day-pill { flex:1; text-align:center; padding:8px 4px; border-radius:10px; border:1px solid var(--border); background:#fff; font-size:11px; font-weight:700; color: var(--text-muted); }
+.day-pill.is-done { background: var(--brand-soft); border-color: var(--brand-border); color: var(--brand); }
+.day-pill.is-today { background: var(--brand); color:#fff; border-color: var(--brand); }

@@ -1,0 +1,694 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>CampusHub — Student Prototype (Makerere University Guild)</title>
+<!-- ══ Prototype note: single-file build. To split later:
+     <style> §TOKENS→css/tokens.css · §COMPONENTS→css/components.css · §APP→css/app.css
+     <script> §DEMO-DATA→js/demo-data.js · §NAV→js/navigation.js · §INTERACTIONS→js/prototype.js ══ -->
+<style>
+/* ═════════ TOKENS ═════════ */
+:root{
+  --bg:#FAF9F6; --surface:#FFFFFF; --surface-2:#F4F2EC;
+  --text:#152430; --text-muted:#5A6B77;
+  --tenant-primary:#0F7050; --tenant-primary-soft:#E4F1EA; --tenant-primary-ink:#0B5A40;
+  --info:#1D6FB8; --info-soft:#E8F1FA;
+  --play:#9A5B00; --play-soft:#FBF0DF;
+  --notice-ink:#0B5A40; --notice-soft:#EDF6F0;
+  --border:#E5E1D8; --border-strong:#D4CEC2;
+  --radius-sm:8px; --radius-md:12px; --radius-lg:16px;
+  --space-1:4px; --space-2:8px; --space-3:12px; --space-4:16px; --space-5:20px; --space-6:24px; --space-8:32px;
+  --shadow:0 1px 2px rgba(21,36,48,.06);
+  --font:-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+/* Tenant override hook: e.g. html[data-tenant="kyu"]{ --tenant-primary:...; } */
+/* ═════════ BASE ═════════ */
+*{box-sizing:border-box;margin:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--font);background:#F1EFE9;color:var(--text);font-size:16px;line-height:1.45;-webkit-font-smoothing:antialiased}
+img,svg{display:block}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+a{color:var(--tenant-primary-ink);text-decoration:none}
+:focus-visible{outline:2px solid var(--info);outline-offset:2px;border-radius:4px}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important;scroll-behavior:auto}}
+.skip{position:absolute;left:-999px;top:0;background:var(--surface);padding:10px 14px;z-index:99;border-radius:0 0 8px 0}
+.skip:focus{left:0}
+/* ═════════ LAYOUT ═════════ */
+.app{max-width:430px;margin:0 auto;min-height:100dvh;background:var(--bg);position:relative;display:flex;flex-direction:column}
+@media (min-width:480px){.app{border-inline:1px solid var(--border-strong)}}
+main{flex:1;padding:0 var(--space-4) 96px}
+.app-header{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:var(--space-3);padding:12px var(--space-4)}
+.crest{width:38px;height:38px;flex:none}
+.tenant{flex:1;min-width:0}
+.tenant-name{font-weight:700;font-size:16px;letter-spacing:-.01em}
+.tenant-sub{font-size:12.5px;color:var(--text-muted);margin-top:1px}
+.bell{position:relative;width:44px;height:44px;display:grid;place-items:center;border-radius:50%;color:var(--text)}
+.bell:hover{background:var(--surface-2)}
+.bell .badge{position:absolute;top:6px;right:6px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:#C6453C;color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center}
+.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;z-index:20;
+  background:var(--surface);border-top:1px solid var(--border);display:flex;padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+.bottom-nav a{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;min-height:56px;justify-content:center;
+  color:#6B7885;font-size:11px;font-weight:600;border-radius:10px}
+.bottom-nav a .ic{width:22px;height:22px}
+.bottom-nav a[aria-current="page"]{color:var(--tenant-primary-ink)}
+/* ═════════ COMPONENTS ═════════ */
+.ic{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.screen{padding-top:var(--space-4)}
+.screen[hidden]{display:none}
+.h1{font-size:22px;font-weight:800;letter-spacing:-.02em}
+.h1:focus{outline:none}
+.h2{font-size:17px;font-weight:700;letter-spacing:-.01em}
+.kicker{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+.kicker.green{color:var(--tenant-primary-ink)} .kicker.blue{color:var(--info)} .kicker.play{color:var(--play)}
+.meta{font-size:13px;color:var(--text-muted)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow);
+  padding:var(--space-4);margin-bottom:var(--space-4)}
+.rowline{display:flex;gap:var(--space-3);align-items:flex-start;padding:var(--space-4);background:var(--surface);
+  border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:var(--space-3)}
+.rowline a.stretch{color:inherit}
+.tile{width:42px;height:42px;border-radius:var(--radius-md);display:grid;place-items:center;flex:none}
+.tile .ic{width:21px;height:21px}
+.tile.green{background:var(--tenant-primary-soft);color:var(--tenant-primary-ink)}
+.tile.blue{background:var(--info-soft);color:var(--info)}
+.tile.play{background:var(--play-soft);color:var(--play)}
+.tile.neutral{background:var(--surface-2);color:var(--text-muted)}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px}
+.chip.blue{background:var(--info-soft);color:var(--info)} .chip.green{background:var(--tenant-primary-soft);color:var(--tenant-primary-ink)}
+.chip.neutral{background:var(--surface-2);color:var(--text-muted)} .chip.final{background:#EFECE6;color:#5B5647}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;padding:0 18px;
+  border-radius:var(--radius-md);font-weight:700;font-size:15px}
+.btn.primary{background:var(--tenant-primary);color:#fff}
+.btn.primary:hover{background:var(--tenant-primary-ink)}
+.btn.primary:disabled{opacity:.45;cursor:not-allowed}
+.btn.secondary{background:var(--surface);border:1px solid var(--border-strong);color:var(--text)}
+.btn.secondary[aria-pressed="true"]{background:var(--tenant-primary-soft);border-color:var(--tenant-primary);color:var(--tenant-primary-ink)}
+.btn.quiet{color:var(--tenant-primary-ink);min-height:40px}
+.linkline{display:inline-flex;align-items:center;gap:4px;font-weight:700;font-size:14px;color:var(--tenant-primary-ink)}
+.notice{background:var(--notice-soft);border:1px solid var(--border);border-left:4px solid var(--tenant-primary);border-radius:var(--radius-lg);padding:var(--space-4);margin-bottom:var(--space-4)}
+.scene{width:100%;aspect-ratio:16/9;border-radius:var(--radius-md);overflow:hidden;background:var(--surface-2)}
+.scene svg{width:100%;height:100%}
+.divider{height:1px;background:var(--border);margin:var(--space-4) 0}
+.list{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:var(--space-4)}
+.list .item{display:flex;align-items:center;gap:var(--space-3);min-height:52px;padding:10px var(--space-4);width:100%;text-align:left;color:inherit}
+.list .item + .item{border-top:1px solid var(--border)}
+.list .item:hover{background:var(--surface-2)}
+.list .item .grow{flex:1;min-width:0}
+.crestpair{display:flex;align-items:center;gap:8px}
+.crest-sm{width:30px;height:30px}
+.scoreline{font-size:16px;font-weight:800;letter-spacing:-.01em}
+.tabs{display:flex;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-md);padding:4px;margin-bottom:var(--space-4)}
+.tabs button{flex:1;min-height:42px;border-radius:8px;font-weight:700;font-size:14.5px;color:var(--text-muted)}
+.tabs button[aria-selected="true"]{background:var(--surface);color:var(--tenant-primary-ink);box-shadow:var(--shadow)}
+.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:var(--space-4);scrollbar-width:none}
+.chips button{flex:none;min-height:38px;padding:0 16px;border-radius:999px;border:1px solid var(--border-strong);background:var(--surface);font-weight:700;font-size:13.5px;color:var(--text-muted)}
+.chips button[aria-pressed="true"]{background:var(--tenant-primary);border-color:var(--tenant-primary);color:#fff}
+.field{margin-bottom:var(--space-3)}
+.field label{display:block;font-size:13px;font-weight:700;margin-bottom:6px}
+.field input,.field select,.field textarea{width:100%;min-height:46px;border:1px solid var(--border-strong);border-radius:var(--radius-md);padding:0 12px;font:inherit;background:var(--surface)}
+.field textarea{padding:10px 12px;resize:vertical}
+.radio-row{display:flex;align-items:center;gap:12px;border:1px solid var(--border);border-radius:var(--radius-md);padding:12px 14px;margin-bottom:8px;min-height:48px;cursor:pointer;background:var(--surface)}
+.radio-row:has(input:checked){border-color:var(--tenant-primary);background:var(--tenant-primary-soft)}
+.radio-row input{width:20px;height:20px;accent-color:var(--tenant-primary);flex:none}
+.progress{height:8px;border-radius:99px;background:rgba(255,255,255,.35);overflow:hidden}
+.progress>div{height:100%;background:#E8B54A;border-radius:99px}
+.stepper{list-style:none;display:flex;flex-direction:column;gap:0;margin:0 0 var(--space-4)}
+.stepper li{display:flex;gap:var(--space-3);position:relative;padding-bottom:var(--space-5)}
+.stepper li::before{content:"";position:absolute;left:15px;top:34px;bottom:2px;width:2px;background:var(--border-strong)}
+.stepper li:last-child::before{display:none}
+.step-dot{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;flex:none;border:2px solid var(--border-strong);background:var(--surface);font-size:12px;font-weight:800;color:var(--text-muted)}
+.stepper li.done .step-dot{background:var(--tenant-primary);border-color:var(--tenant-primary);color:#fff}
+.stepper li.current .step-dot{border-color:var(--tenant-primary);color:var(--tenant-primary-ink)}
+details{border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);margin-bottom:8px}
+details summary{padding:14px var(--space-4);font-weight:700;cursor:pointer;min-height:48px;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:8px}
+details summary::-webkit-details-marker{display:none}
+details summary::after{content:"";width:9px;height:9px;border-right:2px solid var(--text-muted);border-bottom:2px solid var(--text-muted);transform:rotate(45deg);flex:none;transition:transform .15s}
+details[open] summary::after{transform:rotate(225deg)}
+details .body{padding:0 var(--space-4) var(--space-4);font-size:14.5px;color:var(--text-muted)}
+details .body p+p{margin-top:8px}
+.unread-dot{width:9px;height:9px;border-radius:50%;background:#C6453C;flex:none}
+.infobox{display:flex;gap:10px;align-items:flex-start;background:var(--surface-2);border-radius:var(--radius-md);padding:12px 14px;font-size:13.5px;color:var(--text-muted);margin-bottom:var(--space-4)}
+.backline{display:inline-flex;align-items:center;gap:6px;font-weight:700;font-size:14px;margin-bottom:var(--space-3);color:var(--text-muted);min-height:40px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:92px;background:var(--text);color:#fff;padding:10px 18px;border-radius:999px;font-size:14px;z-index:60;box-shadow:var(--shadow)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<!-- Icon sprite (clean line icons only) -->
+<svg hidden xmlns="http://www.w3.org/2000/svg">
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V21h13V9.5"/></symbol>
+<symbol id="i-discover" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></symbol>
+<symbol id="i-participate" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.4"/><path d="M2.8 19.5c.8-3.3 3.3-5.1 6.2-5.1s5.4 1.8 6.2 5.1"/><circle cx="17" cy="9" r="2.7"/><path d="M17.6 14.4c2.4.4 4 1.9 4.6 4.3"/></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4h10v3.5a5 5 0 0 1-10 0z"/><path d="M7 5H4a3 3 0 0 0 3.2 4"/><path d="M17 5h3a3 3 0 0 1-3.2 4"/><path d="M12 12.5V16"/><path d="M8 20h8"/><path d="M10 20c0-2.2.8-4 2-4s2 1.8 2 4"/></symbol>
+<symbol id="i-me" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4.5 20c1-3.8 4-5.8 7.5-5.8s6.5 2 7.5 5.8"/></symbol>
+<symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 9.5a6 6 0 0 1 12 0c0 4.8 1.8 6 1.8 6H4.2S6 14.3 6 9.5"/><path d="M10 19a2.2 2.2 0 0 0 4 0"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 5 5"/></symbol>
+<symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h9M19 7h1"/><circle cx="16" cy="7" r="2.2"/><path d="M4 17h1M11 17h9"/><circle cx="8" cy="17" r="2.2"/></symbol>
+<symbol id="i-megaphone" viewBox="0 0 24 24"><path d="M3 10v4l4 1V9z"/><path d="M7 9.5 20 4v16L7 14.5"/><path d="M8.5 15.5 9.5 20h2l-.8-4"/></symbol>
+<symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+<symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-7-6.1-7-11a7 7 0 0 1 14 0c0 4.9-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+<symbol id="i-briefcase" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></symbol>
+<symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5h16v11H9.5L4 20z"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9.5" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="m12 3 7 2.8V12c0 4.4-2.9 7.4-7 9-4.1-1.6-7-4.6-7-9V5.8z"/><path d="m9 11.5 2.2 2.3L15.5 9"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.7 4.7L19 7.5"/></symbol>
+<symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+<symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5"/><path d="m11 6-6 6 6 6"/></symbol>
+<symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M7 4h10v17l-5-4-5 4z"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 7.8v.2"/></symbol>
+<symbol id="i-chart" viewBox="0 0 24 24"><path d="M6 20v-8M12 20V5M18 20v-5"/></symbol>
+<symbol id="i-droplet" viewBox="0 0 24 24"><path d="M12 3s6 6.6 6 11a6 6 0 0 1-12 0c0-4.4 6-11 6-11z"/></symbol>
+<symbol id="i-bus" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="13" rx="2"/><path d="M4 10.5h16"/><circle cx="8.5" cy="19.5" r="1.4"/><circle cx="15.5" cy="19.5" r="1.4"/></symbol>
+<symbol id="i-wifi" viewBox="0 0 24 24"><path d="M4 9.5a12 12 0 0 1 16 0"/><path d="M7 13a8 8 0 0 1 10 0"/><path d="M10 16.5a4 4 0 0 1 4 0"/><path d="M12 19.5v.1"/></symbol>
+<symbol id="i-activity" viewBox="0 0 24 24"><path d="M3 12h4l3 7 4-14 3 7h4"/></symbol>
+<symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6"/><path d="M20 4 11 13"/><path d="M11 5H5v14h14v-6"/></symbol>
+<symbol id="i-doc" viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/><path d="M10 12h5M10 16h5"/></symbol>
+</svg>
+
+<div class="app">
+<header class="app-header">
+  <!-- Placeholder crest — swap for tenant-supplied mark in assets/logos/ -->
+  <svg class="crest" viewBox="0 0 40 40" role="img" aria-label="Makerere University Guild crest">
+    <path d="M20 2 36 8v12c0 10-7 16-16 18C11 36 4 30 4 20V8z" fill="#0F7050"/>
+    <path d="M20 6 32 10.5V20c0 8-5.4 12.8-12 14.6C13.4 32.8 8 28 8 20v-9.5z" fill="#FAF9F6"/>
+    <path d="M20 10l8 3v7c0 5.4-3.6 8.8-8 10.2C15.6 28.8 12 25.4 12 20v-7z" fill="#E8B54A"/>
+    <circle cx="20" cy="18" r="3.4" fill="#0F7050"/>
+  </svg>
+  <div class="tenant">
+    <div class="tenant-name" data-demo="tenantName">Makerere University Guild</div>
+    <div class="tenant-sub" data-demo="tenantSub">Main Campus · Academic Year 2026/2027</div>
+  </div>
+  <a class="bell" href="#/notifications" id="bellBtn" aria-label="Notifications">
+    <svg class="ic" style="width:23px;height:23px" aria-hidden="true"><use href="#i-bell"/></svg>
+    <span class="badge" id="bellBadge" hidden>0</span>
+  </a>
+</header>
+
+<main id="main">
+
+<!-- ═══════════ 01 HOME ═══════════ -->
+<section class="screen" id="screen-home" aria-labelledby="h-home">
+  <h1 class="h1 sr" id="h-home" tabindex="-1">Home</h1>
+
+  <article class="notice" data-demo-slot="priorityNotice" aria-label="Priority notice"></article>
+
+  <article class="card" style="padding:0;overflow:hidden">
+    <div class="scene" role="img" aria-label="Students walking past the Main Campus clock tower">
+      <svg viewBox="0 0 400 225" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+        <rect width="400" height="225" fill="#DCE8E2"/><rect y="160" width="400" height="65" fill="#CBDFD2"/>
+        <rect x="120" y="95" width="160" height="70" fill="#EAE2D0"/><rect x="128" y="105" width="14" height="18" fill="#B9AE97"/><rect x="152" y="105" width="14" height="18" fill="#B9AE97"/><rect x="234" y="105" width="14" height="18" fill="#B9AE97"/><rect x="258" y="105" width="14" height="18" fill="#B9AE97"/>
+        <rect x="183" y="38" width="34" height="127" fill="#F0E8D6"/><polygon points="183,38 200,18 217,38" fill="#8A6E4B"/><rect x="193" y="52" width="14" height="16" fill="#6E6350"/>
+        <circle cx="70" cy="140" r="26" fill="#7FA98C"/><circle cx="330" cy="135" r="30" fill="#7FA98C"/><circle cx="300" cy="150" r="18" fill="#93B89E"/>
+        <rect x="60" y="176" width="20" height="34" fill="#4B5B66"/><rect x="320" y="172" width="20" height="38" fill="#37474F"/><rect x="150" y="180" width="18" height="30" fill="#5B6B77"/>
+      </svg>
+    </div>
+    <div style="padding:var(--space-4)">
+      <p class="kicker green" data-demo="storyKicker">Innovation Week</p>
+      <h2 class="h2" style="margin:6px 0" data-demo="storyTitle">Makerere Innovation Week opens Monday</h2>
+      <p class="meta" data-demo="storyBody">32 student teams will showcase projects across Main Campus.</p>
+    </div>
+  </article>
+
+  <div data-demo-slot="sportsResult"></div>
+  <div data-demo-slot="opportunityRow"></div>
+
+  <article class="rowline">
+    <span class="tile green"><svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg></span>
+    <div class="grow">
+      <p class="kicker green">Quick poll</p>
+      <h2 class="h2" style="margin:4px 0 2px" data-demo="homePollQ">What should be improved most around Main Campus?</h2>
+      <p class="meta" data-demo="pollCloses">Closes in 2d 14h</p>
+    </div>
+    <a class="linkline" href="#/participate">Respond <svg class="ic" style="width:16px;height:16px" aria-hidden="true"><use href="#i-chevron"/></svg></a>
+  </article>
+
+  <article class="rowline">
+    <span class="tile neutral"><svg class="ic" aria-hidden="true"><use href="#i-chat"/></svg></span>
+    <div class="grow">
+      <p class="kicker" style="color:var(--text-muted)">Student Voice</p>
+      <h2 class="h2" style="margin:4px 0 2px;font-size:15.5px" data-demo="voiceTopTitle">Irregular water supply in Halls</h2>
+      <p class="meta"><span data-demo="voiceTopSupporters">124</span> supporters · <span class="chip blue" data-demo="voiceTopStatus">Acknowledged</span></p>
+    </div>
+    <a class="linkline" href="#/voice">View issue <svg class="ic" style="width:16px;height:16px" aria-hidden="true"><use href="#i-chevron"/></svg></a>
+  </article>
+
+  <article class="rowline" style="background:var(--play-soft);border-color:#EBD9BC">
+    <span class="tile play"><svg class="ic" aria-hidden="true"><use href="#i-play"/></svg></span>
+    <div class="grow">
+      <p class="kicker play">Daily quiz</p>
+      <h2 class="h2" style="margin:4px 0 2px;font-size:15.5px" data-demo="quizQ">Which lake is the largest in East Africa?</h2>
+      <p class="meta">+<span data-demo="quizXP">10</span> XP · Answer &amp; learn</p>
+    </div>
+    <a class="linkline" style="color:var(--play)" href="#/play">Play <svg class="ic" style="width:16px;height:16px" aria-hidden="true"><use href="#i-chevron"/></svg></a>
+  </article>
+
+  <p class="meta" style="text-align:center"><a href="#/play"><span data-demo="xpTotal">2,450</span> XP · Level <span data-demo="level">6</span> · Streak <span data-demo="streakDays">3</span> days</a></p>
+</section>
+
+<!-- ═══════════ 02 DISCOVER ═══════════ -->
+<section class="screen" id="screen-discover" aria-labelledby="h-discover" hidden>
+  <h1 class="h1" id="h-discover" tabindex="-1">Discover</h1>
+  <div style="display:flex;gap:8px;margin:var(--space-4) 0">
+    <div class="field" style="flex:1;margin:0;position:relative">
+      <label class="sr" for="searchInput">Search campus content</label>
+      <input id="searchInput" type="search" placeholder="Search events, opportunities, sports, news..." style="padding-left:40px">
+      <svg class="ic" aria-hidden="true" style="position:absolute;left:12px;top:13px;color:var(--text-muted)"><use href="#i-search"/></svg>
+    </div>
+    <button class="btn secondary" style="min-width:48px;padding:0" id="filterBtn" aria-label="Filter options (prototype)"><svg class="ic" aria-hidden="true"><use href="#i-sliders"/></svg></button>
+  </div>
+  <div class="chips" role="group" aria-label="Content filters">
+    <button aria-pressed="true"  data-filter="all">All</button>
+    <button aria-pressed="false" data-filter="events">Events</button>
+    <button aria-pressed="false" data-filter="opportunities">Opportunities</button>
+    <button aria-pressed="false" data-filter="sports">Sports</button>
+    <button aria-pressed="false" data-filter="news">News</button>
+  </div>
+
+  <article class="card discover-item" data-cat="events" style="padding:0;overflow:hidden">
+    <div style="display:flex;gap:var(--space-4);padding:var(--space-4);flex-wrap:wrap">
+      <div style="flex:1;min-width:170px">
+        <p class="kicker blue">Upcoming event</p>
+        <h2 class="h2" style="margin:6px 0" data-demo="eventTitle">Guild Public Debate: The Future of AI in Africa</h2>
+        <p class="meta" style="display:flex;gap:6px;align-items:center;margin-bottom:4px"><svg class="ic" style="width:15px;height:15px" aria-hidden="true"><use href="#i-calendar"/></svg><span data-demo="eventDate">Thu, 22 May 2026</span></p>
+        <p class="meta" style="display:flex;gap:6px;align-items:center;margin-bottom:4px"><svg class="ic" style="width:15px;height:15px" aria-hidden="true"><use href="#i-clock"/></svg><span data-demo="eventTime">2:00 PM – 4:30 PM</span></p>
+        <p class="meta" style="display:flex;gap:6px;align-items:center"><svg class="ic" style="width:15px;height:15px" aria-hidden="true"><use href="#i-pin"/></svg><span data-demo="eventVenue">Senate Building Auditorium</span></p>
+        <a class="linkline" style="margin-top:10px" href="#/event">View details <svg class="ic" style="width:16px;height:16px" aria-hidden="true"><use href="#i-chevron"/></svg></a>
+      </div>
+      <div class="scene" style="flex:1;min-width:150px" role="img" aria-label="The Senate Building clock tower on Main Campus">
+        <svg viewBox="0 0 400 225" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="400" height="225" fill="#E2E9E4"/><rect y="170" width="400" height="55" fill="#CFE0D4"/><rect x="110" y="70" width="180" height="105" fill="#EDE5D3"/><rect x="178" y="30" width="44" height="145" fill="#F2EADA"/><polygon points="178,30 200,10 222,30" fill="#8A6E4B"/><rect x="190" y="46" width="20" height="20" fill="#6E6350"/><rect x="126" y="90" width="16" height="22" fill="#B9AE97"/><rect x="152" y="90" width="16" height="22" fill="#B9AE97"/><rect x="232" y="90" width="16" height="22" fill="#B9AE97"/><rect x="258" y="90" width="16" height="22" fill="#B9AE97"/><circle cx="60" cy="150" r="28" fill="#7FA98C"/><circle cx="345" cy="145" r="30" fill="#7FA98C"/></svg>
+      </div>
+    </div>
+  </article>
+
+  <article class="card discover-item" data-cat="news" style="padding:0;overflow:hidden">
+    <div style="display:flex;gap:var(--space-4);padding:var(--space-4);flex-wrap:wrap">
+      <div style="flex:1;min-width:170px">
+        <p class="kicker green">Campus story</p>
+        <h2 class="h2" style="margin:6px 0">New Innovation Lab Opens at CoCIS</h2>
+        <p class="meta" style="margin-bottom:8px">The College of Computing and Information Sciences launches a state-of-the-art innovation lab.</p>
+        <p class="meta">19 May 2026 · CoCIS</p>
+      </div>
+      <div class="scene" style="flex:1;min-width:150px" role="img" aria-label="The CoCIS Innovation Lab building">
+        <svg viewBox="0 0 400 225" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="400" height="225" fill="#E4E8EB"/><rect y="175" width="400" height="50" fill="#D3DCD8"/><rect x="70" y="55" width="260" height="120" fill="#EFF1F3"/><rect x="90" y="75" width="60" height="100" fill="#C9D2D8"/><rect x="250" y="75" width="60" height="100" fill="#C9D2D8"/><rect x="165" y="80" width="70" height="46" fill="#16232E"/><text x="200" y="100" fill="#fff" font-size="14" font-weight="700" text-anchor="middle" font-family="sans-serif">CoCIS</text><text x="200" y="116" fill="#fff" font-size="8.5" text-anchor="middle" font-family="sans-serif">INNOVATION LAB</text><circle cx="45" cy="165" r="16" fill="#7FA98C"/><circle cx="355" cy="165" r="16" fill="#7FA98C"/></svg>
+      </div>
+    </div>
+  </article>
+
+  <div class="discover-item" data-cat="opportunities" data-demo-slot="opportunityRow"></div>
+  <div class="discover-item" data-cat="sports" data-demo-slot="sportsResult"></div>
+</section>
+
+<!-- ═══════════ 03 PARTICIPATE ═══════════ -->
+<section class="screen" id="screen-participate" aria-labelledby="h-participate" hidden>
+  <h1 class="h1" id="h-participate" tabindex="-1">Participate</h1>
+  <div class="tabs" role="tablist" aria-label="Participate sections" style="margin-top:var(--space-4)">
+    <button role="tab" id="tab-polls" aria-selected="true" aria-controls="panel-polls">Polls</button>
+    <button role="tab" id="tab-voice" aria-selected="false" aria-controls="panel-voice">Student Voice</button>
+  </div>
+
+  <div id="panel-polls" role="tabpanel" aria-labelledby="tab-polls">
+    <form class="card" id="pollForm" style="border-left:4px solid var(--tenant-primary)">
+      <p class="kicker green">Non-binding student sentiment poll</p>
+      <fieldset style="border:0;padding:0;margin:8px 0 0">
+        <legend class="h2" style="margin-bottom:4px" data-demo="pollQ">How would you rate the cleanliness of public restrooms on campus?</legend>
+        <p class="meta" style="margin-bottom:12px">Your feedback helps the Guild advocate for improvements. · <span data-demo="pollCloses">Closes in 2d 14h</span></p>
+        <div id="pollOptions"></div>
+      </fieldset>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px;flex-wrap:wrap">
+        <p class="meta" style="display:flex;align-items:center;gap:6px"><svg class="ic" style="width:16px;height:16px" aria-hidden="true"><use href="#i-lock"/></svg>Your individual response is private.</p>
+        <button class="btn primary" type="submit" id="pollSubmit" disabled>Submit response</button>
+      </div>
+    </form>
+    <div class="card" id="pollDone" hidden style="border-left:4px solid var(--tenant-primary)">
+      <p style="display:flex;gap:10px;align-items:center;font-weight:700"><svg class="ic" style="color:var(--tenant-primary)" aria-hidden="true"><use href="#i-check"/></svg>Response recorded. Thank you.</p>
+      <p class="meta" style="margin-top:6px">Results will be available after the poll closes.</p>
+    </div>
+  </div>
+
+  <div id="panel-voice" role="tabpanel" aria-labelledby="tab-voice" hidden>
+    <p class="meta" style="margin-bottom:var(--space-3)">Student Voice issues are reviewed and moderated before publication.</p>
+    <div data-demo-slot="voiceList"></div>
+    <div class="infobox"><svg class="ic" aria-hidden="true"><use href="#i-info"/></svg><p>Your identity is visible only to authorised handlers and is not shared publicly.</p></div>
+    <a class="btn primary" style="width:100%" href="#/voice">Raise an issue</a>
+  </div>
+</section>
+
+<!-- ═══════════ 04 PLAY ═══════════ -->
+<section class="screen" id="screen-play" aria-labelledby="h-play" hidden>
+  <h1 class="h1" id="h-play" tabindex="-1">Play</h1>
+  <article class="card" style="background:var(--tenant-primary);border-color:var(--tenant-primary);color:#fff;margin-top:var(--space-4)">
+    <div style="display:flex;justify-content:space-between;align-items:baseline">
+      <h2 class="h2" style="font-size:20px">Level <span data-demo="level">6</span> · <span data-demo="levelName">Explorer</span></h2>
+      <span class="meta" style="color:#D8E9DF"><span data-demo="xpTotal">2,450</span> / 3,000 XP</span>
+    </div>
+    <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="3000" aria-valuenow="2450" aria-label="Progress to next level" style="margin-top:12px"><div style="width:82%"></div></div>
+    <p class="meta" style="color:#D8E9DF;margin-top:10px">Recognition only — nothing essential is ever locked by level.</p>
+  </article>
+
+  <article class="rowline">
+    <span class="tile neutral"><svg class="ic" aria-hidden="true"><use href="#i-activity"/></svg></span>
+    <div class="grow">
+      <p class="kicker" style="color:var(--text-muted)">Streak</p>
+      <h2 class="h2" style="margin:4px 0 2px"><span data-demo="streakDays">3</span> days</h2>
+      <p class="meta">Active Monday, Tuesday and Wednesday. Paused automatically during recess.</p>
+    </div>
+  </article>
+
+  <form class="card" id="quizForm" style="background:var(--play-soft);border-color:#EBD9BC">
+    <p class="kicker play">Daily quiz</p>
+    <h2 class="h2" style="margin:6px 0 2px" data-demo="quizQ">Which lake is the largest in East Africa?</h2>
+    <p class="meta" style="margin-bottom:10px">+<span data-demo="quizXP">10</span> XP · One attempt per day</p>
+    <div id="quizOptions" hidden>
+      <label class="radio-row"><input type="radio" name="quiz" value="Victoria">Lake Victoria</label>
+      <label class="radio-row"><input type="radio" name="quiz" value="Tanganyika">Lake Tanganyika</label>
+      <label class="radio-row"><input type="radio" name="quiz" value="Kyoga">Lake Kyoga</label>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button class="btn primary" style="background:var(--play)" type="button" id="quizToggle">Play quiz</button>
+      <button class="btn primary" style="background:var(--play)" type="submit" id="quizSubmit" hidden>Submit answer</button>
+    </div>
+    <p id="quizResult" class="meta" style="margin-top:8px;font-weight:700;color:var(--play)" hidden></p>
+  </form>
+
+  <h2 class="h2" style="margin:var(--space-5) 0 var(--space-3)">How XP is earned here</h2>
+  <div class="list">
+    <div class="item"><span class="tile play" style="width:36px;height:36px"><svg class="ic" aria-hidden="true"><use href="#i-play"/></svg></span><span class="grow">Daily Quiz (participation + accuracy)</span><strong>+10 XP</strong></div>
+    <div class="item"><span class="tile green" style="width:36px;height:36px"><svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg></span><span class="grow">Respond to a poll</span><strong>+15 XP</strong></div>
+    <div class="item"><span class="tile blue" style="width:36px;height:36px"><svg class="ic" aria-hidden="true"><use href="#i-calendar"/></svg></span><span class="grow">RSVP to an event</span><strong>+20 XP</strong></div>
+    <div class="item"><span class="tile green" style="width:36px;height:36px"><svg class="ic" aria-hidden="true"><use href="#i-shield"/></svg></span><span class="grow">Complete verification</span><strong>+50 XP</strong></div>
+  </div>
+  <p class="meta">Saves, follows and supports do not earn XP. A daily cap applies and never blocks the underlying action.</p>
+</section>
+
+<!-- ═══════════ 05 ME ═══════════ -->
+<section class="screen" id="screen-me" aria-labelledby="h-me" hidden>
+  <h1 class="h1" id="h-me" tabindex="-1">Me</h1>
+  <article class="card" style="margin-top:var(--space-4);display:flex;gap:var(--space-4);align-items:center">
+    <span class="tile green" style="width:56px;height:56px;border-radius:50%;font-size:19px;font-weight:800" aria-hidden="true">BK</span>
+    <div>
+      <h2 class="h2" data-demo="studentName">Bernard Kato</h2>
+      <p class="meta"><span data-demo="studentNumber">23/U/10452</span> · Engineering · Year 3<br><span data-demo="campus">Main Campus</span></p>
+    </div>
+  </article>
+
+  <a class="rowline" href="#/verification" style="color:inherit">
+    <span class="tile green"><svg class="ic" aria-hidden="true"><use href="#i-shield"/></svg></span>
+    <div class="grow">
+      <h2 class="h2" style="font-size:15.5px">L2 — Roster Match</h2>
+      <p class="meta">Your details match the university roster.</p>
+    </div>
+    <svg class="ic" style="color:var(--text-muted)" aria-hidden="true"><use href="#i-chevron"/></svg>
+  </a>
+
+  <div class="card" style="display:flex;text-align:center">
+    <div style="flex:1"><strong data-demo="xpTotal">2,450</strong><br><span class="meta">XP</span></div>
+    <div style="flex:1;border-inline:1px solid var(--border)"><strong data-demo="level">6</strong><br><span class="meta">Level</span></div>
+    <div style="flex:1"><strong data-demo="streakDays">3</strong><br><span class="meta">Day streak</span></div>
+  </div>
+
+  <div class="list">
+    <div class="item"><svg class="ic" style="color:var(--text-muted)" aria-hidden="true"><use href="#i-bookmark"/></svg><span class="grow">Saved</span><span class="meta" id="savedCount">1 item</span><svg class="ic" style="color:var(--text-muted)" aria-hidden="true"><use href="#i-chevron"/></svg></div>
+    <div class="item"><svg class="ic" style="color:var(--text-muted)" aria-hidden="true"><use href="#i-calendar"/></svg><span class="grow">My RSVPs</span><span class="meta" id="rsvpCount">1 upcoming</span><svg class="ic" style="color:var(--text-muted)" aria-hidden="true"><use href="#i-chevron"/></svg></div>
+    <a class="item" href="#/notifications"><svg class="ic" style="color:var(--text-muted)" aria-hidden="true"><use href="#i-bell"/></svg><span class="grow">Notification preferences</span><svg class="ic" style="color:var(--text-muted)" aria-hidden="true"><use href="#i-chevron"/></svg></a>
+    <a class="item" href="#/privacy"><svg class="ic" style="color:var(--text-muted)" aria-hidden="true"><use href="#i-lock"/></svg><span class="grow">Privacy &amp; transparency</span><svg class="ic" style="color:var(--text-muted)" aria-hidden="true"><use href="#i-chevron"/></svg></a>
+    <a class="item" href="#/verification"><svg class="ic" style="color:var(--text-muted)" aria-hidden="true"><use href="#i-shield"/></svg><span class="grow">Verification &amp; membership</span><svg class="ic" style="color:var(--text-muted)" aria-hidden="true"><use href="#i-chevron"/></svg></a>
+    <button class="item" data-toast="Sessions & security is not wired in this prototype."><svg class="ic" style="color:var(--text-muted)" aria-hidden="true"><use href="#i-doc"/></svg><span class="grow">Sessions &amp; security</span><svg class="ic" style="color:var(--text-muted)" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+    <button class="item" data-toast="Help & support is not wired in this prototype."><svg class="ic" style="color:var(--text-muted)" aria-hidden="true"><use href="#i-info"/></svg><span class="grow">Help &amp; support</span><svg class="ic" style="color:var(--text-muted)" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+  </div>
+
+  <h2 class="h2" style="margin-bottom:var(--space-3)">Your profile information</h2>
+  <div class="card">
+    <p class="kicker" style="color:var(--text-muted);margin-bottom:8px">Provided by your university</p>
+    <p style="font-size:14.5px;margin-bottom:14px">Student number · Faculty · Programme · Campus · Enrolment status</p>
+    <p class="kicker" style="color:var(--text-muted);margin-bottom:8px">Provided by you</p>
+    <p style="font-size:14.5px">Display name · Personal email · Phone · Notification preferences</p>
+  </div>
+</section>
+
+<!-- ═══════════ 06 VERIFICATION ═══════════ -->
+<section class="screen" id="screen-verification" aria-labelledby="h-verification" hidden>
+  <a class="backline" href="#/me"><svg class="ic" aria-hidden="true"><use href="#i-back"/></svg>Back to Me</a>
+  <h1 class="h1" id="h-verification" tabindex="-1">Verification &amp; membership</h1>
+  <ol class="stepper" style="margin-top:var(--space-4)">
+    <li class="done"><span class="step-dot"><svg class="ic" style="width:15px;height:15px" aria-hidden="true"><use href="#i-check"/></svg></span><div><strong>L0 — Registered</strong><p class="meta">Account created and contact channel verified.</p></div></li>
+    <li class="current"><span class="step-dot">L2</span><div><strong>L2 — Roster Match</strong> <span class="chip green" style="margin-left:6px">Current</span><p class="meta">Your student number and surname matched the university roster.</p></div></li>
+    <li><span class="step-dot">L3</span><div><strong>L3 — Strong Institutional Proof</strong><p class="meta">Optional. Stronger assurance via an institution-attested channel.</p></div></li>
+  </ol>
+  <div class="infobox"><svg class="ic" aria-hidden="true"><use href="#i-info"/></svg><p>Assurance levels describe the evidence held, not a promise of identity. L2 confirms affiliation with the roster; it is not full identity proof.</p></div>
+  <h2 class="h2" style="margin-bottom:var(--space-3)">Reach L3 (optional)</h2>
+  <div class="list">
+    <button class="item" data-toast="Prototype: OTP to an institution-attested email would start here."><span class="tile green" style="width:36px;height:36px"><svg class="ic" aria-hidden="true"><use href="#i-doc"/></svg></span><span class="grow"><strong style="font-size:14.5px">One-time code to your university email</strong><br><span class="meta">Available where the university attests the domain is issued only to current students.</span></span></button>
+    <button class="item" data-toast="Prototype: manual review request would start here."><span class="tile neutral" style="width:36px;height:36px"><svg class="ic" aria-hidden="true"><use href="#i-shield"/></svg></span><span class="grow"><strong style="font-size:14.5px">Manual review</strong><br><span class="meta">Upload official documents; reviewed against a checklist, up to 2 days.</span></span></span></button>
+  </div>
+  <p class="meta">There is no student-portal or single-sign-on verification in this release.</p>
+</section>
+
+<!-- ═══════════ 07 NOTIFICATIONS ═══════════ -->
+<section class="screen" id="screen-notifications" aria-labelledby="h-notifications" hidden>
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+    <h1 class="h1" id="h-notifications" tabindex="-1">Notifications</h1>
+    <button class="btn quiet" id="markAllRead">Mark all as read</button>
+  </div>
+  <div id="notifList" style="margin-top:var(--space-4)"></div>
+</section>
+
+<!-- ═══════════ 08 EVENT DETAIL ═══════════ -->
+<section class="screen" id="screen-event" aria-labelledby="h-event" hidden>
+  <a class="backline" href="#/discover"><svg class="ic" aria-hidden="true"><use href="#i-back"/></svg>Back to Discover</a>
+  <div class="scene" role="img" aria-label="Senate Building Auditorium exterior">
+    <svg viewBox="0 0 400 225" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="400" height="225" fill="#E2E9E4"/><rect y="170" width="400" height="55" fill="#CFE0D4"/><rect x="90" y="60" width="220" height="115" fill="#EDE5D3"/><rect x="180" y="25" width="40" height="150" fill="#F2EADA"/><polygon points="180,25 200,8 220,25" fill="#8A6E4B"/><rect x="110" y="85" width="18" height="24" fill="#B9AE97"/><rect x="140" y="85" width="18" height="24" fill="#B9AE97"/><rect x="242" y="85" width="18" height="24" fill="#B9AE97"/><rect x="272" y="85" width="18" height="24" fill="#B9AE97"/><circle cx="50" cy="150" r="26" fill="#7FA98C"/><circle cx="352" cy="148" r="26" fill="#7FA98C"/></svg>
+  </div>
+  <p class="kicker blue" style="margin:var(--space-4) 0 6px">Upcoming event</p>
+  <h1 class="h1" id="h-event" tabindex="-1" data-demo="eventTitle">Guild Public Debate: The Future of AI in Africa</h1>
+  <p class="meta" style="margin:10px 0;display:flex;gap:6px;align-items:center"><svg class="ic" style="width:15px;height:15px" aria-hidden="true"><use href="#i-calendar"/></svg><span data-demo="eventDate">Thu, 22 May 2026</span> · <span data-demo="eventTime">2:00 PM – 4:30 PM</span></p>
+  <p class="meta" style="display:flex;gap:6px;align-items:center"><svg class="ic" style="width:15px;height:15px" aria-hidden="true"><use href="#i-pin"/></svg><span data-demo="eventVenue">Senate Building Auditorium</span> · Main Campus</p>
+  <p class="meta" style="margin-top:6px">Hosted by the Makerere University Guild</p>
+  <div style="display:flex;gap:8px;margin:var(--space-5) 0">
+    <button class="btn secondary" style="flex:1" id="rsvpGoing" aria-pressed="false">Going</button>
+    <button class="btn secondary" style="flex:1" id="rsvpInterested" aria-pressed="false">Interested</button>
+  </div>
+  <p class="meta" id="rsvpNote">You will be reminded before the event, and notified of any change or cancellation.</p>
+  <div class="divider"></div>
+  <h2 class="h2" style="margin-bottom:8px">About</h2>
+  <p style="font-size:15px;margin-bottom:8px">A moderated public debate featuring student panellists from the College of Engineering and the School of Law, on how AI should shape African universities.</p>
+  <p style="font-size:15px">Open to all registered students. Entry is free; seating is first come, first served.</p>
+</section>
+
+<!-- ═══════════ 09 PRIVACY ═══════════ -->
+<section class="screen" id="screen-privacy" aria-labelledby="h-privacy" hidden>
+  <a class="backline" href="#/me"><svg class="ic" aria-hidden="true"><use href="#i-back"/></svg>Back to Me</a>
+  <h1 class="h1" id="h-privacy" tabindex="-1">Privacy &amp; transparency</h1>
+  <p class="meta" style="margin:8px 0 var(--space-4)">Written for students, not lawyers. The formal notice exists separately.</p>
+  <details><summary>What we collect</summary><div class="body"><p>At registration: your name, one contact channel and a password — nothing else. Your university then supplies roster details (student number, faculty, programme, campus) used to verify membership.</p><p>We do not collect date of birth, and we do not ask for a photo at registration.</p></div></details>
+  <details><summary>Who can see what</summary><div class="body"><p>The Guild sees aggregate activity only: reach, turnout, participation counts. The university sees counts and trends, never individual behaviour. Sponsors receive no personal data at all.</p></div></details>
+  <details><summary>Poll privacy</summary><div class="body"><p>CampusHub does not provide Guild or university users with a way to see how a named student responded to a poll. Polls are non-binding sentiment instruments.</p><p>The exact technical model behind this is under architecture review; this page will always describe what the system actually delivers, never more.</p></div></details>
+  <details><summary>Student Voice identity</summary><div class="body"><p>Your issue is pseudonymous to other students. Only explicitly authorised handlers can see your identity, each access is recorded, and you can see when it has been accessed.</p></div></details>
+  <details><summary>University official access</summary><div class="body"><p>Named university office-holders see counts, trends and category-level statistics only — no content, no identities, no individual records.</p></div></details>
+  <details><summary>Sponsors</summary><div class="body"><p>Sponsored content is labelled, limited, and shown only to broad audiences (for example, all verified students on a campus). Sponsors can never target you by behaviour, verification strength, or anything you have done.</p><p>Sponsored notifications are never sent.</p></div></details>
+  <details><summary>Your rights</summary><div class="body"><p>You may request a copy of your data, correct it, or request deletion at any time from Help &amp; support. Deletion explains plainly what is removed, what is anonymised, and what must remain for security and accountability.</p></div></details>
+</section>
+
+<!-- ═══════════ 10 OPPORTUNITY DETAIL ═══════════ -->
+<section class="screen" id="screen-opportunity" aria-labelledby="h-opportunity" hidden>
+  <a class="backline" href="#/discover"><svg class="ic" aria-hidden="true"><use href="#i-back"/></svg>Back to Discover</a>
+  <p style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><span class="chip green"><svg class="ic" style="width:13px;height:13px" aria-hidden="true"><use href="#i-shield"/></svg>Verified opportunity</span><span class="chip neutral">Research</span></p>
+  <h1 class="h1" id="h-opportunity" tabindex="-1" data-demo="oppTitle">Research Assistant — Climate Resilience</h1>
+  <p class="meta" style="margin:8px 0" data-demo="oppProvider">Makerere University — Department of Geography</p>
+  <div class="card" style="margin:var(--space-4) 0">
+    <p class="meta" style="display:flex;gap:6px;align-items:center;margin-bottom:6px"><svg class="ic" style="width:15px;height:15px" aria-hidden="true"><use href="#i-calendar"/></svg>Apply by <strong style="margin-left:4px" data-demo="oppDeadline">30 May 2026</strong></p>
+    <p class="meta" style="display:flex;gap:6px;align-items:center;margin-bottom:6px"><svg class="ic" style="width:15px;height:15px" aria-hidden="true"><use href="#i-pin"/></svg>Kampala, Uganda</p>
+    <p class="meta" style="display:flex;gap:6px;align-items:center"><svg class="ic" style="width:15px;height:15px" aria-hidden="true"><use href="#i-briefcase"/></svg>Stipend: yes, details during application</p>
+  </div>
+  <h2 class="h2" style="margin-bottom:8px">About</h2>
+  <p style="font-size:15px;margin-bottom:12px">Support ongoing research on climate adaptation strategies in East Africa, including field-data organisation and community survey coordination.</p>
+  <h2 class="h2" style="margin-bottom:8px">Eligibility</h2>
+  <p style="font-size:15px;margin-bottom:16px">Current students in Geography, Environmental Sciences or related programmes. No application fee is ever required for a legitimate opportunity.</p>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button class="btn secondary" id="saveOpp" aria-pressed="false" style="flex:1;min-width:120px"><svg class="ic" aria-hidden="true"><use href="#i-bookmark"/></svg><span id="saveLabel">Save</span></button>
+    <a class="btn primary" style="flex:2;min-width:180px" href="https://geography.mak.ac.ug/opportunities" target="_blank" rel="noopener noreferrer">Continue to application <svg class="ic" aria-hidden="true"><use href="#i-external"/></svg></a>
+  </div>
+  <p class="meta" style="margin-top:10px">You will leave CampusHub to apply. Check the destination before entering your details.</p>
+</section>
+
+<!-- ═══════════ 11 STUDENT VOICE ═══════════ -->
+<section class="screen" id="screen-voice" aria-labelledby="h-voice" hidden>
+  <a class="backline" href="#/participate"><svg class="ic" aria-hidden="true"><use href="#i-back"/></svg>Back to Participate</a>
+  <h1 class="h1" id="h-voice" tabindex="-1">Student Voice</h1>
+  <p class="meta" style="margin:8px 0 var(--space-4)">Raise campus service issues. Issues are reviewed and moderated before publication, and must stay within the permitted categories.</p>
+  <div data-demo-slot="voiceListFull"></div>
+  <div class="infobox"><svg class="ic" aria-hidden="true"><use href="#i-info"/></svg><p>Your identity is visible only to authorised handlers and is not shared publicly. Student Voice is not anonymous, and not a place to name individuals.</p></div>
+
+  <h2 class="h2" style="margin:var(--space-4) 0 var(--space-3)">Raise an issue</h2>
+  <form class="card" id="voiceForm">
+    <div class="field"><label for="vCat">Category</label>
+      <select id="vCat"><option>Water &amp; Sanitation</option><option>Transport</option><option>Wi-Fi &amp; Connectivity</option><option>Library</option><option>Lighting &amp; Safety Infrastructure</option><option>Campus Facilities</option></select></div>
+    <div class="field"><label for="vTitle">Issue title</label><input id="vTitle" required maxlength="90" placeholder="e.g. Reading room lights out on Level 2"></div>
+    <div class="field"><label for="vDesc">What is happening? (no individual names)</label><textarea id="vDesc" rows="3" required></textarea></div>
+    <label class="radio-row" style="margin-bottom:12px"><input type="checkbox" id="vConsent" required><span style="font-size:14px">I understand my identity is visible only to authorised handlers and is not shared publicly.</span></label>
+    <button class="btn primary" type="submit" style="width:100%">Submit for review</button>
+    <p class="meta" id="voiceDone" hidden style="margin-top:10px;font-weight:700;color:var(--tenant-primary-ink)">Submitted for review. You will be notified when it is published.</p>
+  </form>
+</section>
+
+</main>
+
+<nav class="bottom-nav" aria-label="Primary">
+  <a href="#/home" data-nav="home"><svg class="ic" aria-hidden="true"><use href="#i-home"/></svg>Home</a>
+  <a href="#/discover" data-nav="discover"><svg class="ic" aria-hidden="true"><use href="#i-discover"/></svg>Discover</a>
+  <a href="#/participate" data-nav="participate"><svg class="ic" aria-hidden="true"><use href="#i-participate"/></svg>Participate</a>
+  <a href="#/play" data-nav="play"><svg class="ic" aria-hidden="true"><use href="#i-play"/></svg>Play</a>
+  <a href="#/me" data-nav="me"><svg class="ic" aria-hidden="true"><use href="#i-me"/></svg>Me</a>
+</nav>
+</div>
+
+<script>
+/* ═════════ DEMO-DATA (single source of truth — §20) ═════════ */
+const DEMO = {
+  tenant:{name:"Makerere University Guild",campus:"Main Campus",year:"Academic Year 2026/2027"},
+  student:{name:"Bernard Kato",number:"23/U/10452"},
+  xp:{total:"2,450",level:"6",levelName:"Explorer",streakDays:"3"},
+  quiz:{q:"Which lake is the largest in East Africa?",xp:"10"},
+  notice:{title:"Wednesday Classes Rescheduled",body:"Due to the Guild General Assembly, all teaching on Wednesday, 27 May 2026 will start at 2:00 PM.",date:"25 May 2026",office:"Office of the Academic Registrar"},
+  story:{kicker:"Innovation Week",title:"Makerere Innovation Week opens Monday",body:"32 student teams will showcase projects across Main Campus."},
+  sports:{home:"MUBS",away:"Makerere University",hs:1,as:2,status:"Final",date:"17 May 2026",comp:"Football (Men) · University League"},
+  opp:{title:"Research Assistant — Climate Resilience",provider:"Makerere University — Department of Geography",deadline:"30 May 2026"},
+  event:{title:"Guild Public Debate: The Future of AI in Africa",date:"Thu, 22 May 2026",time:"2:00 PM – 4:30 PM",venue:"Senate Building Auditorium"},
+  poll:{q:"How would you rate the cleanliness of public restrooms on campus?",closes:"Closes in 2d 14h",options:["Very good","Good","Average","Poor","Very poor"]},
+  voice:[
+    {cat:"Water & Sanitation",icon:"droplet",title:"Irregular water supply in Halls",body:"Frequent disruptions are affecting daily routines and hygiene.",supporters:124,status:"Acknowledged",chip:"blue",history:["Submitted 2 May","Published 4 May","Acknowledged 9 May"]},
+    {cat:"Transport",icon:"bus",title:"Need for more buses during evenings",body:"Limited buses after 7 PM make it hard for students to get home.",supporters:87,status:"Under Review",chip:"neutral",history:["Submitted 6 May","Published 8 May","Under Review 12 May"]}
+  ],
+  notifications:[
+    {group:"Today",icon:"megaphone",tile:"green",title:"Priority Notice",body:"Wednesday classes will start at 2:00 PM due to the Guild General Assembly.",time:"9:20 AM",unread:true},
+    {group:"Today",icon:"chart",tile:"green",title:"Poll closing soon",body:"The campus sentiment poll closes in 2 days.",time:"7:45 AM",unread:true},
+    {group:"Yesterday",icon:"calendar",tile:"blue",title:"Event reminder",body:"Guild Public Debate — Thu, 22 May at 2:00 PM.",time:"8:00 AM",unread:false},
+    {group:"Yesterday",icon:"chat",tile:"neutral",title:"Voice update",body:"“Irregular water supply in Halls” is now Acknowledged.",time:"Yesterday",unread:false},
+    {group:"This week",icon:"shield",tile:"green",title:"Verification outcome",body:"Your membership reached L2 — Roster Match.",time:"Mon",unread:false}
+  ]
+};
+/* ═════════ NAVIGATION / ROUTER ═════════ */
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const ROUTES=["home","discover","participate","play","me","verification","notifications","event","opportunity","voice","privacy"];
+const NAVMAP={event:"discover",opportunity:"discover",voice:"participate",verification:"me",privacy:"me"};
+function route(){
+  let r=location.hash.replace("#/","")||"home"; if(!ROUTES.includes(r)) r="home";
+  $$(".screen").forEach(s=>s.hidden=(s.id!=="screen-"+r));
+  $$(".bottom-nav a").forEach(a=>{const key=a.dataset.nav;
+    if(key===r||(NAVMAP[r]===key)){a.setAttribute("aria-current","page")}else{a.removeAttribute("aria-current")}});
+  const h=$("#screen-"+r+" .h1, #screen-"+r+" h1"); if(h){h.setAttribute("tabindex","-1");h.focus({preventScroll:true});}
+  window.scrollTo(0,0);
+}
+addEventListener("hashchange",route);
+/* ═════════ HYDRATION from DEMO ═════════ */
+const icon=(n,w)=>`<svg class="ic" ${w?`style="width:${w}px;height:${w}px"`:""} aria-hidden="true"><use href="#i-${n}"/></svg>`;
+const crest=(t,c)=>`<svg class="crest-sm" viewBox="0 0 30 30" role="img" aria-label="${t} crest"><path d="M15 1 27 6v9c0 7.5-5.2 12-12 14C8.2 27 3 22.5 3 15V6z" fill="${c}"/><text x="15" y="18" text-anchor="middle" fill="#fff" font-size="8" font-weight="700" font-family="sans-serif">${t.slice(0,4)}</text></svg>`;
+function tplSports(){const s=DEMO.sports;return `
+  <article class="rowline"><span class="tile neutral">${icon("activity")}</span>
+  <div class="grow"><p class="kicker" style="color:var(--text-muted)">Sports result</p>
+  <p class="scoreline" style="margin:4px 0 2px">${s.home} ${s.hs} — ${s.as} ${s.away}</p>
+  <p class="meta">${s.comp} · ${s.date}</p></div>
+  <span style="display:flex;flex-direction:column;align-items:flex-end;gap:6px"><span class="crestpair">${crest(s.home,"#1D6FB8")}${crest(s.away,"#A63A32")}</span><span class="chip final">${s.status}</span></span></article>`;}
+function tplOppRow(){const o=DEMO.opp;return `
+  <article class="rowline"><span class="tile green">${icon("briefcase")}</span>
+  <div class="grow"><p class="kicker green">Verified opportunity</p>
+  <h2 class="h2" style="margin:4px 0 2px;font-size:15.5px">${o.title}</h2>
+  <p class="meta">${o.provider}<br>Apply by ${o.deadline}</p></div>
+  <a class="linkline" href="#/opportunity" aria-label="View opportunity: ${o.title}">${icon("chevron",16)}</a></article>`;}
+function tplVoice(v,full){return `
+  <article class="card" style="margin-bottom:12px">
+    <div style="display:flex;gap:12px"><span class="tile ${v.icon==="droplet"?"blue":"green"}">${icon(v.icon)}</span>
+    <div style="flex:1"><p class="kicker blue" style="text-transform:uppercase">${v.cat}</p>
+    <h2 class="h2" style="margin:4px 0 2px;font-size:15.5px">${v.title}</h2>
+    <p class="meta">${v.body}</p>
+    <p class="meta" style="display:flex;align-items:center;gap:10px;margin-top:10px">${icon("participate",16)} ${v.supporters} supporters <span class="chip ${v.chip}">${v.status}</span></p>
+    ${full?`<p class="meta" style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">${v.history.join(" → ")}</p>`:""}
+    </div></div></article>`;}
+function hydrate(){
+  $$("[data-demo]").forEach(el=>{const p=el.dataset.demo;
+    const map={tenantName:DEMO.tenant.name,tenantSub:`${DEMO.tenant.campus} · ${DEMO.tenant.year}`,
+      storyKicker:DEMO.story.kicker,storyTitle:DEMO.story.title,storyBody:DEMO.story.body,
+      homePollQ:"What should be improved most around Main Campus?",pollCloses:DEMO.poll.closes,
+      pollQ:DEMO.poll.q,quizQ:DEMO.quiz.q,quizXP:DEMO.quiz.xp,xpTotal:DEMO.xp.total,level:DEMO.xp.level,
+      levelName:DEMO.xp.levelName,streakDays:DEMO.xp.streakDays,studentName:DEMO.student.name,
+      studentNumber:DEMO.student.number,campus:DEMO.tenant.campus,eventTitle:DEMO.event.title,
+      eventDate:DEMO.event.date,eventTime:DEMO.event.time,eventVenue:DEMO.event venueFix(),
+      oppTitle:DEMO.opp.title,oppProvider:DEMO.opp.provider,oppDeadline:DEMO.opp.deadline,
+      voiceTopTitle:DEMO.voice[0].title,voiceTopSupporters:DEMO.voice[0].supporters,voiceTopStatus:DEMO.voice[0].status};
+    if(map[p]!==undefined) el.textContent=map[p];});
+  function venueFix(){return DEMO.event.venue}
+  $$('[data-demo-slot="priorityNotice"]').forEach(el=>el.innerHTML=`
+    <p class="kicker green" style="display:flex;gap:8px;align-items:center">${icon("megaphone",18)} Priority notice</p>
+    <h2 class="h2" style="margin:6px 0 4px">${DEMO.notice.title}</h2>
+    <p style="font-size:14.5px">${DEMO.notice.body}</p>
+    <p class="meta" style="margin-top:8px">${DEMO.notice.date} · ${DEMO.notice.office}</p>`);
+  $$('[data-demo-slot="sportsResult"]').forEach(el=>el.innerHTML=tplSports());
+  $$('[data-demo-slot="opportunityRow"]').forEach(el=>el.innerHTML=tplOppRow());
+  $$('[data-demo-slot="voiceList"]').forEach(el=>el.innerHTML=DEMO.voice.map(v=>tplVoice(v,false)).join(""));
+  $$('[data-demo-slot="voiceListFull"]').forEach(el=>el.innerHTML=DEMO.voice.map(v=>tplVoice(v,true)).join(""));
+  $("#pollOptions").innerHTML=DEMO.poll.options.map(o=>`<label class="radio-row"><input type="radio" name="poll" value="${o}">${o}</label>`).join("");
+  renderNotifs();
+}
+/* ═════════ INTERACTIONS ═════════ */
+const store={get(k,d){try{return JSON.parse(localStorage.getItem("ch-"+k))??d}catch(e){return d}},set(k,v){try{localStorage.setItem("ch-"+k,JSON.stringify(v))}catch(e){}}};
+function toast(msg){const t=document.createElement("div");t.className="toast";t.setAttribute("role","status");t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2600);}
+$$("[data-toast]").forEach(b=>b.addEventListener("click",()=>toast(b.dataset.toast)));
+function renderNotifs(){
+  const read=store("read",[]);let groups={};
+  DEMO.notifications.forEach((n,i)=>{(groups[n.group]??=[]).push({...n,i,unread:n.unread&&!read.includes(i)})});
+  $("#notifList").innerHTML=Object.entries(groups).map(([g,items])=>`
+    <h2 class="kicker" style="color:var(--text-muted);margin:14px 0 8px">${g}</h2><div class="list">`+
+    items.map(n=>`<button class="item" data-nid="${n.i}" data-unread="${n.unread}">
+      <span class="tile ${n.tile}" style="width:38px;height:38px">${icon(n.icon)}</span>
+      <span class="grow"><strong style="font-size:14.5px">${n.title}</strong><br><span class="meta">${n.body}</span></span>
+      <span style="display:flex;flex-direction:column;align-items:flex-end;gap:6px"><span class="meta">${n.time}</span>${n.unread?'<span class="unread-dot" aria-label="Unread"></span>':""}</span></button>`).join("")+`</div>`).join("");
+  const unread=DEMO.notifications.filter((n,i)=>n.unread&&!read.includes(i)).length;
+  const badge=$("#bellBadge");badge.hidden=unread===0;badge.textContent=unread;
+  $("#bellBtn").setAttribute("aria-label",`Notifications, ${unread} unread`);
+  $$("#notifList .item").forEach(b=>b.addEventListener("click",()=>{const id=+b.dataset.nid;const r=store("read",[]);if(!r.includes(id)){r.push(id);store("read",r);}renderNotifs();}));
+  $("#markAllRead").onclick=()=>{store("read",DEMO.notifications.map((_,i)=>i));renderNotifs();};
+}
+/* Poll */
+$("#pollOptions").addEventListener("change",()=>{$("#pollSubmit").disabled=!$("#pollOptions input:checked")});
+$("#pollForm").addEventListener("submit",e=>{e.preventDefault();if(store("pollDone",false))return;store("pollDone",true);showPoll();toast("Response recorded — thank you.");});
+function showPoll(){const done=store("pollDone",false);$("#pollForm").hidden=done;$("#pollDone").hidden=!done;}
+/* Quiz */
+$("#quizToggle").addEventListener("click",()=>{const open=!$("#quizOptions").hidden;$("#quizOptions").hidden=open;$("#quizSubmit").hidden=open;});
+$("#quizForm").addEventListener("submit",e=>{e.preventDefault();if(!$("#quizForm input:checked")){toast("Choose an answer first.");return;}
+  if(store("quizDone",false))return;store("quizDone",true);showQuiz();});
+function showQuiz(){const done=store("quizDone",false);const r=$("#quizResult");
+  if(done){$("#quizToggle").hidden=true;$("#quizOptions").hidden=true;$("#quizSubmit").hidden=true;r.hidden=false;r.textContent="Completed today · +10 XP earned. Result recorded.";} }
+/* RSVP */
+function setRsvp(v){const cur=store("rsvp",null);const next=(cur===v)?null:v;store("rsvp",next);
+  $("#rsvpGoing").setAttribute("aria-pressed",next==="going");$("#rsvpInterested").setAttribute("aria-pressed",next==="interested");
+  $("#rsvpNote").textContent=next?`You're “${next}”. You will be reminded before the event, and notified of any change or cancellation.`:"You will be reminded before the event, and notified of any change or cancellation.";
+  $("#rsvpCount").textContent=next?"1 upcoming":"0 upcoming";}
+$("#rsvpGoing").addEventListener("click",()=>setRsvp("going"));
+$("#rsvpInterested").addEventListener("click",()=>setRsvp("interested"));
+/* Save opportunity */
+function setSave(){const s=store("saved",false);$("#saveOpp").setAttribute("aria-pressed",s);$("#saveLabel").textContent=s?"Saved":"Save";$("#savedCount").textContent=(s?1:0)+" items";}
+$("#saveOpp").addEventListener("click",()=>{store("saved",!store("saved",false));setSave();toast(store("saved",false)?"Saved to your list.":"Removed from saved.");});
+/* Discover filters + search */
+$$(".chips button").forEach(b=>b.addEventListener("click",()=>{
+  $$(".chips button").forEach(x=>x.setAttribute("aria-pressed",x===b));filterDiscover();}));
+$("#searchInput").addEventListener("input",filterDiscover);
+$("#filterBtn").addEventListener("click",()=>toast("Prototype: advanced filters not wired."));
+function filterDiscover(){const f=$$('.chips button[aria-pressed="true"]`).dataset.filter;const q=$("#searchInput").value.toLowerCase();
+  $$(".discover-item").forEach(el=>{const cat=el.dataset.cat;const okCat=(f==="all")||cat===f;const okTxt=!q||el.textContent.toLowerCase().includes(q);el.style.display=(okCat&&okTxt)?"":"none";});}
+/* Participate tabs */
+$$("#screen-participate [role=tab]").forEach(t=>t.addEventListener("click",()=>{
+  $$("#screen-participate [role=tab]").forEach(x=>x.setAttribute("aria-selected",x===t));
+  $("#panel-polls").hidden=t.id!=="tab-polls";$("#panel-voice").hidden=t.id!=="tab-voice";}));
+/* Voice composer */
+$("#voiceForm").addEventListener("submit",e=>{e.preventDefault();$("#voiceDone").hidden=false;e.target.reset();});
+/* init */
+hydrate();showPoll();showQuiz();setSave();
+(function(){const r=store("rsvp",null);$("#rsvpGoing").setAttribute("aria-pressed",r==="going");$("#rsvpInterested").setAttribute("aria-pressed",r==="interested");})();
+route();
+</script>
+</body>
+</html>
