@@ -358,7 +358,7 @@
   }
 
   function renderVoiceDetail(issueId){
-    const selected = selectVoiceIssue(issueId || participationState().selectedVoiceIssueId) || selectVoiceIssue('v1');
+    const selected = selectVoiceIssue(issueId || participationState().selectedVoiceIssueId) || selectVoiceIssue('voice-water-halls');
     if(!selected) return null;
     const status = $('#voiceDetailStatus');
     const supporters = $('.voice-detail-supporters');
@@ -610,7 +610,7 @@
   }
 
   function defaultMembership(){
-    return { assuranceLevel:1, status:"active" };
+    return { assuranceLevel:2, status:"active" };
   }
 
   function defaultParticipation(){
@@ -622,7 +622,7 @@
       verifiedAttributes:true,
       storyPrerequisites:true,
       returnTo:null,
-      demoScenario:"assurance"
+      demoScenario:"eligible"
     };
   }
 
@@ -647,9 +647,9 @@
     if(typeof state.voiceLastSubmissionId!=="string") state.voiceLastSubmissionId = null;
     if(!Array.isArray(state.supportedVoiceIssues)) state.supportedVoiceIssues = [];
     state.supportedVoiceIssues = [...new Set(state.supportedVoiceIssues.filter(id=>typeof id==="string"))];
-    if(typeof state.selectedVoiceIssueId!=="string") state.selectedVoiceIssueId = "v1";
+    if(typeof state.selectedVoiceIssueId!=="string") state.selectedVoiceIssueId = "voice-water-halls";
     if(!D.voiceIssues.some(issue=>issue.id===state.selectedVoiceIssueId) && !state.voiceSubmissions.some(issue=>issue?.id===state.selectedVoiceIssueId)){
-      state.selectedVoiceIssueId = "v1";
+      state.selectedVoiceIssueId = "voice-water-halls";
     }
     if(typeof state.voiceStatusScenario!=="string" || !D.voiceStatusScenarios?.[state.voiceStatusScenario]){
       state.voiceStatusScenario = null;
@@ -867,8 +867,6 @@
       matchHelp.hidden = level!==1 || membershipRefresh;
       if(!matchHelp.hidden) matchHelp.textContent = "We will check your current enrolment against the university roster.";
     }
-    const toL3 = $('#toL3');
-    if(toL3) toL3.hidden = level!==2;
   }
 
   function renderPollState(){
@@ -937,12 +935,13 @@
         const state = participationState();
         state.pollDone = true;
         state.pollChoice = idx;
-        D.student.xp += 5;
+        const pollXp = Number(D.demoConfig?.xp?.pollParticipation) || 0;
+        D.student.xp += pollXp;
         hydrateTenant();
         renderXPRules();
         saveState(state);
         renderPollState();
-        toast("Response recorded — +5 XP. Your individual response remains private.");
+        toast("Response recorded. Your individual response remains private.");
       }, 500);
     });
   }
@@ -1414,7 +1413,7 @@
     const h = location.hash.replace('#','').trim().toLowerCase() || 'home';
     if(h==="voice-detail" || h.startsWith(VOICE_DETAIL_ROUTE_PREFIX)){
       let issueId = h.slice(VOICE_DETAIL_ROUTE_PREFIX.length) || participationState().selectedVoiceIssueId;
-      try{ issueId = decodeURIComponent(issueId); }catch(e){ issueId = 'v1'; }
+      try{ issueId = decodeURIComponent(issueId); }catch(e){ issueId = 'voice-water-halls'; }
       if(!selectVoiceIssue(issueId)){
         history.replaceState(null, '', '#voice');
         showView('voice');
@@ -1498,7 +1497,7 @@
       if(state.rsvp==='going'){
         going.classList.add('btn--primary'); going.classList.remove('btn'); going.textContent="Going ✓";
         inter.classList.remove('btn--primary'); inter.classList.add('btn'); inter.textContent="Interested";
-        meta.style.display='block'; meta.textContent='You are going — reminder will appear in notifications. +3 XP earned (once).';
+        meta.style.display='block'; meta.textContent='You are going — reminder will appear in notifications.';
         meta.style.color='var(--brand)';
       } else if(state.rsvp==='interested'){
         inter.classList.add('btn--primary'); inter.textContent="Interested ✓";
@@ -1516,11 +1515,9 @@
       if(state.rsvp==='going'){
         state.rsvp=null;
       } else {
-        const first = !state.rsvp;
         state.rsvp='going';
-        if(first){ D.student.xp+=3; hydrateTenant(); }
       }
-      saveState(state); reflect(); toast(state.rsvp? `RSVP: ${state.rsvp} — zero XP beyond first Going` : 'RSVP cleared');
+      saveState(state); reflect(); toast(state.rsvp? `RSVP: ${state.rsvp}` : 'RSVP cleared');
     });
     inter.addEventListener('click', ()=>{
       state.rsvp = state.rsvp==='interested' ? null : 'interested';
@@ -1776,24 +1773,6 @@
       e.preventDefault();
       toast("External destination — verify the URL before submitting documents.");
     }));
-
-    // L3 handler
-    $('#toL3')?.addEventListener('click', event=>{
-      const button = event.currentTarget;
-      const state = participationState();
-      if(state.membership.assuranceLevel!==2) return;
-      button.disabled = true;
-      toast("Code sent to your roster email — enter it to reach L3 (demo).");
-      setTimeout(()=>{
-        const updated = participationState();
-        updated.membership.assuranceLevel = 3;
-        saveState(updated);
-        syncStudentTrustState(updated);
-        hydrateTenant();
-        syncVerificationUi();
-        toast("Verified — now L3. High-integrity polls unlocked.");
-      }, 900);
-    });
 
     // Student Voice entry points reuse the existing participation-gate decision path.
     $('#voiceNewBtn')?.addEventListener('click', event=> requestVoiceComposer(event.currentTarget));

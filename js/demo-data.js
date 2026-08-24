@@ -9,7 +9,15 @@ window.CampusHubDemo = {
     academicYear: "2026/2027",
     logo: "MUK", // text fallback; real crest would be image
     primary: "#1a5c2e", // tenant green
-    verified: true
+    verified: true,
+    strongerVerificationMethods: []
+  },
+
+  // Prototype-only arithmetic configuration; this is not student-facing XP policy.
+  demoConfig: {
+    xp: {
+      pollParticipation: 5
+    }
   },
 
   student: {
@@ -20,9 +28,9 @@ window.CampusHubDemo = {
     year: "Year 3",
     campus: "Main Campus",
     residence: "Mary Stuart Hall",
-    assurance: "L1 — Weak Affiliation",
-    assuranceLevel: 1,
-    assuranceNext: "L3 — Strong Institutional Proof",
+    assurance: "L2 — Roster Match",
+    assuranceLevel: 2,
+    assuranceNext: null,
     xp: 340,
     level: 4,
     streak: 3,
@@ -32,14 +40,16 @@ window.CampusHubDemo = {
   },
 
   priorityNotice: {
+    id: "notice-classes-rescheduled",
     kicker: "Priority Notice",
     title: "Wednesday Classes Rescheduled",
-    body: "Due to the Guild General Assembly, all teaching on Wednesday, 21 May 2026 will start at 2:00 PM.",
+    body: "Due to the Guild General Assembly, all teaching on Wednesday, 20 May 2026 will start at 2:00 PM.",
     meta: "19 May 2026  •  Office of the Academic Registrar",
     href: "#notifications"
   },
 
   heroStory: {
+    id: "innovation-week",
     kicker: "Innovation Week",
     title: "Makerere Innovation Week opens Monday",
     body: "32 student teams will showcase projects across Main Campus. Exhibitions run 09:00 — 17:00 in Freedom Square.",
@@ -50,6 +60,7 @@ window.CampusHubDemo = {
   },
 
   sportsResult: {
+    id: "mubs-mak",
     homeTeam: "MUBS",
     awayTeam: "Makerere University",
     homeScore: 1,
@@ -65,6 +76,7 @@ window.CampusHubDemo = {
   },
 
   opportunity: {
+    id: "ra-climate",
     kicker: "Verified Opportunity",
     title: "Research Assistant — Climate Resilience",
     provider: "Makerere University — Department of Geography",
@@ -81,9 +93,10 @@ window.CampusHubDemo = {
   },
 
   featuredEvent: {
+    id: "guild-debate",
     kicker: "Upcoming Event",
     title: "Guild Public Debate: The Future of AI in Africa",
-    date: "Thu, 22 May 2026",
+    date: "Fri, 22 May 2026",
     time: "2:00 PM — 4:30 PM",
     venue: "Senate Building Auditorium",
     organiser: "Makerere University Guild — Debate Union",
@@ -94,6 +107,7 @@ window.CampusHubDemo = {
   },
 
   campusStory: {
+    id: "cocis-innovation-lab",
     kicker: "Campus Story",
     title: "New Innovation Lab Opens at CoCIS",
     body: "The College of Computing and Information Sciences launches a state-of-the-art innovation lab.",
@@ -105,6 +119,7 @@ window.CampusHubDemo = {
   },
 
   poll: {
+    id: "poll-restroom-cleanliness",
     kicker: "Non-binding student sentiment poll",
     question: "How would you rate the cleanliness of public restrooms on campus?",
     help: "Your feedback helps the Guild advocate for improvements.",
@@ -119,6 +134,7 @@ window.CampusHubDemo = {
   },
 
   quickPollForHome: {
+    id: "poll-campus-improvements",
     kicker: "Quick Poll",
     title: "What should be improved most around Main Campus?",
     cta: "Respond",
@@ -127,7 +143,7 @@ window.CampusHubDemo = {
 
   voiceIssues: [
     {
-      id: "v1",
+      id: "voice-water-halls",
       category: "Water & Sanitation",
       title: "Irregular water supply in Halls",
       body: "Frequent disruptions are affecting daily routines and hygiene.",
@@ -142,7 +158,7 @@ window.CampusHubDemo = {
       officialUpdates: []
     },
     {
-      id: "v2",
+      id: "voice-evening-buses",
       category: "Transport",
       title: "Need for more buses during evenings",
       body: "Limited buses after 7 PM make it hard for students to get home.",
@@ -158,7 +174,7 @@ window.CampusHubDemo = {
       officialUpdates: []
     },
     {
-      id: "v3",
+      id: "voice-library-wifi",
       category: "Wi-Fi",
       title: "Slow Wi-Fi at Main Library upper floor",
       body: "Connectivity drops during peak hours near the graduate wing.",
@@ -173,10 +189,62 @@ window.CampusHubDemo = {
     }
   ],
 
+  // Dedicated debug/validation records. These are not part of the normal public list.
+  voiceValidationFixtures: {
+    "voice-lighting-path": {
+      id: "voice-lighting-path",
+      category: "Lighting",
+      title: "Dark stretch between Mary Stuart and the Main Library",
+      body: "The path between Mary Stuart and the Main Library is poorly lit after evening classes.",
+      supporters: 41,
+      status: "Action Planned",
+      statusVariant: "planned",
+      submittedAt: "18 May 2026",
+      history: [
+        { status:"Submitted", date:"18 May 2026", note:"Issue submitted to Student Voice." },
+        { status:"Acknowledged", date:"19 May 2026", note:"The issue has been acknowledged." },
+        { status:"Under Review", date:"20 May 2026", note:"The issue is being reviewed by the responsible campus team." },
+        { status:"Action Planned", date:"21 May 2026", note:"A repair window has been scheduled." }
+      ],
+      officialUpdates: [
+        {
+          department:"Facilities Directorate",
+          date:"21 May 2026",
+          body:"A lighting survey of the Mary Stuart–Library path is complete. Replacement fittings are scheduled this week."
+        }
+      ]
+    },
+    "voice-library-sunday-hours": {
+      id: "voice-library-sunday-hours",
+      category: "Library",
+      title: "Sunday library hours during the assessment period",
+      body: "Students need dependable Sunday library access during the assessment period.",
+      supporters: 156,
+      status: "Resolved",
+      statusVariant: "resolved",
+      submittedAt: "2 May 2026",
+      history: [
+        { status:"Submitted", date:"2 May 2026", note:"Issue submitted to Student Voice." },
+        { status:"Acknowledged", date:"9 May 2026", note:"The issue has been acknowledged." },
+        { status:"Under Review", date:"16 May 2026", note:"The issue is being reviewed by the responsible campus team." },
+        { status:"Action Planned", date:"21 May 2026", note:"An action has been identified to address this issue." },
+        { status:"Resolved", date:"28 May 2026", note:"The reported issue has been marked as resolved." }
+      ],
+      officialUpdates: [
+        {
+          department:"University Library",
+          date:"28 May 2026",
+          body:"Sunday opening hours have been extended through the assessment period. Students who still cannot access a space can raise a new issue."
+        }
+      ]
+    }
+  },
+
   voiceStatusScenarios: {
     "voice-under-review": {
       label: "Student Voice — Under Review",
-      issueId: "v1",
+      issueId: "voice-water-halls",
+      fixtureId: "voice-evening-buses",
       status: "Under Review",
       statusVariant: "review",
       historyAdditions: [
@@ -186,7 +254,8 @@ window.CampusHubDemo = {
     },
     "voice-action-planned": {
       label: "Student Voice — Action Planned",
-      issueId: "v1",
+      issueId: "voice-water-halls",
+      fixtureId: "voice-lighting-path",
       status: "Action Planned",
       statusVariant: "planned",
       historyAdditions: [
@@ -203,7 +272,8 @@ window.CampusHubDemo = {
     },
     "voice-resolved": {
       label: "Student Voice — Resolved",
-      issueId: "v1",
+      issueId: "voice-water-halls",
+      fixtureId: "voice-library-sunday-hours",
       status: "Resolved",
       statusVariant: "resolved",
       historyAdditions: [
@@ -233,12 +303,12 @@ window.CampusHubDemo = {
   },
 
   notifications: [
-    { id:1, group:"Today", title:"Poll closing soon", body:"“Cleanliness of restrooms” closes tomorrow — your response is still pending.", time:"09:12", unread:true, type:"poll", href:"#participate" },
-    { id:2, group:"Today", title:"Event reminder", body:"Guild Public Debate is tomorrow at 2:00 PM — Senate Building Auditorium.", time:"08:30", unread:true, type:"event", href:"#event" },
-    { id:3, group:"Yesterday", title:"Opportunity deadline", body:"Research Assistant — Climate Resilience: 3 days left to apply.", time:"19:40", unread:false, type:"opportunity", href:"#opportunity" },
-    { id:4, group:"Yesterday", title:"Sports result", body:"MUBS 1 — 2 Makerere University (Final). Tap to see details.", time:"18:05", unread:false, type:"sports", href:"#sports" },
-    { id:5, group:"This week", title:"Verification updated", body:"Your membership is now L2 — Roster Match. Strengthen to L3 in Verification.", time:"15 May", unread:false, type:"system", href:"#verification" },
-    { id:6, group:"This week", title:"Student Voice update", body:"“Irregular water supply in Halls” is now Acknowledged.", time:"14 May", unread:false, type:"voice", href:"#voice" }
+    { id:"notification-poll-closing", group:"Today", title:"Poll closing soon", body:"“Cleanliness of restrooms” closes tomorrow — your response is still pending.", time:"09:12", unread:true, type:"poll", href:"#participate" },
+    { id:"notification-event-reminder", group:"Today", title:"Event reminder", body:"Guild Public Debate is tomorrow at 2:00 PM — Senate Building Auditorium.", time:"08:30", unread:true, type:"event", href:"#event" },
+    { id:"notification-opportunity-deadline", group:"Yesterday", title:"Opportunity deadline", body:"Research Assistant — Climate Resilience: 3 days left to apply.", time:"19:40", unread:false, type:"opportunity", href:"#opportunity" },
+    { id:"notification-sports-result", group:"Yesterday", title:"Sports result", body:"MUBS 1 — 2 Makerere University (Final). Tap to see details.", time:"18:05", unread:false, type:"sports", href:"#sports" },
+    { id:"notification-verification-updated", group:"This week", title:"Verification updated", body:"Your membership is now L2 — Roster Match.", time:"15 May", unread:false, type:"system", href:"#verification" },
+    { id:"notification-voice-update", group:"This week", title:"Student Voice update", body:"“Irregular water supply in Halls” is now Acknowledged.", time:"14 May", unread:false, type:"voice", href:"#voice" }
   ],
 
   quiz: {
@@ -266,8 +336,7 @@ window.CampusHubDemo = {
   xpRules: [
     { action:"Daily Quiz participation", xp:"+5 XP", note:"One attempt per day" },
     { action:"Daily Quiz correct answer bonus", xp:"+5 XP", note:"Added when your answer is correct" },
-    { action:"Poll response", xp:"+5 XP", note:"Non-binding sentiment poll" },
-    { action:"Event RSVP — Going", xp:"+3 XP", note:"RSVP only, attendance not tracked" },
+    { action:"Poll participation", xp:"Configured", note:"Awarded once per poll; identical regardless of option; amount set by this tenant" },
     { action:"Profile completion", xp:"+10 XP", note:"One-time" }
   ],
 
@@ -284,9 +353,9 @@ window.CampusHubDemo = {
 (function(){
   const d = window.CampusHubDemo;
   d.discoverItems = [
-    { id:"e1", kind:"Events", kicker:"Upcoming Event", title:d.featuredEvent.title, meta:`${d.featuredEvent.date} • ${d.featuredEvent.time}`, venue:d.featuredEvent.venue, image:d.featuredEvent.image, imageAlt:d.featuredEvent.imageAlt, href:"#event" },
-    { id:"n1", kind:"News", kicker:"Campus Story", title:d.campusStory.title, body:d.campusStory.body, meta:`${d.campusStory.date} • ${d.campusStory.source}`, image:d.campusStory.image, imageAlt:d.campusStory.imageAlt, href:"#discover" },
-    { id:"o1", kind:"Opportunities", kicker:"Verified Opportunity", title:d.opportunity.title, provider:d.opportunity.provider, body:d.opportunity.summary, deadline:d.opportunity.deadline, href:"#opportunity", verified:true },
-    { id:"s1", kind:"Sports", kicker:"Sports Result", title:`${d.sportsResult.homeTeam} ${d.sportsResult.homeScore} — ${d.sportsResult.awayScore} ${d.sportsResult.awayTeam}`, provider:`${d.sportsResult.sport} • ${d.sportsResult.competition}`, meta:`${d.sportsResult.date} • ${d.sportsResult.status}`, href:"#sports", isResult:true, score:`${d.sportsResult.homeScore} — ${d.sportsResult.awayScore}` }
+    { id:d.featuredEvent.id, kind:"Events", kicker:"Upcoming Event", title:d.featuredEvent.title, meta:`${d.featuredEvent.date} • ${d.featuredEvent.time}`, venue:d.featuredEvent.venue, image:d.featuredEvent.image, imageAlt:d.featuredEvent.imageAlt, href:"#event" },
+    { id:d.campusStory.id, kind:"News", kicker:"Campus Story", title:d.campusStory.title, body:d.campusStory.body, meta:`${d.campusStory.date} • ${d.campusStory.source}`, image:d.campusStory.image, imageAlt:d.campusStory.imageAlt, href:"#discover" },
+    { id:d.opportunity.id, kind:"Opportunities", kicker:"Verified Opportunity", title:d.opportunity.title, provider:d.opportunity.provider, body:d.opportunity.summary, deadline:d.opportunity.deadline, href:"#opportunity", verified:true },
+    { id:d.sportsResult.id, kind:"Sports", kicker:"Sports Result", title:`${d.sportsResult.homeTeam} ${d.sportsResult.homeScore} — ${d.sportsResult.awayScore} ${d.sportsResult.awayTeam}`, provider:`${d.sportsResult.sport} • ${d.sportsResult.competition}`, meta:`${d.sportsResult.date} • ${d.sportsResult.status}`, href:"#sports", isResult:true, score:`${d.sportsResult.homeScore} — ${d.sportsResult.awayScore}` }
   ];
 })();
