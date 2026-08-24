@@ -100,6 +100,88 @@ test.describe('Phase 6D contextual gate presentation and continuation', () => {
     }
   });
 
+  test('keeps module-unavailable presentation honest for every migrated context', async ({ page }) => {
+    const cases = [
+      {
+        context:'poll',
+        route:'#participate',
+        trigger:async () => {
+          await page.locator('#pollForm input[type="radio"]').first().check();
+          await page.locator('#submitPoll').click();
+        },
+        kicker:'Poll unavailable',
+        body:'This poll is not accepting responses right now. You can view other available polls.',
+        primary:'See other polls',
+        returnHash:'#participate'
+      },
+      {
+        context:'voice-submission',
+        route:'#voice',
+        trigger:async () => { await page.locator('#voiceListNewBtn').click(); },
+        kicker:'Student Voice unavailable',
+        body:'New issues are paused while published issues are reviewed. You can still follow existing issues.',
+        primary:'View issues',
+        returnHash:'#voice'
+      },
+      {
+        context:'voice-support',
+        route:'#voice-detail/voice-water-halls',
+        trigger:async () => { await page.locator('#voiceSupportButton').click(); },
+        kicker:'Student Voice unavailable',
+        body:'New issues are paused while published issues are reviewed. You can still follow existing issues.',
+        primary:'View issues',
+        returnHash:'#voice'
+      },
+      {
+        context:'rsvp',
+        route:'#events/guild-debate',
+        trigger:async () => { await page.locator('#rsvpGoing').click(); },
+        kicker:'RSVP unavailable',
+        body:'RSVP is not available for this event right now. You can still view the event details.',
+        primary:'Back to event',
+        returnHash:'#events/guild-debate'
+      },
+      {
+        context:'daily-quiz',
+        route:'#play',
+        trigger:async () => {
+          await page.locator('#quizOptions input[value="0"]').check();
+          await page.locator('#quizSubmit').click();
+        },
+        kicker:'Daily Quiz unavailable',
+        body:'The Daily Quiz is not available right now. You can return to Play and try again later.',
+        primary:'Back to Play',
+        returnHash:'#play'
+      }
+    ];
+
+    for(const item of cases){
+      await resetDemo(page);
+      await page.evaluate(({ key, disable }) => {
+        const state = JSON.parse(localStorage.getItem(key));
+        if(disable === 'poll') state.participation.pollModuleEnabled = false;
+        if(disable === 'voice') state.participation.moduleEnabled = false;
+        if(disable === 'rsvp') state.participation.rsvpModuleEnabled = false;
+        if(disable === 'quiz') state.participation.quizModuleEnabled = false;
+        localStorage.setItem(key, JSON.stringify(state));
+      }, { key:STATE_KEY, disable:item.context === 'poll' ? 'poll' : item.context.startsWith('voice') ? 'voice' : item.context === 'daily-quiz' ? 'quiz' : item.context });
+      await goTo(page, item.route);
+      await item.trigger();
+      await expectDecision(page, { step:'module-enabled', variant:'module-unavailable', resourceContext:item.context });
+      await expect(page.locator('#participationGateKicker')).toHaveText(item.kicker);
+      await expect(page.locator('#participationGateReason')).toHaveText(item.body);
+      await expect(page.locator('#participationGatePrimary')).toHaveText(item.primary);
+      if(item.context.startsWith('voice')){
+        await expect(page.locator('#participationGate')).toContainText('Student Voice unavailable');
+      } else {
+        await expect(page.locator('#participationGate')).not.toContainText('Student Voice unavailable');
+      }
+      await page.locator('#participationGatePrimary').click();
+      await expect.poll(() => new URL(page.url()).hash).toBe(item.returnHash);
+      await expect(page.locator('#participationGate')).toBeHidden();
+    }
+  });
+
   test('uses resource-context assurance copy for Poll, Voice, RSVP and Daily Quiz', async ({ page }) => {
     await openPollGate(page);
     await expect(page.locator('#participationGateReason')).toHaveText(POLL_BODY);

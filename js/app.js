@@ -1066,14 +1066,44 @@
       };
     }
     if(variant === "module-unavailable"){
-      return {
-        ...base,
-        kicker:"Student Voice unavailable",
-        title:"Student Voice unavailable",
-        reason:"New issues are paused while published issues are reviewed. You can still follow existing issues.",
-        primary:"View issues",
-        navigationHash:"#voice"
-      };
+      if(["voice-submission", "voice-support"].includes(resourceContext)){
+        return {
+          ...base,
+          kicker:"Student Voice unavailable",
+          title:"Student Voice unavailable",
+          reason:"New issues are paused while published issues are reviewed. You can still follow existing issues.",
+          primary:"View issues",
+          navigationHash:"#voice"
+        };
+      }
+      if(resourceContext === "poll"){
+        return {
+          ...base,
+          kicker:"Poll unavailable",
+          title:"Poll unavailable",
+          reason:"This poll is not accepting responses right now. You can view other available polls.",
+          primary:"See other polls"
+        };
+      }
+      if(resourceContext === "rsvp"){
+        return {
+          ...base,
+          kicker:"RSVP unavailable",
+          title:"RSVP unavailable",
+          reason:"RSVP is not available for this event right now. You can still view the event details.",
+          primary:"Back to event"
+        };
+      }
+      if(resourceContext === "daily-quiz"){
+        return {
+          ...base,
+          kicker:"Daily Quiz unavailable",
+          title:"Daily Quiz unavailable",
+          reason:"The Daily Quiz is not available right now. You can return to Play and try again later.",
+          primary:"Back to Play"
+        };
+      }
+      throw new TypeError(`Unknown resource context for module-unavailable presentation: ${resourceContext}.`);
     }
     if(variant === "tenant-inactive"){
       return {
@@ -2008,26 +2038,41 @@
 
   // Segmented
   function initParticipateTabs(){
-    const pollsBtn = $('#seg-polls');
-    const voiceBtn = $('#seg-voice');
-    const panePolls = $('#pane-polls');
-    const paneVoice = $('#pane-voice');
-    function toPolls(){
-      pollsBtn.setAttribute('aria-selected','true');
-      voiceBtn.setAttribute('aria-selected','false');
-      panePolls.hidden=false; paneVoice.hidden=true;
+    const tabs = [$('#seg-polls'), $('#seg-voice')];
+    const panes = [$('#pane-polls'), $('#pane-voice')];
+    if(tabs.some(tab=>!tab) || panes.some(pane=>!pane)) return;
+
+    function activateTab(index, { focus=false }={}){
+      const activeIndex = (index + tabs.length) % tabs.length;
+      tabs.forEach((tab, tabIndex)=>{
+        const active = tabIndex===activeIndex;
+        tab.setAttribute('aria-selected', active ? 'true' : 'false');
+        tab.tabIndex = active ? 0 : -1;
+        panes[tabIndex].hidden = !active;
+      });
+      if(focus) tabs[activeIndex].focus({preventScroll:true});
     }
-    function toVoice(){
-      voiceBtn.setAttribute('aria-selected','true');
-      pollsBtn.setAttribute('aria-selected','false');
-      paneVoice.hidden=false; panePolls.hidden=true;
-    }
-    pollsBtn.addEventListener('click', toPolls);
-    voiceBtn.addEventListener('click', toVoice);
+
+    tabs.forEach((tab, index)=>{
+      tab.addEventListener('click', ()=> activateTab(index));
+      tab.addEventListener('keydown', event=>{
+        let nextIndex = null;
+        if(event.key==='ArrowRight') nextIndex = index + 1;
+        if(event.key==='ArrowLeft') nextIndex = index - 1;
+        if(event.key==='Home') nextIndex = 0;
+        if(event.key==='End') nextIndex = tabs.length - 1;
+        if(nextIndex===null) return;
+        event.preventDefault();
+        activateTab(nextIndex, { focus:true });
+      });
+    });
+
+    const initialIndex = tabs.findIndex(tab=>tab.getAttribute('aria-selected')==='true');
+    activateTab(initialIndex >= 0 ? initialIndex : 0);
     // deep link ?voice
     if(location.hash==="#participate-voice"){
       location.hash="#participate";
-      setTimeout(toVoice,0);
+      setTimeout(()=> activateTab(1),0);
     }
   }
 
