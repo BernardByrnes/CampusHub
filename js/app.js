@@ -7,6 +7,17 @@
   const VOICE_NEW_RETURN_ROUTE = "participate/voice/new";
   const VOICE_DETAIL_RETURN_PREFIX = "participate/voice/";
   const VOICE_DETAIL_ROUTE_PREFIX = "voice-detail/";
+  const LEGACY_DETAIL_ALIASES = Object.freeze({
+    event: "events/guild-debate",
+    opportunity: "opportunities/ra-climate",
+    sports: "sports/mubs-mak"
+  });
+  const DETAIL_ROUTE_DEFINITIONS = Object.freeze({
+    events: { view: "event", parent: "discover", resolve: id => findCanonicalEntity("featuredEvent", id) },
+    opportunities: { view: "opportunity", parent: "discover", resolve: id => findCanonicalEntity("opportunity", id) },
+    sports: { view: "sports", parent: "discover", resolve: id => findCanonicalEntity("sportsResult", id) },
+    "voice-detail": { view: "voice-detail", parent: "participate", resolve: id => D.voiceIssues.find(issue => issue.id.toLowerCase() === id.toLowerCase()) || null }
+  });
   const VOICE_CATEGORIES = Object.freeze([
     "Wi-Fi",
     "Water & Sanitation",
@@ -57,6 +68,74 @@
     }
   };
 
+  function findCanonicalEntity(key, entityId){
+    const entity = D[key];
+    if(!entity || !entityId) return null;
+    return entity.id.toLowerCase() === entityId.toLowerCase() ? entity : null;
+  }
+
+  function parseHashRoute(hash=location.hash){
+    const raw = String(hash || "").replace(/^#/, "").trim();
+    if(!raw) return { kind:"view", view:"home" };
+    const slash = raw.indexOf("/");
+    const routeName = (slash === -1 ? raw : raw.slice(0, slash)).toLowerCase();
+    const entityPart = slash === -1 ? "" : raw.slice(slash + 1);
+    const definition = DETAIL_ROUTE_DEFINITIONS[routeName];
+    if(!definition) return { kind:"view", view:routeName };
+    if(!entityPart) return { kind:"detail", routeName, definition, entityId:null, entity:null };
+    let entityId = "";
+    try{
+      entityId = decodeURIComponent(entityPart);
+    }catch(error){
+      return { kind:"detail", routeName, definition, entityId:null, entity:null };
+    }
+    const entity = definition.resolve(entityId);
+    return { kind:"detail", routeName, definition, entityId, entity };
+  }
+
+  function setEntityField(selector, value){
+    const element = $(selector);
+    if(element) element.textContent = value == null ? "" : String(value);
+  }
+
+  function renderEventEntity(event){
+    if(!event) return;
+    setEntityField('[data-field="eventTitle"]', event.title);
+    setEntityField('[data-field="eventDate"]', `${event.date} • ${event.time}`);
+    setEntityField('[data-field="eventVenue"]', event.venue);
+    setEntityField('[data-field="eventOrg"]', event.organiser);
+    setEntityField('[data-field="eventDescription"]', event.description);
+    const image = $('#eventImg');
+    if(image){
+      image.src = event.image;
+      image.alt = event.imageAlt;
+    }
+  }
+
+  function renderOpportunityEntity(opportunity){
+    if(!opportunity) return;
+    setEntityField('[data-field="oppTitle"]', opportunity.title);
+    setEntityField('[data-field="oppProvider"]', opportunity.provider);
+    setEntityField('[data-field="oppDeadline"]', opportunity.deadline);
+    setEntityField('[data-field="oppProvider2"]', opportunity.provider);
+    setEntityField('[data-field="oppDeadline2"]', opportunity.deadlineDate);
+    setEntityField('[data-field="oppDetailTitle"]', opportunity.title);
+  }
+
+  function renderSportsEntity(sports){
+    if(!sports) return;
+    const title = `${sports.homeTeam} ${sports.homeScore} — ${sports.awayScore} ${sports.awayTeam}`;
+    const league = `${sports.sport} • ${sports.competition}`;
+    setEntityField('[data-field="sportsTitle"]', title);
+    setEntityField('[data-field="sportsLeague"]', league);
+    setEntityField('[data-field="sportsMeta"]', `${sports.date} • ${sports.status}`);
+    setEntityField('[data-field="sportsTitle2"]', title);
+    setEntityField('[data-field="sportsLeague2"]', league);
+    setEntityField('[data-field="sportsMeta2"]', `${sports.date} • ${sports.venue}`);
+    setEntityField('[data-field="sportsScore"]', `${sports.homeScore} — ${sports.awayScore}`);
+    setEntityField('[data-field="sportsDateLong"]', `${sports.date} • ${sports.status}`);
+  }
+
   // Populate tenant header
   function hydrateTenant(){
     $('[data-field="tenantCampus"]').textContent = D.tenant.campusLabel;
@@ -71,35 +150,10 @@
     $('[data-field="heroBody"]').textContent = D.heroStory.body;
     $('#heroImg').src = D.heroStory.image;
     $('#heroImg').alt = D.heroStory.imageAlt;
-    // sports
-    $('[data-field="sportsTitle"]').textContent = `${D.sportsResult.homeTeam} ${D.sportsResult.homeScore} — ${D.sportsResult.awayScore} ${D.sportsResult.awayTeam}`;
-    $('[data-field="sportsLeague"]').textContent = `${D.sportsResult.sport} • ${D.sportsResult.competition}`;
-    $('[data-field="sportsMeta"]').textContent = `${D.sportsResult.date} • ${D.sportsResult.status}`;
-    // sports detail (same canonical object)
-    const sTitle2 = $('[data-field="sportsTitle2"]');
-    if(sTitle2) sTitle2.textContent = `${D.sportsResult.homeTeam} ${D.sportsResult.homeScore} — ${D.sportsResult.awayScore} ${D.sportsResult.awayTeam}`;
-    const sLeague2 = $('[data-field="sportsLeague2"]');
-    if(sLeague2) sLeague2.textContent = `${D.sportsResult.sport} • ${D.sportsResult.competition}`;
-    const sMeta2 = $('[data-field="sportsMeta2"]');
-    if(sMeta2) sMeta2.textContent = `${D.sportsResult.date} • ${D.sportsResult.venue}`;
-    const sScore = $('[data-field="sportsScore"]');
-    if(sScore) sScore.textContent = `${D.sportsResult.homeScore} — ${D.sportsResult.awayScore}`;
-    const sDateLong = $('[data-field="sportsDateLong"]');
-    if(sDateLong) sDateLong.textContent = `${D.sportsResult.date} • ${D.sportsResult.status}`;
-    // opportunity
-    $('[data-field="oppTitle"]').textContent = D.opportunity.title;
-    $('[data-field="oppProvider"]').textContent = D.opportunity.provider;
-    $('[data-field="oppDeadline"]').textContent = D.opportunity.deadline;
-    $('[data-field="oppProvider2"]').textContent = D.opportunity.provider;
-    $('[data-field="oppDeadline2"]').textContent = D.opportunity.deadlineDate;
-    $('[data-field="oppDetailTitle"]').textContent = D.opportunity.title;
-    // event
-    $('[data-field="eventTitle"]').textContent = D.featuredEvent.title;
-    $('[data-field="eventDate"]').textContent = `${D.featuredEvent.date} • ${D.featuredEvent.time}`;
-    $('[data-field="eventVenue"]').textContent = D.featuredEvent.venue;
-    $('[data-field="eventOrg"]').textContent = D.featuredEvent.organiser;
-    $('#eventImg').src = D.featuredEvent.image;
-    $('#eventImg').alt = D.featuredEvent.imageAlt;
+    // Entity surfaces share the canonical records used by detail routes.
+    renderSportsEntity(D.sportsResult);
+    renderOpportunityEntity(D.opportunity);
+    renderEventEntity(D.featuredEvent);
     // me
     $('[data-field="studentName"]').textContent = D.student.displayName;
     $('[data-field="studentProg"]').textContent = `${D.student.programme} • ${D.student.year}`;
@@ -160,7 +214,7 @@
                 <span style="display:flex; gap:6px; align-items:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/></svg> ${escapeHtml(item.meta)}</span>
                 <span style="display:flex; gap:6px; align-items:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11z"/></svg> ${escapeHtml(item.venue)}</span>
               </div>
-              <a href="#event" class="btn btn--small" style="margin-top:10px; background:var(--info-soft); border-color:#c9ddf1; color:var(--info);">View details →</a>
+              <a href="${escapeHtml(item.href)}" class="btn btn--small" style="margin-top:10px; background:var(--info-soft); border-color:#c9ddf1; color:var(--info);">View details →</a>
             </div>
             <div class="cover" style="width:42%; max-width:170px; flex:0 0 42%; height:auto;">
               <img src="${item.image}" alt="${escapeHtml(item.imageAlt)}" width="300" height="220" loading="lazy" decoding="async" />
@@ -192,7 +246,7 @@
               <div class="title" style="margin-top:4px;">${escapeHtml(item.title)}</div>
               <div class="meta" style="margin-top:4px;">${escapeHtml(item.provider)}</div>
               <p class="body-sm" style="margin:4px 0 0;">${escapeHtml(item.body)}</p>
-              <div class="inline-meta" style="margin-top:8px; justify-content:space-between; width:100%;"><span style="display:flex; gap:6px; align-items:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/></svg> ${escapeHtml(item.deadline)}</span><a href="#opportunity" class="section-action">Makerere University →</a></div>
+              <div class="inline-meta" style="margin-top:8px; justify-content:space-between; width:100%;"><span style="display:flex; gap:6px; align-items:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/></svg> ${escapeHtml(item.deadline)}</span><a href="${escapeHtml(item.href)}" class="section-action">Makerere University →</a></div>
             </div>
           </div>
         </article>`;
@@ -209,7 +263,7 @@
             </div>
             <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
               <div class="vs"><span class="crest">MUBS</span><span class="score">${escapeHtml(item.score||'1 — 2')}</span><span class="crest" style="background:var(--brand-soft); color:var(--brand); border-color:var(--brand-border);">MUK</span></div>
-              <a href="#sports" class="section-action">View details →</a>
+              <a href="${escapeHtml(item.href)}" class="section-action">View details →</a>
             </div>
           </div>
         </article>`;
@@ -358,7 +412,7 @@
   }
 
   function renderVoiceDetail(issueId){
-    const selected = selectVoiceIssue(issueId || participationState().selectedVoiceIssueId) || selectVoiceIssue('voice-water-halls');
+    const selected = selectVoiceIssue(issueId || participationState().selectedVoiceIssueId);
     if(!selected) return null;
     const status = $('#voiceDetailStatus');
     const supporters = $('.voice-detail-supporters');
@@ -1343,6 +1397,17 @@
   // Navigation (hash routing)
   const views = ["home","discover","participate","play","me","verification","notifications","event","opportunity","voice","voice-new","voice-detail","privacy","sports"];
   const primaryTabs = ["home","discover","participate","play","me"];
+  const parentPrimaryTabs = Object.freeze({
+    event: "discover",
+    opportunity: "discover",
+    sports: "discover",
+    voice: "participate",
+    "voice-new": "participate",
+    "voice-detail": "participate",
+    verification: "me",
+    privacy: "me",
+    notifications: "home"
+  });
   let pendingReturnFocus = false;
   let pendingVoiceComposerFocus = false;
   let pendingVoiceDetailFocus = false;
@@ -1363,8 +1428,8 @@
     });
     if(target==="voice-new") renderVoiceComposer();
     if(target==="voice-detail") renderVoiceDetail();
-    // bottom nav active
-    const primary = primaryTabs.includes(target) ? target : null;
+    // Secondary screens inherit the active primary destination.
+    const primary = primaryTabs.includes(target) ? target : (parentPrimaryTabs[target] || null);
     $$('.nav-item').forEach(a=>{
       const nav = a.getAttribute('data-nav');
       if(primary && nav===primary){
@@ -1410,19 +1475,39 @@
   }
 
   function handleHash(){
-    const h = location.hash.replace('#','').trim().toLowerCase() || 'home';
-    if(h==="voice-detail" || h.startsWith(VOICE_DETAIL_ROUTE_PREFIX)){
-      let issueId = h.slice(VOICE_DETAIL_ROUTE_PREFIX.length) || participationState().selectedVoiceIssueId;
-      try{ issueId = decodeURIComponent(issueId); }catch(e){ issueId = 'voice-water-halls'; }
-      if(!selectVoiceIssue(issueId)){
-        history.replaceState(null, '', '#voice');
-        showView('voice');
-        return;
-      }
-      pendingVoiceDetailFocus = true;
-      showView('voice-detail');
+    const route = parseHashRoute();
+    const rawPath = String(location.hash || "").replace(/^#/, "").trim();
+    const normalizedPath = rawPath.toLowerCase();
+    const legacyTarget = LEGACY_DETAIL_ALIASES[normalizedPath];
+    if(legacyTarget){
+      history.replaceState(null, "", `#${legacyTarget}`);
+      handleHash();
       return;
     }
+
+    if(route.kind==="detail"){
+      if(!route.entity){
+        const fallback = route.definition.parent === "participate" ? "#voice" : "#discover";
+        history.replaceState(null, "", fallback);
+        showView(route.definition.parent === "participate" ? "voice" : "discover");
+        return;
+      }
+      if(route.definition.view === "event") renderEventEntity(route.entity);
+      if(route.definition.view === "opportunity") renderOpportunityEntity(route.entity);
+      if(route.definition.view === "sports") renderSportsEntity(route.entity);
+      if(route.definition.view === "voice-detail"){
+        if(!selectVoiceIssue(route.entity.id)){
+          history.replaceState(null, "", "#voice");
+          showView("voice");
+          return;
+        }
+        pendingVoiceDetailFocus = true;
+      }
+      showView(route.definition.view);
+      return;
+    }
+
+    const h = route.view || "home";
     if(h==="voice-new"){
       const gate = resolveParticipation(participationState(), 'voice');
       if(gate){

@@ -83,7 +83,7 @@ test.describe('CampusHub Phase 1 baseline', () => {
     await goTo(page, '#verification');
     await expect(page.locator('#view-verification [data-field="assuranceTitle"]')).toHaveText('L2 — Roster Match');
 
-    await goTo(page, '#event');
+    await goTo(page, '#events/guild-debate');
     await expect(page.locator('#view-event [data-field="eventDate"]')).toContainText('Fri, 22 May 2026');
 
     await goTo(page, '#voice');

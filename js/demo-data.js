@@ -72,7 +72,8 @@ window.CampusHubDemo = {
     time: "4:00 PM",
     venue: "MUBS Arena",
     homeCrest: "MUBS",
-    awayCrest: "MUK"
+    awayCrest: "MUK",
+    href: "#sports/mubs-mak"
   },
 
   opportunity: {
@@ -89,7 +90,7 @@ window.CampusHubDemo = {
     verified: true,
     eligibility: "Open to Year 2+ Geography, Environmental Science and related programmes. L2 verification required.",
     requirements: ["CV (1 page)", "Brief motivation (250 words)", "Academic transcript (unofficial accepted)"],
-    href: "#opportunity"
+    href: "#opportunities/ra-climate"
   },
 
   featuredEvent: {
@@ -103,7 +104,8 @@ window.CampusHubDemo = {
     image: "assets/images/event-debate.webp",
     imageAlt: "University building exterior in daylight",
     description: "Join leading researchers, Guild leaders and student innovators for a debate on AI opportunities, ethics and skills for Africa's next decade.",
-    rsvpState: null // 'going' | 'interested' | null
+    rsvpState: null, // 'going' | 'interested' | null
+    href: "#events/guild-debate"
   },
 
   campusStory: {
@@ -304,9 +306,9 @@ window.CampusHubDemo = {
 
   notifications: [
     { id:"notification-poll-closing", group:"Today", title:"Poll closing soon", body:"“Cleanliness of restrooms” closes tomorrow — your response is still pending.", time:"09:12", unread:true, type:"poll", href:"#participate" },
-    { id:"notification-event-reminder", group:"Today", title:"Event reminder", body:"Guild Public Debate is tomorrow at 2:00 PM — Senate Building Auditorium.", time:"08:30", unread:true, type:"event", href:"#event" },
-    { id:"notification-opportunity-deadline", group:"Yesterday", title:"Opportunity deadline", body:"Research Assistant — Climate Resilience: 3 days left to apply.", time:"19:40", unread:false, type:"opportunity", href:"#opportunity" },
-    { id:"notification-sports-result", group:"Yesterday", title:"Sports result", body:"MUBS 1 — 2 Makerere University (Final). Tap to see details.", time:"18:05", unread:false, type:"sports", href:"#sports" },
+    { id:"notification-event-reminder", group:"Today", title:"Event reminder", body:"Guild Public Debate is tomorrow at 2:00 PM — Senate Building Auditorium.", time:"08:30", unread:true, type:"event", href:"#events/guild-debate" },
+    { id:"notification-opportunity-deadline", group:"Yesterday", title:"Opportunity deadline", body:"Research Assistant — Climate Resilience: 3 days left to apply.", time:"19:40", unread:false, type:"opportunity", href:"#opportunities/ra-climate" },
+    { id:"notification-sports-result", group:"Yesterday", title:"Sports result", body:"MUBS 1 — 2 Makerere University (Final). Tap to see details.", time:"18:05", unread:false, type:"sports", href:"#sports/mubs-mak" },
     { id:"notification-verification-updated", group:"This week", title:"Verification updated", body:"Your membership is now L2 — Roster Match.", time:"15 May", unread:false, type:"system", href:"#verification" },
     { id:"notification-voice-update", group:"This week", title:"Student Voice update", body:"“Irregular water supply in Halls” is now Acknowledged.", time:"14 May", unread:false, type:"voice", href:"#voice" }
   ],
@@ -353,9 +355,9 @@ window.CampusHubDemo = {
 (function(){
   const d = window.CampusHubDemo;
   d.discoverItems = [
-    { id:d.featuredEvent.id, kind:"Events", kicker:"Upcoming Event", title:d.featuredEvent.title, meta:`${d.featuredEvent.date} • ${d.featuredEvent.time}`, venue:d.featuredEvent.venue, image:d.featuredEvent.image, imageAlt:d.featuredEvent.imageAlt, href:"#event" },
+    { id:d.featuredEvent.id, kind:"Events", kicker:"Upcoming Event", title:d.featuredEvent.title, meta:`${d.featuredEvent.date} • ${d.featuredEvent.time}`, venue:d.featuredEvent.venue, image:d.featuredEvent.image, imageAlt:d.featuredEvent.imageAlt, href:d.featuredEvent.href },
     { id:d.campusStory.id, kind:"News", kicker:"Campus Story", title:d.campusStory.title, body:d.campusStory.body, meta:`${d.campusStory.date} • ${d.campusStory.source}`, image:d.campusStory.image, imageAlt:d.campusStory.imageAlt, href:"#discover" },
-    { id:d.opportunity.id, kind:"Opportunities", kicker:"Verified Opportunity", title:d.opportunity.title, provider:d.opportunity.provider, body:d.opportunity.summary, deadline:d.opportunity.deadline, href:"#opportunity", verified:true },
-    { id:d.sportsResult.id, kind:"Sports", kicker:"Sports Result", title:`${d.sportsResult.homeTeam} ${d.sportsResult.homeScore} — ${d.sportsResult.awayScore} ${d.sportsResult.awayTeam}`, provider:`${d.sportsResult.sport} • ${d.sportsResult.competition}`, meta:`${d.sportsResult.date} • ${d.sportsResult.status}`, href:"#sports", isResult:true, score:`${d.sportsResult.homeScore} — ${d.sportsResult.awayScore}` }
+    { id:d.opportunity.id, kind:"Opportunities", kicker:"Verified Opportunity", title:d.opportunity.title, provider:d.opportunity.provider, body:d.opportunity.summary, deadline:d.opportunity.deadline, href:d.opportunity.href, verified:true },
+    { id:d.sportsResult.id, kind:"Sports", kicker:"Sports Result", title:`${d.sportsResult.homeTeam} ${d.sportsResult.homeScore} — ${d.sportsResult.awayScore} ${d.sportsResult.awayTeam}`, provider:`${d.sportsResult.sport} • ${d.sportsResult.competition}`, meta:`${d.sportsResult.date} • ${d.sportsResult.status}`, href:d.sportsResult.href, isResult:true, score:`${d.sportsResult.homeScore} — ${d.sportsResult.awayScore}` }
   ];
 })();
