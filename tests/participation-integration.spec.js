@@ -17,6 +17,10 @@ async function readState(page) {
   return page.evaluate(key => JSON.parse(localStorage.getItem(key) || 'null'), PARTICIPATION_STATE_KEY);
 }
 
+async function readVoiceDraft(page) {
+  return page.evaluate(() => JSON.parse(sessionStorage.getItem('campushub:voice-draft') || 'null'));
+}
+
 async function readDecision(page) {
   return page.evaluate(() => window.CampusHubDebug.getLastGateDecision());
 }
@@ -159,6 +163,7 @@ test.describe('Phase 6B Poll and Student Voice GSC-14 integration', () => {
     await resetDemo(page, 'assurance-required');
     await goTo(page, '#voice');
     const before = await readState(page);
+    const beforeDraft = await readVoiceDraft(page);
 
     await page.locator('#voiceListNewBtn').click();
     await expectGateDecision(page, {
@@ -169,7 +174,8 @@ test.describe('Phase 6B Poll and Student Voice GSC-14 integration', () => {
     await expect(page.locator('#view-voice')).toBeVisible();
     await expect(page.locator('#view-voice-new')).toBeHidden();
     const after = await readState(page);
-    expect(after.voiceDraft).toEqual(before.voiceDraft);
+    expect(after.voiceDraft).toBeUndefined();
+    expect(await readVoiceDraft(page)).toEqual(beforeDraft);
     expect(after.voiceSubmissions).toEqual(before.voiceSubmissions);
   });
 
@@ -216,7 +222,8 @@ test.describe('Phase 6B Poll and Student Voice GSC-14 integration', () => {
     await expect(page.locator('#voiceStepReview')).toBeVisible();
     const state = await readState(page);
     expect(state.voiceSubmissions).toHaveLength(0);
-    expect(state.voiceDraft).toMatchObject({
+    expect(state.voiceDraft).toBeUndefined();
+    expect(await readVoiceDraft(page)).toMatchObject({
       category:'Water & Sanitation',
       title:'Water supply interruptions in Lumumba Hall',
       description:'Water is frequently unavailable during the evening in Lumumba Hall.',

@@ -689,8 +689,7 @@
       <!-- STUDENT VOICE: NEW ISSUE -->
       <section id="view-voice-new" data-view="voice-new" class="view" role="tabpanel" aria-label="Raise a campus issue" hidden>
         <div class="view-head voice-composer-head" style="display:flex; align-items:center; gap:10px;">
-          <button class="icon-btn" id="voiceComposerCancelTop" type="button" aria-label="Cancel new issue" style="width:36px; height:36px;">‹</button>
-          <div><div class="view-title">Student Voice</div><p class="view-sub" style="margin-top:2px;">A structured route for everyday campus-service issues.</p></div>
+          <div><div class="view-title">Raise an issue</div><p class="view-sub" style="margin-top:2px;">A structured route for everyday campus-service issues.</p></div>
         </div>
 
         <form id="voiceComposerForm" novalidate>
@@ -709,7 +708,7 @@
 
             <fieldset class="voice-category-fieldset" aria-describedby="voiceCategoryHelp voiceCategoryError">
               <legend class="sr-only">Choose an issue category</legend>
-              <p class="voice-field-help" id="voiceCategoryHelp">Select one permitted campus issue category.</p>
+              <p class="voice-field-help" id="voiceCategoryHelp">Choose the campus issue category that fits best.</p>
               <div class="voice-category-grid">
                 <label class="voice-category"><input type="radio" name="voiceCategory" value="Wi-Fi" /><span>Wi-Fi</span></label>
                 <label class="voice-category"><input type="radio" name="voiceCategory" value="Water &amp; Sanitation" /><span>Water &amp; Sanitation</span></label>
@@ -732,27 +731,31 @@
             <div class="kicker kicker--info">Step 2 of 3</div>
             <h1 class="voice-composer-title" id="voiceDetailsHeading" tabindex="-1">Issue details</h1>
             <p class="body-sm voice-composer-intro">Keep the information factual and focused on the campus issue.</p>
+            <p class="voice-validation" id="voiceDetailsError" role="alert" hidden></p>
 
             <div class="voice-field">
               <label class="voice-field-label" for="voiceIssueTitle">Issue title</label>
-              <input class="voice-field-input" id="voiceIssueTitle" name="voiceIssueTitle" type="text" maxlength="120" autocomplete="off" aria-describedby="voiceIssueTitleHelp voiceTitleError" placeholder="Water supply frequently unavailable in Lumumba Hall" />
+              <input class="voice-field-input" id="voiceIssueTitle" name="voiceIssueTitle" type="text" maxlength="80" autocomplete="off" aria-describedby="voiceIssueTitleHelp voiceIssueTitleCount voiceTitleError" placeholder="e.g. Irregular water supply in Halls" />
               <p class="voice-field-help" id="voiceIssueTitleHelp">A short, clear summary of the issue.</p>
+              <p class="voice-field-counter" id="voiceIssueTitleCount">0 / 80</p>
               <p class="voice-validation" id="voiceTitleError" role="alert" hidden></p>
             </div>
 
             <div class="voice-field">
               <label class="voice-field-label" for="voiceIssueDescription">Describe the issue</label>
-              <textarea class="voice-field-input voice-field-input--textarea" id="voiceIssueDescription" name="voiceIssueDescription" rows="6" maxlength="1000" aria-describedby="voiceIssueDescriptionHelp voiceDescriptionError" placeholder="Describe what is happening, where it is happening and how it affects students."></textarea>
+              <textarea class="voice-field-input voice-field-input--textarea" id="voiceIssueDescription" name="voiceIssueDescription" rows="6" maxlength="500" aria-describedby="voiceIssueDescriptionHelp voiceIssueDescriptionCount voiceDescriptionError" placeholder="What is happening, and how does it affect students?"></textarea>
               <p class="voice-field-help" id="voiceIssueDescriptionHelp">Describe what is happening, where it is happening and how it affects students.</p>
+              <p class="voice-field-counter" id="voiceIssueDescriptionCount">0 / 500</p>
               <p class="voice-validation" id="voiceDescriptionError" role="alert" hidden></p>
             </div>
 
             <aside class="voice-guidance" aria-label="Student Voice guidance">
               <strong>Helpful guidance</strong>
-              <p>Do not include allegations about named individuals or urgent safety matters. Student Voice is for campus services and facilities issues. For urgent safety or personal-support concerns, use the appropriate university or emergency support channel.</p>
+              <p>Do not include other people's names or personal details.</p>
             </aside>
 
             <div class="voice-composer-actions">
+              <button class="btn" id="voiceDetailsCancel" type="button">Cancel</button>
               <button class="btn" id="voiceDetailsBack" type="button">Back</button>
               <button class="btn btn--primary" id="voiceDetailsContinue" type="button">Continue to review</button>
             </div>
@@ -771,14 +774,14 @@
 
             <aside class="voice-identity-disclosure" aria-label="Identity and privacy">
               <div class="kicker kicker--info">Identity &amp; privacy</div>
-              <p><strong>Your identity is not shown publicly.</strong></p>
-              <p>Other students will not see who submitted this issue. Your identity may be accessed only by authorised CampusHub identity handlers when required for moderation, safety or accountability, and that access is recorded.</p>
-              <p>Normal University/Guild Student Voice views do not reveal your identity.</p>
+              <p>Other students will not see who submitted this issue. Your identity may be accessed only by authorised identity handlers when required for moderation, safety or accountability, and that access is recorded.</p>
             </aside>
 
-            <p class="voice-review-note">Student Voice submissions are reviewed before publication and must stay within the permitted campus issue categories.</p>
+            <p class="voice-review-note">Submission is not publication.</p>
+            <p class="voice-validation" id="voiceSubmitError" role="alert" hidden></p>
             <div class="voice-composer-actions">
-              <button class="btn" id="voiceReviewBack" type="button">Back to edit</button>
+              <button class="btn" id="voiceReviewCancel" type="button">Cancel</button>
+              <button class="btn" id="voiceReviewBack" type="button">Back</button>
               <button class="btn btn--primary" id="voiceSubmitIssue" type="button">Submit issue</button>
             </div>
           </section>
@@ -787,11 +790,12 @@
             <div class="voice-confirmation__icon" aria-hidden="true">✓</div>
             <div class="kicker">Issue submitted</div>
             <h1 class="voice-composer-title" id="voiceConfirmationHeading" tabindex="-1">Your issue has been submitted for review.</h1>
-            <p class="body-sm voice-composer-intro">Student Voice submissions are reviewed before publication.</p>
             <div class="voice-confirmation__status">
               <span>Status</span>
               <strong class="status-chip chip-submitted" id="voiceConfirmationStatus">Submitted</strong>
             </div>
+            <p class="body-sm voice-composer-intro">Submission does not mean publication.</p>
+            <p class="voice-confirmation-note">You'll be notified when the status changes.</p>
             <button class="btn btn--primary" id="voiceConfirmationBack" type="button">Back to Student Voice</button>
           </section>
         </form>

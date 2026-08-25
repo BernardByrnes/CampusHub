@@ -219,6 +219,43 @@ test.describe('Phase 7D canonical visual regression baselines', () => {
       await captureMobileViewport(page, 'voice-composer-category-390.png');
     });
 
+    test('voice-composer-details-390', async ({ page }) => {
+      await resetAndGo(page, '#voice-new');
+      await page.locator('input[name="voiceCategory"]').first().check();
+      await page.locator('#voiceCategoryContinue').click();
+      await expect(page.locator('#voiceStepDetails')).toBeVisible();
+      await clearTransientUi(page);
+      await settle(page);
+      await captureMobileViewport(page, 'voice-composer-details-390.png');
+    });
+
+    test('voice-composer-review-390', async ({ page }) => {
+      await resetAndGo(page, '#voice-new');
+      await page.locator('input[name="voiceCategory"]').first().check();
+      await page.locator('#voiceCategoryContinue').click();
+      await page.locator('#voiceIssueTitle').fill('Irregular water supply in Halls');
+      await page.locator('#voiceIssueDescription').fill('Water is unavailable most evenings and affects students using the residence facilities.');
+      await page.locator('#voiceDetailsContinue').click();
+      await expect(page.locator('#voiceStepReview')).toBeVisible();
+      await clearTransientUi(page);
+      await settle(page);
+      await captureMobileViewport(page, 'voice-composer-review-390.png');
+    });
+
+    test('voice-composer-submitted-390', async ({ page }) => {
+      await resetAndGo(page, '#voice-new');
+      await page.locator('input[name="voiceCategory"]').first().check();
+      await page.locator('#voiceCategoryContinue').click();
+      await page.locator('#voiceIssueTitle').fill('Irregular water supply in Halls');
+      await page.locator('#voiceIssueDescription').fill('Water is unavailable most evenings and affects students using the residence facilities.');
+      await page.locator('#voiceDetailsContinue').click();
+      await page.locator('#voiceSubmitIssue').click();
+      await expect(page.locator('#voiceStepConfirmation')).toBeVisible();
+      await clearTransientUi(page);
+      await settle(page);
+      await captureMobileViewport(page, 'voice-composer-submitted-390.png');
+    });
+
     test('verification-l2-390', async ({ page }) => {
       await resetAndGo(page, '#verification');
       await captureMobileViewport(page, 'verification-l2-390.png');

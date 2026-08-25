@@ -469,6 +469,13 @@
   font-size:12px;
   line-height:1.45;
 }
+.voice-field-counter {
+  margin:4px 0 0;
+  color:var(--text-muted);
+  font-size:11.5px;
+  line-height:1.35;
+  text-align:right;
+}
 .voice-category-grid {
   display:grid;
   grid-template-columns:repeat(2, minmax(0, 1fr));
@@ -583,6 +590,7 @@
   white-space:pre-wrap;
 }
 .voice-review-note { margin:12px 0 0; color:var(--text-muted); font-size:12px; line-height:1.5; }
+.voice-confirmation-note { margin:0 0 16px; color:var(--text-muted); font-size:12px; line-height:1.5; }
 .voice-confirmation { text-align:center; padding-top:18px; }
 .voice-confirmation__icon {
   display:grid;

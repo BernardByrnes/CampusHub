@@ -31,6 +31,9 @@
     "Academic Facilities",
     "Campus Services"
   ]);
+  const VOICE_DRAFT_SESSION_KEY = "campushub:voice-draft";
+  const VOICE_TITLE_MAX = 80;
+  const VOICE_DESCRIPTION_MAX = 500;
 
   const CANONICAL_PARTICIPATION_SCENARIOS = Object.freeze({
     "assurance-required": {
@@ -811,16 +814,41 @@
     return { category:"", title:"", description:"", step:1 };
   }
 
+  function normalizeVoiceDraft(draft){
+    const source = draft && typeof draft === "object" && !Array.isArray(draft) ? draft : {};
+    const title = typeof source.title === "string" ? source.title.slice(0, VOICE_TITLE_MAX) : "";
+    const description = typeof source.description === "string" ? source.description.slice(0, VOICE_DESCRIPTION_MAX) : "";
+    return {
+      category: VOICE_CATEGORIES.includes(source.category) ? source.category : "",
+      title,
+      description,
+      step: [1,2,3].includes(Number(source.step)) ? Number(source.step) : 1
+    };
+  }
+
+  function readVoiceDraftSession(){
+    try{
+      const raw = sessionStorage.getItem(VOICE_DRAFT_SESSION_KEY);
+      return raw ? JSON.parse(raw) : null;
+    }catch(e){
+      return null;
+    }
+  }
+
+  function writeVoiceDraftSession(draft){
+    try{
+      sessionStorage.setItem(VOICE_DRAFT_SESSION_KEY, JSON.stringify(normalizeVoiceDraft(draft)));
+      return true;
+    }catch(e){}
+    return false;
+  }
+
+  function clearVoiceDraftSession(){
+    try{ sessionStorage.removeItem(VOICE_DRAFT_SESSION_KEY); }catch(e){}
+  }
+
   function ensureVoiceState(state){
-    const defaults = defaultVoiceDraft();
-    if(!state.voiceDraft || typeof state.voiceDraft!=="object") state.voiceDraft = {};
-    Object.keys(defaults).forEach(key=>{
-      if(state.voiceDraft[key]===undefined || state.voiceDraft[key]===null) state.voiceDraft[key] = defaults[key];
-    });
-    state.voiceDraft.category = VOICE_CATEGORIES.includes(state.voiceDraft.category) ? state.voiceDraft.category : "";
-    state.voiceDraft.title = typeof state.voiceDraft.title==="string" ? state.voiceDraft.title : "";
-    state.voiceDraft.description = typeof state.voiceDraft.description==="string" ? state.voiceDraft.description : "";
-    state.voiceDraft.step = [1,2,3].includes(Number(state.voiceDraft.step)) ? Number(state.voiceDraft.step) : 1;
+    state.voiceDraft = normalizeVoiceDraft(state.voiceDraft);
     if(!Array.isArray(state.voiceSubmissions)) state.voiceSubmissions = [];
     state.voiceSubmissionCounter = Number.isInteger(state.voiceSubmissionCounter) && state.voiceSubmissionCounter>=0
       ? state.voiceSubmissionCounter
@@ -1498,6 +1526,8 @@
 
   // Student Voice composer — local prototype state only. Submitted issues are not added to the public issue list.
   let voiceComposerStep = 1;
+  let voiceSubmitInFlight = false;
+  let voiceSubmitTimer = null;
 
   function voiceHeadingForStep(step=voiceComposerStep){
     return ({
@@ -1581,14 +1611,25 @@
 
   function clearVoiceValidation(){
     clearVoiceError('#voiceCategoryError');
+    clearVoiceError('#voiceDetailsError');
     clearVoiceError('#voiceTitleError', '#voiceIssueTitle');
     clearVoiceError('#voiceDescriptionError', '#voiceIssueDescription');
+    clearVoiceError('#voiceSubmitError');
   }
 
   function updateVoiceCategoryContinue(){
     const button = $('#voiceCategoryContinue');
     const selected = $('#voiceComposerForm input[name="voiceCategory"]:checked');
     if(button) button.disabled = !selected;
+  }
+
+  function updateVoiceCounters(){
+    const title = $('#voiceIssueTitle');
+    const description = $('#voiceIssueDescription');
+    const titleCount = $('#voiceIssueTitleCount');
+    const descriptionCount = $('#voiceIssueDescriptionCount');
+    if(titleCount) titleCount.textContent = `${Math.min(title?.value.length || 0, VOICE_TITLE_MAX)} / ${VOICE_TITLE_MAX}`;
+    if(descriptionCount) descriptionCount.textContent = `${Math.min(description?.value.length || 0, VOICE_DESCRIPTION_MAX)} / ${VOICE_DESCRIPTION_MAX}`;
   }
 
   function saveVoiceDraft(){
@@ -1607,7 +1648,8 @@
   function validateVoiceCategory(){
     const selected = $('#voiceComposerForm input[name="voiceCategory"]:checked');
     if(!selected){
-      showVoiceError('#voiceCategoryError', null, 'Choose a category before continuing.');
+      showVoiceError('#voiceCategoryError', null, 'Choose a category.');
+      setVoiceStatus('Choose a category.');
       return false;
     }
     clearVoiceError('#voiceCategoryError');
@@ -1621,14 +1663,17 @@
     const titleValue = title?.value.trim() || '';
     const descriptionValue = description?.value.trim() || '';
     let valid = true;
+    const bothMissing = !titleValue && !descriptionValue;
+    if(bothMissing) showVoiceError('#voiceDetailsError', null, 'Add a title and a description.');
+    else clearVoiceError('#voiceDetailsError');
     if(!titleValue){
-      showVoiceError('#voiceTitleError', '#voiceIssueTitle', 'Enter a short issue title.');
+      showVoiceError('#voiceTitleError', '#voiceIssueTitle', 'Add a title.');
       valid = false;
     } else {
       clearVoiceError('#voiceTitleError', '#voiceIssueTitle');
     }
     if(!descriptionValue){
-      showVoiceError('#voiceDescriptionError', '#voiceIssueDescription', 'Describe the campus issue before continuing.');
+      showVoiceError('#voiceDescriptionError', '#voiceIssueDescription', 'Add a description.');
       valid = false;
     } else {
       clearVoiceError('#voiceDescriptionError', '#voiceIssueDescription');
@@ -1672,16 +1717,29 @@
     if(title) title.value = draft.title;
     if(description) description.value = draft.description;
     clearVoiceValidation();
+    const submitButton = $('#voiceSubmitIssue');
+    if(submitButton && !voiceSubmitInFlight){
+      submitButton.disabled = false;
+      submitButton.textContent = 'Submit issue';
+    }
+    updateVoiceCounters();
     updateVoiceCategoryContinue();
     setVoiceStep(draft.step, { focus:false, persist:false });
   }
 
   function resetVoiceDraft(){
+    if(voiceSubmitTimer){
+      clearTimeout(voiceSubmitTimer);
+      voiceSubmitTimer = null;
+    }
+    voiceSubmitInFlight = false;
     const state = participationState();
     state.voiceDraft = defaultVoiceDraft();
     saveState(state);
+    clearVoiceDraftSession();
     voiceComposerStep = 1;
     clearVoiceValidation();
+    updateVoiceCounters();
   }
 
   function cancelVoiceComposer(){
@@ -1690,6 +1748,7 @@
   }
 
   function submitVoiceIssue(){
+    if(voiceSubmitInFlight) return;
     if(!validateVoiceCategory()){
       setVoiceStep(1);
       return;
@@ -1709,21 +1768,49 @@
       setVoiceStep(3, { focus:false, persist:true });
       return;
     }
-    state.voiceSubmissionCounter += 1;
-    const submission = {
-      id:`voice-local-${state.voiceSubmissionCounter}`,
-      category:draft.category,
-      title:draft.title,
-      description:draft.description,
-      submittedAt:new Date().toISOString(),
-      status:'Submitted'
-    };
-    state.voiceSubmissions.unshift(submission);
-    state.voiceLastSubmissionId = submission.id;
-    state.voiceDraft = defaultVoiceDraft();
-    applyStreakQualification("voice-submission", state);
-    saveState(state);
-    setVoiceStep(4);
+    const submittedDraft = { ...draft };
+    const submitButton = $('#voiceSubmitIssue');
+    voiceSubmitInFlight = true;
+    clearVoiceError('#voiceSubmitError');
+    if(submitButton){
+      submitButton.disabled = true;
+      submitButton.textContent = 'Submitting…';
+    }
+    setVoiceStatus('Submitting issue.');
+    voiceSubmitTimer = setTimeout(()=>{
+      voiceSubmitTimer = null;
+      try{
+        const currentState = participationState();
+        currentState.voiceSubmissionCounter += 1;
+        const submission = {
+          id:`voice-local-${currentState.voiceSubmissionCounter}`,
+          category:submittedDraft.category,
+          title:submittedDraft.title,
+          description:submittedDraft.description,
+          submittedAt:new Date().toISOString(),
+          status:'Submitted',
+          moderationState:'submitted'
+        };
+        currentState.voiceSubmissions.unshift(submission);
+        currentState.voiceLastSubmissionId = submission.id;
+        currentState.voiceDraft = defaultVoiceDraft();
+        applyStreakQualification("voice-submission", currentState);
+        if(!saveState(currentState)) throw new Error('Unable to persist the Voice submission.');
+        clearVoiceDraftSession();
+        voiceSubmitInFlight = false;
+        setVoiceStep(4);
+      }catch(error){
+        voiceSubmitInFlight = false;
+        writeVoiceDraftSession(submittedDraft);
+        const button = $('#voiceSubmitIssue');
+        if(button){
+          button.disabled = false;
+          button.textContent = 'Submit issue';
+        }
+        showVoiceError('#voiceSubmitError', null, 'We couldn’t submit your issue. Please try again.');
+        setVoiceStatus('Submission failed. Please try again.');
+      }
+    }, 120);
   }
 
   function requestVoiceComposer(trigger){
@@ -1749,23 +1836,34 @@
     });
     $('#voiceIssueTitle')?.addEventListener('input', ()=>{
       saveVoiceDraft();
+      updateVoiceCounters();
+      if($('#voiceIssueTitle').value.trim()) clearVoiceError('#voiceDetailsError');
       if($('#voiceIssueTitle').value.trim()) clearVoiceError('#voiceTitleError', '#voiceIssueTitle');
     });
     $('#voiceIssueDescription')?.addEventListener('input', ()=>{
       saveVoiceDraft();
+      updateVoiceCounters();
+      if($('#voiceIssueDescription').value.trim()) clearVoiceError('#voiceDetailsError');
       if($('#voiceIssueDescription').value.trim()) clearVoiceError('#voiceDescriptionError', '#voiceIssueDescription');
     });
     $('#voiceCategoryContinue')?.addEventListener('click', ()=>{
       if(validateVoiceCategory()) setVoiceStep(2);
     });
-    $('#voiceDetailsBack')?.addEventListener('click', ()=> setVoiceStep(1));
+    $('#voiceDetailsBack')?.addEventListener('click', ()=>{
+      saveVoiceDraft();
+      setVoiceStep(1);
+    });
+    $('#voiceDetailsCancel')?.addEventListener('click', cancelVoiceComposer);
     $('#voiceDetailsContinue')?.addEventListener('click', ()=>{
       if(validateVoiceDetails()) setVoiceStep(3);
     });
-    $('#voiceReviewBack')?.addEventListener('click', ()=> setVoiceStep(2));
+    $('#voiceReviewBack')?.addEventListener('click', ()=>{
+      saveVoiceDraft();
+      setVoiceStep(2);
+    });
+    $('#voiceReviewCancel')?.addEventListener('click', cancelVoiceComposer);
     $('#voiceSubmitIssue')?.addEventListener('click', submitVoiceIssue);
     $('#voiceCategoryCancel')?.addEventListener('click', cancelVoiceComposer);
-    $('#voiceComposerCancelTop')?.addEventListener('click', cancelVoiceComposer);
     $('#voiceConfirmationBack')?.addEventListener('click', ()=> location.hash = '#voice');
   }
 
@@ -2224,6 +2322,7 @@
 
   function loadState(){
     let state = null;
+    let hadLegacyVoiceDraft = false;
     try{
       const raw = localStorage.getItem('campushub:state');
       if(raw) state = JSON.parse(raw);
@@ -2239,11 +2338,39 @@
         saves: D.saves.slice(),
         notifsRead: []
       };
+    } else {
+      hadLegacyVoiceDraft = Object.prototype.hasOwnProperty.call(state, 'voiceDraft');
     }
-    return ensureParticipationState(state);
+    const sessionDraft = readVoiceDraftSession();
+    if(sessionDraft) state.voiceDraft = sessionDraft;
+    const normalized = ensureParticipationState(state);
+    if(!sessionDraft && hadLegacyVoiceDraft){
+      // One-time migration from the pre-8D durable draft into this browser session.
+      writeVoiceDraftSession(normalized.voiceDraft);
+    }
+    return normalized;
   }
   function saveState(s){
-    try{ localStorage.setItem('campushub:state', JSON.stringify(s)); }catch(e){}
+    const normalized = ensureParticipationState(s);
+    const durable = { ...normalized };
+    delete durable.voiceDraft;
+    let previousSessionDraft = null;
+    try{
+      previousSessionDraft = sessionStorage.getItem(VOICE_DRAFT_SESSION_KEY);
+    }catch(e){
+      return false;
+    }
+    if(!writeVoiceDraftSession(normalized.voiceDraft)) return false;
+    try{
+      localStorage.setItem('campushub:state', JSON.stringify(durable));
+      return true;
+    }catch(e){
+      try{
+        if(previousSessionDraft===null) sessionStorage.removeItem(VOICE_DRAFT_SESSION_KEY);
+        else sessionStorage.setItem(VOICE_DRAFT_SESSION_KEY, previousSessionDraft);
+      }catch(rollbackError){}
+      return false;
+    }
   }
 
   function escapeHtml(s){
@@ -2283,7 +2410,13 @@
     // Always expose console helper, but only show UI badge if debug=1
     window.CampusHubDebug = {
       resetDemo(){
+        if(voiceSubmitTimer){
+          clearTimeout(voiceSubmitTimer);
+          voiceSubmitTimer = null;
+        }
+        voiceSubmitInFlight = false;
         localStorage.removeItem('campushub:state');
+        clearVoiceDraftSession();
         // reset in-memory demo state
         D.student.xp = 340;
         if(D.demoConfig?.calendar) D.demoConfig.calendar.isInRecess = false;
@@ -2306,6 +2439,7 @@
         state.xp = 340;
         lastParticipationDecision = null;
         saveState(state);
+        clearVoiceDraftSession();
         syncStudentTrustState(state);
         hydrateTenant(state);
         renderQuiz();
