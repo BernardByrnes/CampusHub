@@ -368,6 +368,40 @@
 .participation-gate__actions { display:grid; gap:8px; margin-top:14px; }
 .participation-gate__actions .btn { width:100%; }
 
+/* Safe external Opportunity hand-off */
+.opportunity-actions { display:grid; gap:8px; }
+.leave-campus-dialog {
+  width:min(420px, calc(100% - 24px));
+  max-height:calc(100dvh - 32px);
+  margin:auto;
+  padding:0;
+  border:0;
+  background:transparent;
+  color:var(--text);
+  overflow:visible;
+}
+.leave-campus-dialog::backdrop { background:rgba(15,26,19,.32); backdrop-filter:blur(2px); }
+.leave-campus-dialog__panel {
+  max-height:calc(100dvh - 32px);
+  overflow:auto;
+  padding:18px;
+  border:1px solid var(--border-strong);
+  border-radius:var(--dialog-radius);
+  background:var(--surface);
+  box-shadow:var(--dialog-shadow);
+}
+.leave-campus-dialog__title {
+  margin:0;
+  color:var(--text-strong);
+  font-size:var(--type-screen-size);
+  font-weight:var(--type-screen-weight);
+  letter-spacing:var(--type-screen-tracking);
+  line-height:1.2;
+}
+.leave-campus-dialog__body { margin:10px 0 0; }
+.leave-campus-dialog__actions { display:grid; gap:8px; margin-top:16px; }
+.leave-campus-dialog__actions .btn { width:100%; min-height:var(--control-min-h); }
+
 /* compact local demo control for trust-gate QA */
 .prototype-controls {
   margin-top:10px;

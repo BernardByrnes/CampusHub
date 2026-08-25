@@ -121,6 +121,18 @@
     if(element) element.textContent = value == null ? "" : String(value);
   }
 
+  // Opportunity destinations are deliberately strict: malformed, relative,
+  // non-HTTPS and scheme-smuggling values never become actionable links.
+  function isSafeExternalHttpsUrl(value){
+    if(typeof value !== "string" || !value.trim()) return false;
+    try{
+      const parsed = new URL(value);
+      return parsed.protocol === "https:" && Boolean(parsed.hostname);
+    }catch(error){
+      return false;
+    }
+  }
+
   function renderEventEntity(event){
     if(!event) return;
     setEntityField('[data-field="eventTitle"]', event.title);
@@ -141,8 +153,49 @@
     setEntityField('[data-field="oppProvider"]', opportunity.provider);
     setEntityField('[data-field="oppDeadline"]', opportunity.deadline);
     setEntityField('[data-field="oppProvider2"]', opportunity.provider);
-    setEntityField('[data-field="oppDeadline2"]', opportunity.deadlineDate);
+    setEntityField('[data-field="oppDeadline2"]', opportunity.deadlineDate || opportunity.deadline);
     setEntityField('[data-field="oppDetailTitle"]', opportunity.title);
+    setEntityField('[data-field="oppLocation"]', opportunity.location);
+    setEntityField('[data-field="oppType"]', opportunity.type);
+    setEntityField('[data-field="oppStipend"]', opportunity.stipend);
+    setEntityField('[data-field="oppDescription"]', opportunity.description || opportunity.summary);
+    setEntityField('[data-field="oppEligibility"]', opportunity.eligibility);
+    setEntityField('[data-field="oppRequiredAssurance"]', `${opportunity.requiredAssurance || "L2"} required`);
+
+    const requirements = $('#oppRequirements');
+    if(requirements){
+      requirements.replaceChildren();
+      (Array.isArray(opportunity.requirements) ? opportunity.requirements : []).forEach(requirement=>{
+        const item = document.createElement("li");
+        item.textContent = requirement;
+        requirements.appendChild(item);
+      });
+    }
+
+    const apply = $('#oppApply');
+    const destination = isSafeExternalHttpsUrl(opportunity.externalUrl) ? opportunity.externalUrl : "";
+    if(apply){
+      apply.hidden = !destination;
+      apply.disabled = !destination;
+    }
+    const continueLink = $('#leaveCampusHubContinue');
+    if(continueLink){
+      continueLink.hidden = !destination;
+      if(destination) continueLink.href = destination;
+      else continueLink.removeAttribute("href");
+    }
+    syncOpportunityReportButton(opportunity);
+  }
+
+  function syncOpportunityReportButton(opportunity=D.opportunity){
+    const report = $('#oppReport');
+    if(!report || !opportunity) return;
+    const state = participationState();
+    const reported = Array.isArray(state.reportedOpportunityIds)
+      && state.reportedOpportunityIds.includes(opportunity.id);
+    report.disabled = reported;
+    report.textContent = reported ? "Report sent ✓" : "Report suspicious opportunity";
+    report.setAttribute("aria-disabled", reported ? "true" : "false");
   }
 
   function renderSportsEntity(sports){
@@ -901,6 +954,8 @@
     if(typeof state.participation.returnTo!=="string") state.participation.returnTo = null;
     if(typeof state.participation.returnAction!=="string") state.participation.returnAction = null;
     ensureVoiceState(state);
+    if(!Array.isArray(state.reportedOpportunityIds)) state.reportedOpportunityIds = [];
+    state.reportedOpportunityIds = [...new Set(state.reportedOpportunityIds.filter(id => typeof id === "string" && id))];
 
     if(state.quizParticipation && typeof state.quizParticipation!=="object") state.quizParticipation = null;
     if(state.quizParticipation){
@@ -2071,6 +2126,83 @@
     });
   }
 
+  // Opportunity external destinations use their own native dialog so the
+  // provider URL is never opened before the student sees the leave-campus copy.
+  function initLeaveCampusHubFlow(){
+    const dialog = $('#leaveCampusHubDialog');
+    const apply = $('#oppApply');
+    const continueLink = $('#leaveCampusHubContinue');
+    const stay = $('#leaveCampusHubStay');
+    const report = $('#oppReport');
+    const title = $('#leaveCampusHubTitle');
+    if(!dialog) return;
+
+    let applyTrigger = null;
+
+    const restoreFocus = () => {
+      const target = applyTrigger;
+      applyTrigger = null;
+      if(target && document.contains(target) && !target.hidden){
+        setTimeout(()=> target.focus({preventScroll:true}), 0);
+      }
+    };
+
+    const closeDialog = () => {
+      if(dialog.open && typeof dialog.close === "function") dialog.close();
+      else {
+        dialog.removeAttribute("open");
+        restoreFocus();
+      }
+    };
+
+    apply?.addEventListener('click', event=>{
+      event.preventDefault();
+      const opportunity = D.opportunity;
+      if(!isSafeExternalHttpsUrl(opportunity?.externalUrl)){
+        renderOpportunityEntity(opportunity);
+        return;
+      }
+      applyTrigger = event.currentTarget;
+      continueLink.href = opportunity.externalUrl;
+      continueLink.target = "_blank";
+      continueLink.rel = "noopener noreferrer";
+      if(!dialog.open){
+        if(typeof dialog.showModal === "function") dialog.showModal();
+        else dialog.setAttribute("open", "");
+      }
+      setTimeout(()=> title?.focus({preventScroll:true}), 0);
+    });
+
+    continueLink?.addEventListener('click', event=>{
+      // Keep the validated destination on the dedicated anchor; the browser
+      // owns opening it in a new tab and applies noopener protection.
+      const opportunity = D.opportunity;
+      if(!isSafeExternalHttpsUrl(opportunity?.externalUrl)){
+        event.preventDefault();
+        return;
+      }
+      continueLink.href = opportunity.externalUrl;
+    });
+    stay?.addEventListener('click', closeDialog);
+    dialog.addEventListener('close', restoreFocus);
+    dialog.addEventListener('cancel', ()=>{
+      // Native cancel semantics close the dialog; the close listener restores focus.
+    });
+
+    report?.addEventListener('click', ()=>{
+      const opportunity = D.opportunity;
+      const state = participationState();
+      if(state.reportedOpportunityIds.includes(opportunity.id)){
+        syncOpportunityReportButton(opportunity);
+        return;
+      }
+      state.reportedOpportunityIds.push(opportunity.id);
+      saveState(state);
+      syncOpportunityReportButton(opportunity);
+      toast("Report received. The Guild office reviews every report.");
+    });
+  }
+
   // RSVP
   function initRSVP(){
     const going = $('#rsvpGoing');
@@ -2421,6 +2553,7 @@
         xp:D.student.xp,
         rsvp:null,
         saveEvent:false, saveOpp:false,
+        reportedOpportunityIds: [],
         saves: D.saves.slice(),
         notifsRead: []
       };
@@ -2518,6 +2651,7 @@
         state.quizParticipation = null;
         pendingQuizChoice = null;
         state.rsvp = null;
+        state.reportedOpportunityIds = [];
         state.voiceStatusScenario = null;
         state.selectedVoiceIssueId = "voice-water-halls";
         state.supportedVoiceIssues = [];
@@ -2604,6 +2738,7 @@
     initVoiceComposer();
     initVoiceDetail();
     initSavesToggles();
+    initLeaveCampusHubFlow();
     initRSVP();
     initBack();
     initImageFallbacks();
@@ -2617,12 +2752,6 @@
       renderNotifications();
       toast("All notifications marked read.");
     });
-
-    // External link warnings
-    $$('[data-external]').forEach(a=> a.addEventListener('click', (e)=>{
-      e.preventDefault();
-      toast("External destination — verify the URL before submitting documents.");
-    }));
 
     // Student Voice entry points reuse the existing participation-gate decision path.
     $('#voiceNewBtn')?.addEventListener('click', event=> requestVoiceComposer(event.currentTarget));

@@ -118,14 +118,18 @@ window.CampusHubDemo = {
     title: "Research Assistant — Climate Resilience",
     provider: "Makerere University — Department of Geography",
     summary: "Support ongoing research on climate adaptation strategies in East Africa.",
+    description: "Support ongoing research on climate adaptation strategies in East Africa.",
     deadline: "Apply by 30 May 2026",
     deadlineDate: "30 May 2026",
-    location: "Main Campus • Part-time",
+    location: "Main Campus",
     stipend: "UGX 600,000 / month",
-    type: "Research",
+    type: "Part-time",
     verified: true,
-    eligibility: "Open to Year 2+ Geography, Environmental Science and related programmes. L2 verification required.",
-    requirements: ["CV (1 page)", "Brief motivation (250 words)", "Academic transcript (unofficial accepted)"],
+    eligibility: "Year 2+ Geography, Environmental Science and related programmes.",
+    requiredAssurance: "L2",
+    requirements: ["CV", "Brief motivation", "Academic transcript"],
+    // Production records must contain the actual provider application URL.
+    externalUrl: "https://www.mak.ac.ug/",
     href: "#opportunities/ra-climate"
   },
 

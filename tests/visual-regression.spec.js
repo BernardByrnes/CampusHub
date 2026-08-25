@@ -193,6 +193,20 @@ test.describe('Phase 7D canonical visual regression baselines', () => {
       await captureMobileViewport(page, 'event-guild-debate-390.png');
     });
 
+    test('opportunity-ra-climate-390', async ({ page }) => {
+      await resetAndGo(page, '#opportunities/ra-climate');
+      await captureMobileViewport(page, 'opportunity-ra-climate-390.png');
+    });
+
+    test('opportunity-leave-dialog-390', async ({ page }) => {
+      await resetAndGo(page, '#opportunities/ra-climate');
+      await page.locator('#oppApply').click();
+      await expect(page.locator('#leaveCampusHubDialog')).toBeVisible();
+      await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe('leaveCampusHubTitle');
+      await settle(page);
+      await captureMobileViewport(page, 'opportunity-leave-dialog-390.png');
+    });
+
     test('news-innovation-week-390', async ({ page }) => {
       await resetAndGo(page, '#news/innovation-week');
       await captureMobileViewport(page, 'news-innovation-week-390.png');
@@ -290,6 +304,15 @@ test.describe('Phase 7D canonical visual regression baselines', () => {
     test('gate-poll-assurance-1280', async ({ page }) => {
       await openPollAssuranceGate(page);
       await captureViewport(page, 'gate-poll-assurance-1280.png');
+    });
+
+    test('opportunity-leave-dialog-1280', async ({ page }) => {
+      await resetAndGo(page, '#opportunities/ra-climate');
+      await page.locator('#oppApply').click();
+      await expect(page.locator('#leaveCampusHubDialog')).toBeVisible();
+      await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe('leaveCampusHubTitle');
+      await settle(page);
+      await captureViewport(page, 'opportunity-leave-dialog-1280.png');
     });
   });
 
