@@ -80,6 +80,36 @@
   --leading-tight: 1.15;
   --leading-normal: 1.5;
 
+  /* frozen typography roles — keep hierarchy semantic and swappable */
+  --type-screen-size: 20px;
+  --type-screen-weight: 700;
+  --type-screen-tracking: -0.02em;
+  --type-hero-size: 21px;
+  --type-hero-weight: 700;
+  --type-hero-tracking: -0.015em;
+  --type-poll-size: 19px;
+  --type-poll-weight: 650;
+  --type-poll-tracking: -0.012em;
+  --type-card-size: 16px;
+  --type-card-weight: 650;
+  --type-card-tracking: -0.008em;
+  --type-card-small-size: 15px;
+  --type-card-small-weight: 600;
+  --type-body-size: 13.5px;
+  --type-body-leading: 1.5;
+  --type-meta-size: 12.5px;
+  --type-label-size: 14px;
+  --type-label-weight: 600;
+  --type-nav-size: 10.5px;
+  --type-nav-weight: 600;
+  --type-kicker-size: 11px;
+  --type-kicker-weight: 700;
+  --type-kicker-tracking: .07em;
+  --type-chip-size: 12px;
+  --type-chip-weight: 600;
+  --type-level-size: 26px;
+  --type-level-weight: 800;
+
   /* layout */
   --content-max: 430px;
   --content-gutter: 16px;

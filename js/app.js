@@ -277,12 +277,12 @@
           <div style="display:flex; gap:12px;">
             <div style="flex:1; min-width:0;">
               <div class="kicker kicker--info">${escapeHtml(item.kicker)}</div>
-              <div class="title" style="margin-top:6px; font-size:16px;">${escapeHtml(item.title)}</div>
+              <div class="title" style="margin-top:6px;">${escapeHtml(item.title)}</div>
               <div class="inline-meta" style="margin-top:8px; flex-direction:column; align-items:flex-start;">
                 <span style="display:flex; gap:6px; align-items:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/></svg> ${escapeHtml(item.meta)}</span>
                 <span style="display:flex; gap:6px; align-items:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11z"/></svg> ${escapeHtml(item.venue)}</span>
               </div>
-              <a href="${escapeHtml(item.href)}" class="btn btn--small" style="margin-top:10px; background:var(--info-soft); border-color:#c9ddf1; color:var(--info);">View details →</a>
+              <a href="${escapeHtml(item.href)}" class="btn btn--small" style="margin-top:10px; background:var(--info-soft); border-color:var(--info-border); color:var(--info);">View details →</a>
             </div>
             <div class="cover" style="width:42%; max-width:170px; flex:0 0 42%; height:auto;">
               <img src="${item.image}" alt="${escapeHtml(item.imageAlt)}" width="300" height="220" loading="lazy" decoding="async" />
@@ -295,7 +295,7 @@
           <div style="display:flex; gap:12px;">
             <div style="flex:1; min-width:0;">
               <div class="kicker">${escapeHtml(item.kicker)}</div>
-              <div class="title" style="margin-top:6px; font-size:16px;">${escapeHtml(item.title)}</div>
+              <div class="title" style="margin-top:6px;">${escapeHtml(item.title)}</div>
               <p class="body-sm" style="margin:6px 0 0;">${escapeHtml(item.body)}</p>
               <div class="meta" style="margin-top:8px;">${escapeHtml(item.meta)} <a href="${escapeHtml(item.href)}" class="section-action" style="margin-left:8px;">Read more →</a></div>
             </div>
@@ -325,7 +325,7 @@
           <div style="display:flex; gap:12px; align-items:center; justify-content:space-between;">
             <div style="min-width:0; flex:1;">
               <div class="kicker">${escapeHtml(item.kicker)}</div>
-              <div class="title" style="margin-top:4px; font-size:15px;">${escapeHtml(item.title)}</div>
+              <div class="small-card-title" style="margin-top:4px;">${escapeHtml(item.title)}</div>
               <div class="meta" style="margin-top:4px;">${escapeHtml(item.provider)}</div>
               <div class="meta" style="margin-top:4px; font-weight:600;">${escapeHtml(item.meta)}</div>
             </div>
@@ -442,7 +442,7 @@
           </div>
           <div style="flex:1; min-width:0;">
             <div class="kicker kicker--info" style="font-size:11px;">${escapeHtml(it.category)}</div>
-            <div class="title" style="margin-top:4px; font-size:14px;">${escapeHtml(it.title)}</div>
+            <div class="title small-card-title" style="margin-top:4px;">${escapeHtml(it.title)}</div>
             <p class="body-sm" style="margin:4px 0 0;">${escapeHtml(it.body)}</p>
             <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; gap:8px;">
               <span class="meta" style="display:flex; gap:6px; align-items:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> ${it.supporters} supporters</span>
@@ -615,7 +615,7 @@
           <span class="${n.unread?'notif-dot':'notif-dot notif-dot--read'}" aria-hidden="true"></span>
           <div style="flex:1; min-width:0;">
             <div style="display:flex; justify-content:space-between; gap:8px;">
-              <span class="title" style="font-size:14px;">${escapeHtml(n.title)}</span>
+              <span class="small-card-title">${escapeHtml(n.title)}</span>
               <span class="meta" style="white-space:nowrap;">${escapeHtml(n.time)}</span>
             </div>
             <p class="body-sm" style="margin:4px 0 0;">${escapeHtml(n.body)}</p>
@@ -662,9 +662,9 @@
       fb.hidden = false;
       if(note) note.hidden = false;
       const correct = participation.optionIndex===D.quiz.correctIndex;
-      fb.style.background = correct ? '#e6f2e9' : '#fef3f2';
-      fb.style.borderColor = correct ? '#cfe3d4' : '#fecdc9';
-      fb.style.color = correct ? '#115e2b' : '#7a271a';
+      fb.style.background = correct ? 'var(--success-soft)' : 'var(--danger-soft)';
+      fb.style.borderColor = correct ? 'var(--border)' : 'var(--danger)';
+      fb.style.color = correct ? 'var(--success)' : 'var(--danger)';
       const earned = participation.xpAwarded || quizAwardForChoice(participation.optionIndex, D.quiz);
       fb.innerHTML = correct
         ? `<strong>Correct!</strong> ${escapeHtml(D.quiz.explanation)} <br/><span class="pill pill--brand" style="margin-top:6px;">+${earned} XP earned — +${xpPart} for taking part +${xpBonus} bonus for correct answer</span>`
