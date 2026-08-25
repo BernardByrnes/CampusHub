@@ -37,6 +37,13 @@ async function geometry(page, selector) {
   });
 }
 
+// CSS specifies these minimums at exactly 52px, but Chromium on Windows may
+// expose a tiny floating-point measurement error. This epsilon is for
+// measurement precision only, not design tolerance.
+function expectAtLeastWithSubpixelTolerance(actual, minimum, epsilon = 0.01) {
+  expect(actual + epsilon).toBeGreaterThanOrEqual(minimum);
+}
+
 async function expectNoHorizontalOverflow(page, route) {
   const metrics = await page.evaluate(() => ({
     viewportWidth: window.innerWidth,
@@ -62,12 +69,6 @@ async function openAssuranceGate(page) {
 }
 
 test.describe('Phase 7B frozen component geometry', () => {
-  // Chromium on Windows can report a CSS min-height of 51.99997px for a
-  // 52px option after a long multi-project run. Keep the exact assertions,
-  // but retry this read-only geometry suite once so subpixel timing noise
-  // cannot make the full regression run nondeterministic.
-  test.describe.configure({ retries: 1 });
-
   test.beforeEach(async ({ page }) => {
     await blockExternalFonts(page);
   });
@@ -152,7 +153,7 @@ test.describe('Phase 7B frozen component geometry', () => {
     }));
     expect(options).toHaveLength(5);
     for (const option of options) {
-      expect(option.height).toBeGreaterThanOrEqual(52);
+      expectAtLeastWithSubpixelTolerance(option.height, 52);
       expect(option.scrollHeight).toBeLessThanOrEqual(option.clientHeight + 2);
       expect(option.inputWidth).toBeGreaterThan(0);
       expect(option.inputHeight).toBeGreaterThan(0);
@@ -170,7 +171,7 @@ test.describe('Phase 7B frozen component geometry', () => {
     })));
     expect(before.length).toBeGreaterThan(1);
     for (const option of before) {
-      expect(option.height).toBeGreaterThanOrEqual(52);
+      expectAtLeastWithSubpixelTolerance(option.height, 52);
       expect(option.inputWidth).toBeGreaterThan(0);
       expect(option.inputHeight).toBeGreaterThan(0);
     }
@@ -180,7 +181,7 @@ test.describe('Phase 7B frozen component geometry', () => {
     await expect(page.locator('#quizFeedback')).toBeVisible();
     await expect(page.locator('#quizOptions .quiz-opt.correct')).toHaveCount(1);
     const after = await page.locator('#quizOptions .quiz-opt').evaluateAll(elements => elements.map(element => element.getBoundingClientRect().height));
-    for (const height of after) expect(height).toBeGreaterThanOrEqual(52);
+    for (const height of after) expectAtLeastWithSubpixelTolerance(height, 52);
   });
 
   test('uses the 12px field radius for Voice title and description inputs', async ({ page }, testInfo) => {
