@@ -89,11 +89,43 @@ async function resetAndGoVoiceValidation(page, scenario, issueId) {
   await clearTransientUi(page);
 }
 
-async function captureShell(page, name) {
-  // Mobile baselines target the complete student shell, not browser chrome or
-  // an arbitrary pixel rectangle. The fixed bottom nav remains part of this
-  // deterministic shell capture.
-  await expect(page.locator('#shell')).toHaveScreenshot(name, SNAPSHOT_OPTIONS);
+async function expectMobileNavReady(page) {
+  const navState = await page.locator('.bottom-nav').evaluate(nav => {
+    const shell = document.querySelector('#shell');
+    const main = document.querySelector('#main');
+    const navRect = nav.getBoundingClientRect();
+    const shellRect = shell?.getBoundingClientRect();
+    const navStyle = getComputedStyle(nav);
+    const mainStyle = main ? getComputedStyle(main) : null;
+    return {
+      visible: navStyle.display !== 'none'
+        && navStyle.visibility !== 'hidden'
+        && navRect.width > 0
+        && navRect.height > 0,
+      position: navStyle.position,
+      navBottom: navRect.bottom,
+      viewportHeight: window.innerHeight,
+      navWidth: navRect.width,
+      viewportWidth: window.innerWidth,
+      shellWidth: shellRect?.width ?? 0,
+      navHeight: navRect.height,
+      mainPaddingBottom: Number.parseFloat(mainStyle?.paddingBottom || '0')
+    };
+  });
+
+  expect(navState.visible).toBe(true);
+  expect(navState.position).toBe('fixed');
+  expect(Math.abs(navState.navBottom - navState.viewportHeight)).toBeLessThanOrEqual(1);
+  expect(navState.navWidth).toBeLessThanOrEqual(Math.min(navState.shellWidth, navState.viewportWidth) + 1);
+  expect(navState.mainPaddingBottom + 1).toBeGreaterThanOrEqual(navState.navHeight);
+}
+
+async function captureMobileViewport(page, name) {
+  // Mobile goldens intentionally represent the real viewport because the
+  // student bottom navigation is fixed. Tall locator screenshots are not used
+  // because Playwright stitching can relocate fixed elements over lower content.
+  await expectMobileNavReady(page);
+  await expect(page).toHaveScreenshot(name, SNAPSHOT_OPTIONS);
 }
 
 async function captureViewport(page, name) {
@@ -128,73 +160,73 @@ test.describe('Phase 7D canonical visual regression baselines', () => {
 
     test('home-390', async ({ page }) => {
       await resetAndGo(page, '#home');
-      await captureShell(page, 'home-390.png');
+      await captureMobileViewport(page, 'home-390.png');
     });
 
     test('discover-390', async ({ page }) => {
       await resetAndGo(page, '#discover');
-      await captureShell(page, 'discover-390.png');
+      await captureMobileViewport(page, 'discover-390.png');
     });
 
     test('participate-polls-390', async ({ page }) => {
       await resetAndGo(page, '#participate');
-      await captureShell(page, 'participate-polls-390.png');
+      await captureMobileViewport(page, 'participate-polls-390.png');
     });
 
     test('participate-voice-390', async ({ page }) => {
       await resetAndGo(page, '#voice');
-      await captureShell(page, 'participate-voice-390.png');
+      await captureMobileViewport(page, 'participate-voice-390.png');
     });
 
     test('play-390', async ({ page }) => {
       await resetAndGo(page, '#play');
-      await captureShell(page, 'play-390.png');
+      await captureMobileViewport(page, 'play-390.png');
     });
 
     test('me-390', async ({ page }) => {
       await resetAndGo(page, '#me');
-      await captureShell(page, 'me-390.png');
+      await captureMobileViewport(page, 'me-390.png');
     });
 
     test('event-guild-debate-390', async ({ page }) => {
       await resetAndGo(page, '#events/guild-debate');
-      await captureShell(page, 'event-guild-debate-390.png');
+      await captureMobileViewport(page, 'event-guild-debate-390.png');
     });
 
     test('news-innovation-week-390', async ({ page }) => {
       await resetAndGo(page, '#news/innovation-week');
-      await captureShell(page, 'news-innovation-week-390.png');
+      await captureMobileViewport(page, 'news-innovation-week-390.png');
     });
 
     test('voice-water-halls-390', async ({ page }) => {
       await resetAndGo(page, '#voice-detail/voice-water-halls');
-      await captureShell(page, 'voice-water-halls-390.png');
+      await captureMobileViewport(page, 'voice-water-halls-390.png');
     });
 
     test('voice-action-planned-390', async ({ page }) => {
       await resetAndGoVoiceValidation(page, 'voice-action-planned', 'voice-lighting-path');
-      await captureShell(page, 'voice-action-planned-390.png');
+      await captureMobileViewport(page, 'voice-action-planned-390.png');
     });
 
     test('voice-resolved-390', async ({ page }) => {
       await resetAndGoVoiceValidation(page, 'voice-resolved', 'voice-library-sunday-hours');
-      await captureShell(page, 'voice-resolved-390.png');
+      await captureMobileViewport(page, 'voice-resolved-390.png');
     });
 
     test('voice-composer-category-390', async ({ page }) => {
       await resetAndGo(page, '#voice-new');
       await expect(page.locator('#voiceStepCategory')).toBeVisible();
-      await captureShell(page, 'voice-composer-category-390.png');
+      await captureMobileViewport(page, 'voice-composer-category-390.png');
     });
 
     test('verification-l2-390', async ({ page }) => {
       await resetAndGo(page, '#verification');
-      await captureShell(page, 'verification-l2-390.png');
+      await captureMobileViewport(page, 'verification-l2-390.png');
     });
 
     test('gate-poll-assurance-390', async ({ page }) => {
       await openPollAssuranceGate(page);
-      await captureViewport(page, 'gate-poll-assurance-390.png');
+      await captureMobileViewport(page, 'gate-poll-assurance-390.png');
     });
   });
 
@@ -231,12 +263,12 @@ test.describe('Phase 7D canonical visual regression baselines', () => {
 
     test('home-320', async ({ page }) => {
       await resetAndGo(page, '#home');
-      await captureShell(page, 'home-320.png');
+      await captureMobileViewport(page, 'home-320.png');
     });
 
     test('participate-polls-320', async ({ page }) => {
       await resetAndGo(page, '#participate');
-      await captureShell(page, 'participate-polls-320.png');
+      await captureMobileViewport(page, 'participate-polls-320.png');
     });
   });
 });

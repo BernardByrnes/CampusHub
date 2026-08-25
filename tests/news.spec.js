@@ -20,9 +20,18 @@ async function expectNoHorizontalOverflow(page, route) {
 }
 
 async function expectLoadedImage(page) {
-  const imageState = await page.locator('#newsDetailImage').evaluate(image => ({
-    complete: image.complete,
-    naturalWidth: image.naturalWidth
+  const image = page.locator('#newsDetailImage');
+  await expect.poll(() => image.evaluate(candidate => (
+    candidate.complete && candidate.naturalWidth > 0
+  ))).toBe(true);
+  await image.evaluate(async candidate => {
+    if (typeof candidate.decode === 'function') {
+      await candidate.decode().catch(() => undefined);
+    }
+  });
+  const imageState = await image.evaluate(candidate => ({
+    complete: candidate.complete,
+    naturalWidth: candidate.naturalWidth
   }));
   expect(imageState.complete).toBe(true);
   expect(imageState.naturalWidth).toBeGreaterThan(0);
