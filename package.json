@@ -5,6 +5,8 @@
   "scripts": {
     "check:js": "node --check js/demo-data.js && node --check js/participation-evaluator.js && node --check js/app.js",
     "test": "playwright test",
+    "test:visual": "playwright test tests/visual-regression.spec.js",
+    "test:visual:update": "playwright test tests/visual-regression.spec.js --update-snapshots",
     "test:headed": "playwright test --headed",
     "test:report": "playwright show-report"
   },

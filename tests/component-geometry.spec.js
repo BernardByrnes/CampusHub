@@ -62,6 +62,12 @@ async function openAssuranceGate(page) {
 }
 
 test.describe('Phase 7B frozen component geometry', () => {
+  // Chromium on Windows can report a CSS min-height of 51.99997px for a
+  // 52px option after a long multi-project run. Keep the exact assertions,
+  // but retry this read-only geometry suite once so subpixel timing noise
+  // cannot make the full regression run nondeterministic.
+  test.describe.configure({ retries: 1 });
+
   test.beforeEach(async ({ page }) => {
     await blockExternalFonts(page);
   });
