@@ -19,7 +19,7 @@
     opportunities: { view: "opportunity", parent: "discover", resolve: id => findCanonicalEntity("opportunity", id) },
     sports: { view: "sports", parent: "discover", resolve: id => findCanonicalEntity("sportsResult", id) },
     news: { view: "news", parent: "discover", resolve: findPublication },
-    "voice-detail": { view: "voice-detail", parent: "participate", resolve: id => D.voiceIssues.find(issue => issue.id.toLowerCase() === id.toLowerCase()) || null }
+    "voice-detail": { view: "voice-detail", parent: "participate", resolve: resolveVoiceDetailEntity }
   });
   const VOICE_CATEGORIES = Object.freeze([
     "Wi-Fi",
@@ -72,6 +72,26 @@
   function findPublication(entityId){
     if(!entityId || !Array.isArray(D.publications)) return null;
     return D.publications.find(publication => publication.id.toLowerCase() === entityId.toLowerCase()) || null;
+  }
+
+  function voiceScenarioFixtureId(state){
+    const scenario = state?.voiceStatusScenario ? D.voiceStatusScenarios?.[state.voiceStatusScenario] : null;
+    return scenario?.fixtureId || null;
+  }
+
+  function findVoiceIssue(issueId){
+    if(!issueId || !Array.isArray(D.voiceIssues)) return null;
+    const normalizedId = String(issueId).toLowerCase();
+    return D.voiceIssues.find(issue => issue.id.toLowerCase() === normalizedId) || null;
+  }
+
+  function resolveVoiceDetailEntity(issueId){
+    const publicIssue = findVoiceIssue(issueId);
+    if(publicIssue) return publicIssue;
+    const state = participationState();
+    const fixtureId = voiceScenarioFixtureId(state);
+    if(!fixtureId || fixtureId.toLowerCase() !== String(issueId || "").toLowerCase()) return null;
+    return D.voiceValidationFixtures?.[fixtureId] || null;
   }
 
   function parseHashRoute(hash=location.hash){
@@ -388,29 +408,26 @@
     return new Intl.DateTimeFormat("en-GB", { day:"numeric", month:"long", year:"numeric" }).format(parsed);
   }
 
+  function voiceIssueView(record, state){
+    const isSupported = state.supportedVoiceIssues.includes(record.id);
+    return {
+      ...record,
+      supporters: record.supporters + (isSupported ? 1 : 0),
+      isPublic:true,
+      isSupported
+    };
+  }
+
   function getVoiceIssue(issueId, state=participationState()){
-    const publicIssue = D.voiceIssues.find(issue=> issue.id===issueId);
-    if(publicIssue){
-      const scenario = state.voiceStatusScenario ? D.voiceStatusScenarios?.[state.voiceStatusScenario] : null;
-      const hasScenario = scenario?.issueId===publicIssue.id;
-      const isSupported = state.supportedVoiceIssues.includes(publicIssue.id);
-      return {
-        ...publicIssue,
-        supporters: publicIssue.supporters + (isSupported ? 1 : 0),
-        status: hasScenario ? scenario.status : publicIssue.status,
-        statusVariant: hasScenario ? scenario.statusVariant : publicIssue.statusVariant,
-        history: [
-          ...(publicIssue.history || []),
-          ...(hasScenario ? scenario.historyAdditions || [] : [])
-        ],
-        officialUpdates: [
-          ...(publicIssue.officialUpdates || []),
-          ...(hasScenario ? scenario.officialUpdates || [] : [])
-        ],
-        isPublic:true,
-        isSupported
-      };
+    const publicIssue = findVoiceIssue(issueId);
+    if(publicIssue) return voiceIssueView(publicIssue, state);
+
+    const fixtureId = voiceScenarioFixtureId(state);
+    if(fixtureId && fixtureId.toLowerCase() === String(issueId || "").toLowerCase()){
+      const fixture = D.voiceValidationFixtures?.[fixtureId];
+      if(fixture) return voiceIssueView(fixture, state);
     }
+
     const submission = state.voiceSubmissions.find(item=>item?.id===issueId);
     if(!submission) return null;
     const submittedAt = formatVoiceDate(submission.submittedAt);
@@ -465,8 +482,14 @@
     const state = participationState();
     const issue = getVoiceIssue(issueId, state);
     if(!issue) return null;
+    const scenarioFixtureId = voiceScenarioFixtureId(state);
+    if(state.voiceStatusScenario && scenarioFixtureId && issue.id!==scenarioFixtureId){
+      state.voiceStatusScenario = null;
+    }
     if(state.selectedVoiceIssueId!==issue.id){
       state.selectedVoiceIssueId = issue.id;
+      saveState(state);
+    } else if(!state.voiceStatusScenario && scenarioFixtureId){
       saveState(state);
     }
     return issue;
@@ -520,9 +543,9 @@
 
     const timeline = $('#voiceTimeline');
     if(timeline){
-      timeline.innerHTML = selected.history.map(event=>{
+      timeline.innerHTML = selected.history.map((event, index)=>{
         const variant = voiceStatusVariant(event.status);
-        return `<li class="voice-timeline__item voice-timeline__item--${escapeHtml(variant)}">
+        return `<li class="voice-timeline__item voice-timeline__item--${escapeHtml(variant)}"${index===selected.history.length-1 ? ' aria-current="step"' : ''}>
           <div class="voice-timeline__event">
             <span class="voice-timeline__status">${escapeHtml(event.status)}</span>
             <time class="voice-timeline__date">${escapeHtml(event.date)}</time>
@@ -575,10 +598,16 @@
   function applyVoiceStatusScenario(name, announce=false){
     const scenario = D.voiceStatusScenarios?.[name] || null;
     const state = participationState();
+    const fixtureId = scenario?.fixtureId || "voice-water-halls";
     state.voiceStatusScenario = scenario ? name : null;
+    state.selectedVoiceIssueId = fixtureId;
     saveState(state);
     renderVoiceLists();
-    if(!$('#view-voice-detail')?.hidden) renderVoiceDetail(state.selectedVoiceIssueId);
+    if(!$('#view-voice-detail')?.hidden){
+      const nextRoute = voiceDetailRoute(fixtureId);
+      if(location.hash.toLowerCase()===nextRoute.toLowerCase()) renderVoiceDetail(fixtureId);
+      else location.hash = nextRoute;
+    }
     if(announce) toast(scenario ? `${scenario.label} selected for this prototype.` : 'Student Voice — Acknowledged selected for this prototype.');
   }
 
@@ -804,13 +833,18 @@
     if(typeof state.voiceLastSubmissionId!=="string") state.voiceLastSubmissionId = null;
     if(!Array.isArray(state.supportedVoiceIssues)) state.supportedVoiceIssues = [];
     state.supportedVoiceIssues = [...new Set(state.supportedVoiceIssues.filter(id=>typeof id==="string"))];
-    if(typeof state.selectedVoiceIssueId!=="string") state.selectedVoiceIssueId = "voice-water-halls";
-    if(!D.voiceIssues.some(issue=>issue.id===state.selectedVoiceIssueId) && !state.voiceSubmissions.some(issue=>issue?.id===state.selectedVoiceIssueId)){
-      state.selectedVoiceIssueId = "voice-water-halls";
-    }
     if(typeof state.voiceStatusScenario!=="string" || !D.voiceStatusScenarios?.[state.voiceStatusScenario]){
       state.voiceStatusScenario = null;
     }
+    if(typeof state.selectedVoiceIssueId!=="string") state.selectedVoiceIssueId = "voice-water-halls";
+    const fixtureId = voiceScenarioFixtureId(state);
+    const selectedIsPublic = Boolean(findVoiceIssue(state.selectedVoiceIssueId));
+    const selectedIsFixture = Boolean(fixtureId && fixtureId.toLowerCase()===state.selectedVoiceIssueId.toLowerCase());
+    const selectedIsLocal = state.voiceSubmissions.some(issue=>issue?.id===state.selectedVoiceIssueId);
+    if(!selectedIsPublic && !selectedIsFixture && !selectedIsLocal){
+      state.selectedVoiceIssueId = "voice-water-halls";
+    }
+    if(fixtureId) state.selectedVoiceIssueId = fixtureId;
     return state;
   }
 
@@ -2193,6 +2227,9 @@
         state.quizParticipation = null;
         pendingQuizChoice = null;
         state.rsvp = null;
+        state.voiceStatusScenario = null;
+        state.selectedVoiceIssueId = "voice-water-halls";
+        state.supportedVoiceIssues = [];
         state.xp = 340;
         lastParticipationDecision = null;
         saveState(state);

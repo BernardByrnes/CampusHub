@@ -178,7 +178,7 @@ test.describe('Phase 7C canonical typography roles', () => {
     expect(colors.border).toBe(colors.expected.border);
 
     await page.evaluate(() => window.CampusHubDebug.setScenario('voice-resolved'));
-    await goTo(page, '#voice-detail/voice-water-halls');
+    await goTo(page, '#voice-detail/voice-library-sunday-hours');
     colors = await semanticColors(page, '#voiceDetailStatus', { color: '--success', background: '--success-soft' });
     expect(colors.color).toBe(colors.expected.color);
     expect(colors.background).toBe(colors.expected.background);

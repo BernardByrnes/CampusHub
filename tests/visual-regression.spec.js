@@ -79,6 +79,16 @@ async function resetAndGo(page, hash) {
   await clearTransientUi(page);
 }
 
+async function resetAndGoVoiceValidation(page, scenario, issueId) {
+  await resetAndGo(page, '#home');
+  await page.evaluate(name => window.CampusHubDebug.setScenario(name), scenario);
+  await clearTransientUi(page);
+  await page.goto(`/#voice-detail/${issueId}`);
+  await expect(page.locator('#view-voice-detail')).toBeVisible();
+  await settle(page);
+  await clearTransientUi(page);
+}
+
 async function captureShell(page, name) {
   // Mobile baselines target the complete student shell, not browser chrome or
   // an arbitrary pixel rectangle. The fixed bottom nav remains part of this
@@ -159,6 +169,16 @@ test.describe('Phase 7D canonical visual regression baselines', () => {
     test('voice-water-halls-390', async ({ page }) => {
       await resetAndGo(page, '#voice-detail/voice-water-halls');
       await captureShell(page, 'voice-water-halls-390.png');
+    });
+
+    test('voice-action-planned-390', async ({ page }) => {
+      await resetAndGoVoiceValidation(page, 'voice-action-planned', 'voice-lighting-path');
+      await captureShell(page, 'voice-action-planned-390.png');
+    });
+
+    test('voice-resolved-390', async ({ page }) => {
+      await resetAndGoVoiceValidation(page, 'voice-resolved', 'voice-library-sunday-hours');
+      await captureShell(page, 'voice-resolved-390.png');
     });
 
     test('voice-composer-category-390', async ({ page }) => {

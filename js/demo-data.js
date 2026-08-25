@@ -262,56 +262,15 @@ window.CampusHubDemo = {
   voiceStatusScenarios: {
     "voice-under-review": {
       label: "Student Voice — Under Review",
-      issueId: "voice-water-halls",
-      fixtureId: "voice-evening-buses",
-      status: "Under Review",
-      statusVariant: "review",
-      historyAdditions: [
-        { status:"Under Review", date:"17 May 2026", note:"The issue is being reviewed by the responsible campus team." }
-      ],
-      officialUpdates: []
+      fixtureId: "voice-evening-buses"
     },
     "voice-action-planned": {
       label: "Student Voice — Action Planned",
-      issueId: "voice-water-halls",
-      fixtureId: "voice-lighting-path",
-      status: "Action Planned",
-      statusVariant: "planned",
-      historyAdditions: [
-        { status:"Under Review", date:"17 May 2026", note:"The issue is being reviewed by the responsible campus team." },
-        { status:"Action Planned", date:"21 May 2026", note:"An action has been identified to address this issue." }
-      ],
-      officialUpdates: [
-        {
-          department:"Facilities Directorate",
-          date:"21 May 2026",
-          body:"Water supply interruptions have been traced to maintenance work on the western hall line. Repairs are scheduled this week."
-        }
-      ]
+      fixtureId: "voice-lighting-path"
     },
     "voice-resolved": {
       label: "Student Voice — Resolved",
-      issueId: "voice-water-halls",
-      fixtureId: "voice-library-sunday-hours",
-      status: "Resolved",
-      statusVariant: "resolved",
-      historyAdditions: [
-        { status:"Under Review", date:"17 May 2026", note:"The issue is being reviewed by the responsible campus team." },
-        { status:"Action Planned", date:"21 May 2026", note:"An action has been identified to address this issue." },
-        { status:"Resolved", date:"28 May 2026", note:"The reported issue has been marked as resolved." }
-      ],
-      officialUpdates: [
-        {
-          department:"Facilities Directorate",
-          date:"21 May 2026",
-          body:"Water supply interruptions have been traced to maintenance work on the western hall line. Repairs are scheduled this week."
-        },
-        {
-          department:"Facilities Directorate",
-          date:"28 May 2026",
-          body:"Repairs to the affected water line have been completed. Students experiencing continued disruption can raise a new issue."
-        }
-      ]
+      fixtureId: "voice-library-sunday-hours"
     }
   },
 
