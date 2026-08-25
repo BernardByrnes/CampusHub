@@ -15,6 +15,12 @@ window.CampusHubDemo = {
 
   // Prototype-only arithmetic configuration; this is not student-facing XP policy.
   demoConfig: {
+    calendar: {
+      // Canonical prototype facts; the browser/device date is not authoritative.
+      currentTenantDay: "2026-05-20",
+      previousActiveTenantDay: "2026-05-19",
+      isInRecess: false
+    },
     xp: {
       pollParticipation: 5
     },
@@ -41,6 +47,13 @@ window.CampusHubDemo = {
     streakLabel: "Active on Monday, Tuesday and Wednesday",
     savesCount: 6,
     rsvpsCount: 3
+  },
+
+  // Phase 8B starting fixture. This historical demo fact preserves the
+  // existing 3-day presentation until Phase 8C wires persistence/rendering.
+  streakState: {
+    count: 3,
+    lastQualifiedTenantDay: "2026-05-19"
   },
 
   priorityNotice: {
