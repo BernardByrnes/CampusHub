@@ -69,5 +69,7 @@
 /* Streak day pills */
 .streak-days { display:flex; gap:6px; margin-top:8px; }
 .day-pill { flex:1; text-align:center; padding:8px 4px; border-radius:10px; border:1px solid var(--border); background:#fff; font-size:11px; font-weight:700; color: var(--text-muted); }
-.day-pill.is-done { background: var(--brand-soft); border-color: var(--brand-border); color: var(--brand); }
+.day-pill.is-done,
+.day-pill.is-last-qualified { background: var(--brand-soft); border-color: var(--brand-border); color: var(--brand); }
 .day-pill.is-today { background: var(--brand); color:#fff; border-color: var(--brand); }
+.day-pill.is-paused { background:var(--play-soft); border-color:var(--play-border); color:var(--play); }

@@ -365,20 +365,12 @@
           <div class="row" style="justify-content:space-between;">
             <div>
               <div class="kicker">Streak</div>
-              <div class="streak-number" style="margin-top:4px;"><span data-field="streakDays">3</span> days</div>
-              <div class="meta">Active on Monday, Tuesday and Wednesday</div>
+              <div class="streak-number" style="margin-top:4px;" data-field="streakDuration">3 days</div>
+              <div class="meta" data-field="streakActivitySummary">Last active Tuesday</div>
             </div>
             <div class="icon-tile" aria-hidden="true" style="background:var(--play-soft); border-color:var(--play-border); color:var(--play);">⟡</div>
           </div>
-          <div class="streak-days" aria-label="Streak days">
-            <div class="day-pill is-done">Mon</div>
-            <div class="day-pill is-done">Tue</div>
-            <div class="day-pill is-today">Wed</div>
-            <div class="day-pill">Thu</div>
-            <div class="day-pill">Fri</div>
-            <div class="day-pill">Sat</div>
-            <div class="day-pill">Sun</div>
-          </div>
+          <div class="streak-days" role="list" aria-label="Current tenant week"></div>
           <p class="meta" style="margin-top:8px; font-size:11px;" data-field="streakPauseNote">Your streak pauses automatically during university recess.</p>
         </article>
 
@@ -461,7 +453,7 @@
         <div class="list" style="margin-top:10px;">
           <a class="list-row" href="#me" data-save-link><span><span class="row-label">Saves</span><span class="row-meta" style="display:block;" data-field="savesMeta">6 saved • Events, opportunities, news</span></span><span>›</span></a>
           <a class="list-row" href="#me" data-rsvp-link><span><span class="row-label">RSVPs</span><span class="row-meta" style="display:block;">3 upcoming • 1 interested</span></span><span>›</span></a>
-          <a class="list-row" href="#play"><span><span class="row-label">Play</span><span class="row-meta" style="display:block;">Level 4 • Streak <span data-field="meStreak">3</span> days</span></span><span>›</span></a>
+          <a class="list-row" href="#play"><span><span class="row-label">Play</span><span class="row-meta" style="display:block;">Level 4 • <span data-field="meStreak">Streak 3 days</span></span></span><span>›</span></a>
           <a class="list-row" href="#notifications"><span><span class="row-label">Notifications</span><span class="row-meta" style="display:block;">2 unread • Grouped by Today / Yesterday</span></span><span>›</span></a>
           <a class="list-row" href="#privacy"><span><span class="row-label">Privacy &amp; transparency</span><span class="row-meta" style="display:block;">What we collect • Who can see what</span></span><span>›</span></a>
           <a class="list-row" href="#me"><span><span class="row-label">Sessions &amp; security</span><span class="row-meta" style="display:block;">Review devices • End sessions</span></span><span>›</span></a>

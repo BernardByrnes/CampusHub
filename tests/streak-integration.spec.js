@@ -74,12 +74,12 @@ test.describe('Phase 8C canonical tenant-day streak integration', () => {
 
     await expect(page.locator('#homePlaySummary')).toContainText('3 day streak');
     await goTo(page, '#play');
-    await expect(page.locator('[data-field="streakDays"]')).toHaveText('3');
+    await expect(page.locator('[data-field="streakDuration"]')).toHaveText('3 days');
     await goTo(page, '#me');
-    await expect(page.locator('[data-field="meStreak"]')).toHaveText('3');
+    await expect(page.locator('[data-field="meStreak"]')).toHaveText('Streak 3 days');
 
     await page.reload();
-    await expect(page.locator('[data-field="meStreak"]')).toHaveText('3');
+    await expect(page.locator('[data-field="meStreak"]')).toHaveText('Streak 3 days');
     expect((await readState(page)).streakState.count).toBe(3);
   });
 
@@ -92,14 +92,14 @@ test.describe('Phase 8C canonical tenant-day streak integration', () => {
     expect((await readState(page)).streakState).toEqual({ count:4, lastQualifiedTenantDay:'2026-05-20' });
     expect(await page.evaluate(() => window.CampusHubDemo.student.xp)).toBe(startingXp + pollXp);
     await goTo(page, '#play');
-    await expect(page.locator('[data-field="streakDays"]')).toHaveText('4');
+    await expect(page.locator('[data-field="streakDuration"]')).toHaveText('4 days');
     await goTo(page, '#home');
     await expect(page.locator('#homePlaySummary')).toContainText('4 day streak');
     await goTo(page, '#me');
-    await expect(page.locator('[data-field="meStreak"]')).toHaveText('4');
+    await expect(page.locator('[data-field="meStreak"]')).toHaveText('Streak 4 days');
 
     await page.reload();
-    await expect(page.locator('[data-field="meStreak"]')).toHaveText('4');
+    await expect(page.locator('[data-field="meStreak"]')).toHaveText('Streak 4 days');
     await goTo(page, '#participate');
     await expect(page.locator('#pollSuccess')).toBeVisible();
     expect((await readState(page)).streakState.count).toBe(4);

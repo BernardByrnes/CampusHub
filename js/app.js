@@ -2260,6 +2260,57 @@
     return typeof value === "string" && /^(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(value);
   }
 
+  const TENANT_WEEKDAY_NAMES = Object.freeze([
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday"
+  ]);
+
+  // Tenant calendar dates are explicit UTC midnights; the browser clock and
+  // device timezone never participate in the Play week calculation.
+  function parseTenantDay(value){
+    if(!isCanonicalTenantDay(value)) return null;
+    const date = new Date(`${value}T00:00:00Z`);
+    if(Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10)!==value) return null;
+    return date;
+  }
+
+  function buildTenantWeek(currentTenantDay){
+    const currentDate = parseTenantDay(currentTenantDay);
+    if(!currentDate) return [];
+    const mondayOffset = (currentDate.getUTCDay() + 6) % 7;
+    const monday = new Date(currentDate.getTime());
+    monday.setUTCDate(monday.getUTCDate() - mondayOffset);
+    return Array.from({length:7}, (_, index)=>{
+      const date = new Date(monday.getTime());
+      date.setUTCDate(monday.getUTCDate() + index);
+      return {
+        tenantDay: date.toISOString().slice(0, 10),
+        shortName: TENANT_WEEKDAY_NAMES[date.getUTCDay()].slice(0, 3),
+        name: TENANT_WEEKDAY_NAMES[date.getUTCDay()]
+      };
+    });
+  }
+
+  function weekdayNameForTenantDay(tenantDay){
+    const date = parseTenantDay(tenantDay);
+    return date ? TENANT_WEEKDAY_NAMES[date.getUTCDay()] : null;
+  }
+
+  function formatStreakCopy(value){
+    const count = Number.isInteger(value) && value>=0 ? value : 0;
+    const unit = count===1 ? "day" : "days";
+    return {
+      count,
+      duration: `${count} ${unit}`,
+      compact: `${count} day streak`
+    };
+  }
+
   function ensureStreakState(state){
     const fallback = canonicalDemoStreakState();
     const stored = state?.streakState;
@@ -2296,18 +2347,53 @@
   function syncStreakPresentation(state){
     const normalizedState = ensureStreakState(state || {});
     const streak = normalizedState.streakState.count;
-    const inRecess = D.demoConfig?.calendar?.isInRecess === true;
+    const lastQualifiedTenantDay = normalizedState.streakState.lastQualifiedTenantDay;
+    const calendar = D.demoConfig?.calendar || {};
+    const currentTenantDay = calendar.currentTenantDay;
+    const inRecess = calendar.isInRecess === true;
+    const streakCopy = formatStreakCopy(streak);
+    const lastQualifiedWeekday = weekdayNameForTenantDay(lastQualifiedTenantDay);
+    const summary = lastQualifiedWeekday
+      ? (lastQualifiedTenantDay===currentTenantDay && !inRecess
+        ? "Active today"
+        : `Last active ${lastQualifiedWeekday}`)
+      : "No qualifying activity yet";
     D.student.streak = streak;
-    setEntityField('[data-field="streakDays"]', streak);
-    setEntityField('[data-field="homeStreak"]', `${streak} day streak`);
-    setEntityField('[data-field="meStreak"]', streak);
+    setEntityField('[data-field="streakDuration"]', streakCopy.duration);
+    setEntityField('[data-field="streakActivitySummary"]', summary);
+    setEntityField('[data-field="homeStreak"]', streakCopy.compact);
+    setEntityField('[data-field="meStreak"]', `Streak ${streakCopy.duration}`);
     setEntityField('[data-field="streakPauseNote"]', inRecess
       ? "Your streak is paused for the recess."
       : "Your streak pauses automatically during university recess.");
+
+    const week = buildTenantWeek(currentTenantDay);
+    const weekElement = $('#view-play .streak-days');
+    if(weekElement){
+      weekElement.setAttribute('role', 'list');
+      weekElement.setAttribute('aria-label', 'Current tenant week');
+      weekElement.innerHTML = week.map(day=>{
+        const isToday = day.tenantDay===currentTenantDay;
+        const isQualifiedToday = isToday && !inRecess && lastQualifiedTenantDay===currentTenantDay;
+        const isLastQualified = !isToday && day.tenantDay===lastQualifiedTenantDay;
+        const isPausedToday = isToday && inRecess;
+        const classes = ['day-pill'];
+        if(isToday) classes.push('is-today');
+        if(isLastQualified) classes.push('is-done', 'is-last-qualified');
+        if(isQualifiedToday) classes.push('is-done', 'is-qualified-today');
+        if(isPausedToday) classes.push('is-paused');
+        let label = day.name;
+        if(isToday) label += ' — today';
+        if(isLastQualified) label += ' — last qualifying day';
+        if(isQualifiedToday) label += ', qualifying activity completed';
+        if(isPausedToday) label += ', streak paused';
+        return `<div class="${classes.join(' ')}" role="listitem" aria-label="${escapeHtml(label)}"${isToday ? ' aria-current="date"' : ''}>${day.shortName}</div>`;
+      }).join('');
+    }
     const homePlayLink = $('#homePlaySummary [data-testid="home-play-link"]');
     if(homePlayLink){
       homePlayLink.href = "#play";
-      homePlayLink.setAttribute("aria-label", `Open Play: Level ${D.student.level}, ${D.student.xp} XP, ${streak} day streak`);
+      homePlayLink.setAttribute("aria-label", `Open Play: Level ${D.student.level}, ${D.student.xp} XP, ${streakCopy.compact}`);
     }
     return normalizedState;
   }
