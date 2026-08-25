@@ -182,7 +182,8 @@
   }
 
   // Populate tenant header
-  function hydrateTenant(){
+  function hydrateTenant(state=participationState()){
+    syncStreakPresentation(state);
     $('[data-field="tenantCampus"]').textContent = D.tenant.campusLabel;
     $('[data-field="tenantYear"]').textContent = `Academic Year ${D.tenant.academicYear}`;
     // priority
@@ -247,7 +248,6 @@
     $('[data-field="levelTitle"]').textContent = levelInfo.title;
     $('[data-field="xpCount"]').textContent = D.student.xp;
     $('[data-field="xpNext"]').textContent = next ? `${next.xpMin - D.student.xp} XP to Level ${next.level}` : `Max level`;
-    $('[data-field="streakDays"]').textContent = D.student.streak;
     $('[data-field="levelTitle"]') && void 0;
     // xp bar
     if(next){
@@ -261,12 +261,6 @@
     setEntityField('[data-field="homeQuizXpBonus"]', `+${D.quiz.xpBonus || 5} XP`);
     setEntityField('[data-field="homeLevel"]', `Level ${D.student.level}`);
     setEntityField('[data-field="homeXp"]', `${D.student.xp} XP`);
-    setEntityField('[data-field="homeStreak"]', `${D.student.streak} day streak`);
-    const homePlayLink = $('#homePlaySummary [data-testid="home-play-link"]');
-    if(homePlayLink){
-      homePlayLink.href = "#play";
-      homePlayLink.setAttribute("aria-label", `Open Play: Level ${D.student.level}, ${D.student.xp} XP, ${D.student.streak} day streak`);
-    }
   }
 
   // Discover rendering
@@ -738,9 +732,10 @@
       };
       D.student.xp += earned;
       state.xp = D.student.xp;
+      applyStreakQualification("daily-quiz", state);
       pendingQuizChoice = null;
       saveState(state);
-      hydrateTenant();
+      hydrateTenant(state);
       renderXPRules();
       toast(correct ? `Correct — +${earned} XP (+${xpPart} +${xpBonus} bonus). A new quiz will be available tomorrow.` : `Answer recorded — +${earned} XP for taking part. A new quiz will be available tomorrow.`);
       renderQuiz();
@@ -850,6 +845,7 @@
 
   function ensureParticipationState(state){
     if(!state || typeof state!=="object") state = {};
+    ensureStreakState(state);
     const membershipDefaults = defaultMembership();
     const participationDefaults = defaultParticipation();
     if(!state.membership || typeof state.membership!=="object") state.membership = {};
@@ -901,7 +897,7 @@
   }
 
   function participationState(){
-    return ensureParticipationState(loadState());
+    return loadState();
   }
 
   function syncStudentTrustState(state=participationState()){
@@ -1348,9 +1344,10 @@
         const pollXp = Number(D.demoConfig?.xp?.pollParticipation) || 0;
         D.student.xp += pollXp;
         state.xp = D.student.xp;
-        hydrateTenant();
-        renderXPRules();
+        applyStreakQualification("poll-response", state);
         saveState(state);
+        hydrateTenant(state);
+        renderXPRules();
         renderPollState();
         toast("Response recorded. Your individual response remains private.");
       }, 500);
@@ -1367,7 +1364,7 @@
     state.pollChoice = null;
     saveState(state);
     syncStudentTrustState(state);
-    hydrateTenant();
+    hydrateTenant(state);
     renderPollState();
     syncVerificationUi();
     renderQuiz();
@@ -1433,7 +1430,7 @@
       const returning = [POLL_RETURN_ROUTE, VOICE_NEW_RETURN_ROUTE, RSVP_RETURN_ROUTE, QUIZ_RETURN_ROUTE].includes(returnTo) || isVoiceDetailReturnIntent(returnTo);
       saveState(updated);
       syncStudentTrustState(updated);
-      hydrateTenant();
+      hydrateTenant(updated);
       renderPollState();
       syncVerificationUi();
       renderQuiz();
@@ -1724,6 +1721,7 @@
     state.voiceSubmissions.unshift(submission);
     state.voiceLastSubmissionId = submission.id;
     state.voiceDraft = defaultVoiceDraft();
+    applyStreakQualification("voice-submission", state);
     saveState(state);
     setVoiceStep(4);
   }
@@ -1798,6 +1796,7 @@
 
   function showView(name){
     const target = views.includes(name) ? name : "home";
+    syncStreakPresentation(participationState());
     // hide all
     views.forEach(v=>{
       const el = document.getElementById(`view-${v}`);
@@ -2011,8 +2010,12 @@
         returnAction:trigger?.id === 'rsvpInterested' ? 'rsvp-interested' : 'rsvp-going'
       })) return;
       currentState.rsvp = nextState;
+      if(nextState === 'going' || nextState === 'interested'){
+        applyStreakQualification("event-rsvp", currentState);
+      }
       state = currentState;
       saveState(currentState);
+      syncStreakPresentation(currentState);
       reflect();
       toast(successMessage);
     }
@@ -2147,6 +2150,70 @@
     return Number(choice)===Number(quiz?.correctIndex) ? participationXp + accuracyXp : participationXp;
   }
 
+  function canonicalDemoStreakState(){
+    const fixture = D.streakState || {};
+    return {
+      count: typeof fixture.count === "number" && Number.isInteger(fixture.count) && fixture.count>=0 ? fixture.count : 0,
+      lastQualifiedTenantDay: typeof fixture.lastQualifiedTenantDay === "string" ? fixture.lastQualifiedTenantDay : null
+    };
+  }
+
+  function isCanonicalTenantDay(value){
+    return typeof value === "string" && /^(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(value);
+  }
+
+  function ensureStreakState(state){
+    const fallback = canonicalDemoStreakState();
+    const stored = state?.streakState;
+    const count = stored && typeof stored.count === "number" && Number.isInteger(stored.count) && stored.count>=0
+      ? stored.count
+      : fallback.count;
+    const lastQualifiedTenantDay = stored && (stored.lastQualifiedTenantDay===null || isCanonicalTenantDay(stored.lastQualifiedTenantDay))
+      ? stored.lastQualifiedTenantDay
+      : fallback.lastQualifiedTenantDay;
+    state.streakState = { count, lastQualifiedTenantDay };
+    return state;
+  }
+
+  // One integration boundary for all qualifying product actions. The pure
+  // engine owns arithmetic; this adapter only supplies tenant facts and copies
+  // the result into the caller's state. It deliberately does not persist.
+  function applyStreakQualification(activityType, state){
+    const normalizedState = ensureStreakState(state);
+    const calendar = D.demoConfig?.calendar || {};
+    const result = window.CampusHubStreak.applyQualifyingActivity({
+      activityType,
+      tenantDay: calendar.currentTenantDay,
+      currentStreak: normalizedState.streakState.count,
+      lastQualifiedTenantDay: normalizedState.streakState.lastQualifiedTenantDay,
+      previousActiveTenantDay: calendar.previousActiveTenantDay ?? null,
+      isInRecess: calendar.isInRecess === true
+    });
+    normalizedState.streakState.count = result.streak;
+    normalizedState.streakState.lastQualifiedTenantDay = result.lastQualifiedTenantDay;
+    return result;
+  }
+
+  // All visible streak surfaces are synchronized from persistent state here.
+  function syncStreakPresentation(state){
+    const normalizedState = ensureStreakState(state || {});
+    const streak = normalizedState.streakState.count;
+    const inRecess = D.demoConfig?.calendar?.isInRecess === true;
+    D.student.streak = streak;
+    setEntityField('[data-field="streakDays"]', streak);
+    setEntityField('[data-field="homeStreak"]', `${streak} day streak`);
+    setEntityField('[data-field="meStreak"]', streak);
+    setEntityField('[data-field="streakPauseNote"]', inRecess
+      ? "Your streak is paused for the recess."
+      : "Your streak pauses automatically during university recess.");
+    const homePlayLink = $('#homePlaySummary [data-testid="home-play-link"]');
+    if(homePlayLink){
+      homePlayLink.href = "#play";
+      homePlayLink.setAttribute("aria-label", `Open Play: Level ${D.student.level}, ${D.student.xp} XP, ${streak} day streak`);
+    }
+    return normalizedState;
+  }
+
   function quizParticipationForCurrentDay(state, quiz=D.quiz){
     const record = state?.quizParticipation;
     if(!record || typeof record!=="object") return null;
@@ -2156,20 +2223,24 @@
   }
 
   function loadState(){
+    let state = null;
     try{
       const raw = localStorage.getItem('campushub:state');
-      if(raw) return JSON.parse(raw);
+      if(raw) state = JSON.parse(raw);
     }catch(e){}
-    return {
-      pollDone:false, pollChoice:null,
-      quizDone:false, quizChoice:null,
-      quizParticipation:null,
-      xp:D.student.xp,
-      rsvp:null,
-      saveEvent:false, saveOpp:false,
-      saves: D.saves.slice(),
-      notifsRead: []
-    };
+    if(!state || typeof state!=="object" || Array.isArray(state)){
+      state = {
+        pollDone:false, pollChoice:null,
+        quizDone:false, quizChoice:null,
+        quizParticipation:null,
+        xp:D.student.xp,
+        rsvp:null,
+        saveEvent:false, saveOpp:false,
+        saves: D.saves.slice(),
+        notifsRead: []
+      };
+    }
+    return ensureParticipationState(state);
   }
   function saveState(s){
     try{ localStorage.setItem('campushub:state', JSON.stringify(s)); }catch(e){}
@@ -2215,6 +2286,7 @@
         localStorage.removeItem('campushub:state');
         // reset in-memory demo state
         D.student.xp = 340;
+        if(D.demoConfig?.calendar) D.demoConfig.calendar.isInRecess = false;
         D.voiceIssues[0].supporters = 124;
         D.notifications.forEach((n,i)=> n.unread = i<2);
         const state = participationState();
@@ -2230,11 +2302,12 @@
         state.voiceStatusScenario = null;
         state.selectedVoiceIssueId = "voice-water-halls";
         state.supportedVoiceIssues = [];
+        state.streakState = { count:3, lastQualifiedTenantDay:"2026-05-19" };
         state.xp = 340;
         lastParticipationDecision = null;
         saveState(state);
         syncStudentTrustState(state);
-        hydrateTenant();
+        hydrateTenant(state);
         renderQuiz();
         renderSaves();
         renderVoiceLists();
@@ -2298,7 +2371,7 @@
     const initialParticipationState = participationState();
     saveState(initialParticipationState);
     syncStudentTrustState(initialParticipationState);
-    hydrateTenant();
+    hydrateTenant(initialParticipationState);
     renderDiscover("All","");
     renderVoiceLists();
     renderNotifications();
