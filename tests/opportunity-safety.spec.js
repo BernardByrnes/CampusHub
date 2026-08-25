@@ -38,11 +38,35 @@ test.describe('Opportunity external destination safety', () => {
   test('renders canonical detail facts and a validated Apply action', async ({ page }) => {
     await resetAndGo(page);
 
+    const opportunityContract = await page.evaluate(() => {
+      const opportunity = window.CampusHubDemo.opportunity;
+      const acceptedTypes = [
+        'internship',
+        'scholarship',
+        'fellowship',
+        'graduate_role',
+        'competition',
+        'hackathon',
+        'volunteering',
+        'campus_role'
+      ];
+      return {
+        type: opportunity.type,
+        workArrangement: opportunity.workArrangement,
+        typeIsAccepted: acceptedTypes.includes(opportunity.type)
+      };
+    });
+    expect(opportunityContract).toEqual({
+      type: 'campus_role',
+      workArrangement: 'Part-time',
+      typeIsAccepted: true
+    });
+
     await expect(page.locator('[data-field="oppDetailTitle"]')).toHaveText('Research Assistant — Climate Resilience');
     await expect(page.locator('[data-field="oppProvider2"]')).toHaveText('Makerere University — Department of Geography');
     await expect(page.locator('[data-field="oppDeadline2"]')).toHaveText('30 May 2026');
     await expect(page.locator('[data-field="oppLocation"]')).toHaveText('Main Campus');
-    await expect(page.locator('[data-field="oppType"]')).toHaveText('Part-time');
+    await expect(page.locator('[data-field="oppWorkArrangement"]')).toHaveText('Part-time');
     await expect(page.locator('[data-field="oppDescription"]')).toContainText('climate adaptation strategies');
     await expect(page.locator('[data-field="oppEligibility"]')).toContainText('Year 2+ Geography');
     await expect(page.locator('[data-field="oppRequiredAssurance"]')).toHaveText('L2 required');

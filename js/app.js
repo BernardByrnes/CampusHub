@@ -156,7 +156,7 @@
     setEntityField('[data-field="oppDeadline2"]', opportunity.deadlineDate || opportunity.deadline);
     setEntityField('[data-field="oppDetailTitle"]', opportunity.title);
     setEntityField('[data-field="oppLocation"]', opportunity.location);
-    setEntityField('[data-field="oppType"]', opportunity.type);
+    setEntityField('[data-field="oppWorkArrangement"]', opportunity.workArrangement);
     setEntityField('[data-field="oppStipend"]', opportunity.stipend);
     setEntityField('[data-field="oppDescription"]', opportunity.description || opportunity.summary);
     setEntityField('[data-field="oppEligibility"]', opportunity.eligibility);
