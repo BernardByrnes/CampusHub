@@ -884,6 +884,35 @@
 }
 .score { font-weight:800; font-size:14px; }
 
+/* sports result detail */
+.sports-subheader { display:flex; align-items:center; gap:10px; padding:2px 0 10px; }
+.sports-route-label { color:var(--text-strong); font-size:var(--type-screen-size); font-weight:var(--type-screen-weight); letter-spacing:var(--type-screen-tracking); line-height:1.15; }
+.sports-subheader .view-sub { margin-top:4px; }
+.sports-back { width:44px; height:44px; flex:0 0 44px; }
+.sports-detail-card { margin-top:0; }
+.sports-detail-title { margin:6px 0 0; line-height:1.2; }
+.sports-detail-lede { margin-top:6px; }
+.sports-scoreboard {
+  display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:center; justify-items:center;
+  gap:16px; margin-top:18px; text-align:center;
+}
+.sports-team { min-width:0; display:flex; justify-content:center; }
+.sports-crest { width:44px; height:44px; }
+.sports-crest--away { background:var(--brand-soft); border-color:var(--brand-border); color:var(--brand); }
+.sports-score { color:var(--text-strong); font-size:30px; letter-spacing:-.04em; line-height:1; white-space:nowrap; }
+.sports-status-row { display:flex; justify-content:center; margin-top:14px; }
+.sports-status { background:var(--surface-muted); border-color:var(--border); color:var(--text-muted); }
+.sports-meta { display:grid; gap:10px; margin-top:2px; color:var(--text-muted); font-size:var(--type-body-size); line-height:var(--type-body-leading); }
+.sports-meta-row { display:flex; align-items:flex-start; gap:8px; min-width:0; }
+.sports-meta-row > svg { flex:0 0 16px; margin-top:2px; }
+.sports-meta-row__value { min-width:0; overflow-wrap:anywhere; }
+.sports-report-note { margin:14px 0 0; padding-top:12px; border-top:1px solid var(--border); color:var(--text-muted); font-size:var(--type-meta-size); line-height:1.45; }
+@media (max-width:359px){
+  .sports-scoreboard { gap:8px; }
+  .sports-score { font-size:28px; }
+  .sports-crest { width:40px; height:40px; }
+}
+
 /* progress */
 .progress { height:8px; background:#e9ece8; border-radius:999px; overflow:hidden; }
 .progress-bar { height:100%; background: var(--brand); border-radius:999px; }

@@ -206,14 +206,25 @@
     if(!sports) return;
     const title = `${sports.homeTeam} ${sports.homeScore} — ${sports.awayScore} ${sports.awayTeam}`;
     const league = `${sports.sport} • ${sports.competition}`;
+    const score = `${sports.homeScore} — ${sports.awayScore}`;
+    const accessibleScore = `${sports.status} result: ${sports.homeTeam} ${sports.homeScore}, ${sports.awayTeam} ${sports.awayScore}`;
     setEntityField('[data-field="sportsTitle"]', title);
     setEntityField('[data-field="sportsLeague"]', league);
     setEntityField('[data-field="sportsMeta"]', `${sports.date} • ${sports.status}`);
     setEntityField('[data-field="sportsTitle2"]', title);
     setEntityField('[data-field="sportsLeague2"]', league);
-    setEntityField('[data-field="sportsMeta2"]', `${sports.date} • ${sports.venue}`);
-    setEntityField('[data-field="sportsScore"]', `${sports.homeScore} — ${sports.awayScore}`);
-    setEntityField('[data-field="sportsDateLong"]', `${sports.date} • ${sports.status}`);
+    setEntityField('[data-field="sportsScore"]', score);
+    setEntityField('[data-field="sportsStatus"]', sports.status);
+    setEntityField('[data-field="sportsDetailDate"]', sports.date);
+    setEntityField('[data-field="sportsDetailTime"]', sports.time);
+    setEntityField('[data-field="sportsDetailVenue"]', sports.venue);
+    setEntityField('[data-field="sportsDetailSport"]', sports.sport);
+    setEntityField('[data-field="sportsDetailCompetition"]', sports.competition);
+    setEntityField('[data-field="sportsReportNote"]', sports.reportNote || "");
+    setEntityField('[data-field="sportsHomeCrest"]', sports.homeCrest || sports.homeTeam);
+    setEntityField('[data-field="sportsAwayCrest"]', sports.awayCrest || sports.awayTeam);
+    const scoreboard = $('#sportsScoreboard');
+    if(scoreboard) scoreboard.setAttribute('aria-label', accessibleScore);
   }
 
   function renderPublicationEntity(publication){
@@ -634,6 +645,13 @@
 
   function focusNewsDetailTitle(){
     const title = $('#newsDetailTitle');
+    if(!title) return;
+    title.focus({preventScroll:true});
+    title.scrollIntoView({block:"start", behavior:"auto"});
+  }
+
+  function focusSportsDetailTitle(){
+    const title = $('#sportsDetailTitle');
     if(!title) return;
     title.focus({preventScroll:true});
     title.scrollIntoView({block:"start", behavior:"auto"});
@@ -2026,6 +2044,7 @@
   let pendingRsvpAction = null;
   let pendingQuizFocus = false;
   let pendingNewsDetailFocus = false;
+  let pendingSportsDetailFocus = false;
   let pendingDiscoverSearchFocus = false;
   let pendingDiscoverFilterFocus = false;
 
@@ -2103,6 +2122,9 @@
     } else if(target==="news" && pendingNewsDetailFocus){
       pendingNewsDetailFocus = false;
       setTimeout(focusNewsDetailTitle, 60);
+    } else if(target==="sports" && pendingSportsDetailFocus){
+      pendingSportsDetailFocus = false;
+      setTimeout(focusSportsDetailTitle, 60);
     } else if(target==="discover" && (pendingDiscoverSearchFocus || pendingDiscoverFilterFocus)) {
       const focusSearch = pendingDiscoverSearchFocus;
       pendingDiscoverSearchFocus = false;
@@ -2141,7 +2163,10 @@
       }
       if(route.definition.view === "event") renderEventEntity(route.entity);
       if(route.definition.view === "opportunity") renderOpportunityEntity(route.entity);
-      if(route.definition.view === "sports") renderSportsEntity(route.entity);
+      if(route.definition.view === "sports"){
+        renderSportsEntity(route.entity);
+        pendingSportsDetailFocus = true;
+      }
       if(route.definition.view === "news"){
         renderPublicationEntity(route.entity);
         pendingNewsDetailFocus = true;

@@ -588,29 +588,41 @@
         </article>
       </section>
 
-      <!-- SPORTS DETAIL — lightweight result screen with entity-aware routing -->
+      <!-- SPORTS DETAIL — canonical result screen with entity-aware routing -->
       <section id="view-sports" data-view="sports" class="view" role="tabpanel" aria-label="Sports result detail" hidden>
-        <div class="view-head" style="display:flex; align-items:center; gap:10px;">
-          <button class="icon-btn" data-back aria-label="Back" style="width:36px; height:36px;">‹</button>
-          <div><h1 class="view-title">Sports</h1><p class="view-sub" style="margin-top:2px;">University League • Final result</p></div>
+        <div class="sports-subheader">
+          <button class="icon-btn sports-back" data-back aria-label="Back">‹</button>
+          <div>
+            <div class="sports-route-label">Sports</div>
+            <p class="view-sub">Result detail</p>
+          </div>
         </div>
-        <article class="card card-pad">
-          <div class="kicker">Sports Result</div>
-          <h2 class="detail-title" style="margin:6px 0 8px; line-height:1.2;" data-field="sportsTitle2">MUBS 1 — 2 Makerere University</h2>
-          <div class="meta" data-field="sportsLeague2">Football (Men) • University League</div>
-          <div style="display:flex; align-items:center; gap:16px; margin-top:14px; justify-content:center;">
-            <span class="crest" style="width:56px; height:56px;">MUBS</span>
-            <span class="score" style="font-size:18px;" data-field="sportsScore">1 — 2</span>
-            <span class="crest" style="width:56px; height:56px; background:var(--brand-soft); border-color:var(--brand-border); color:var(--brand);">MUK</span>
+        <article class="card card-pad sports-detail-card" aria-labelledby="sportsDetailTitle">
+          <div class="kicker">Sports result</div>
+          <h1 id="sportsDetailTitle" class="detail-title sports-detail-title" tabindex="-1" data-field="sportsTitle2">MUBS 1 — 2 Makerere University</h1>
+          <div class="meta sports-detail-lede" data-field="sportsLeague2">Football (Men) • University League</div>
+          <div id="sportsScoreboard" class="sports-scoreboard" role="group" aria-label="Final result: MUBS 1, Makerere University 2">
+            <div class="sports-team"><span class="crest sports-crest" aria-hidden="true" data-field="sportsHomeCrest">MUBS</span></div>
+            <span class="score sports-score" aria-hidden="true" data-field="sportsScore">1 — 2</span>
+            <div class="sports-team"><span class="crest sports-crest sports-crest--away" aria-hidden="true" data-field="sportsAwayCrest">MUK</span></div>
           </div>
-          <div class="inline-meta" style="margin-top:14px; justify-content:center;"><span class="pill pill--brand">Final</span><span class="pill" data-field="sportsMeta2">17 May 2026 • MUBS Arena</span></div>
+          <div class="sports-status-row"><span class="status-chip sports-status" data-field="sportsStatus">Final</span></div>
           <div class="divider"></div>
-          <div class="stack-8" style="font-size:13px; color: var(--text-muted);">
-            <div style="display:flex; gap:8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/></svg> <span data-field="sportsDateLong">17 May 2026</span></div>
-            <div style="display:flex; gap:8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg> <span>MUBS Arena</span></div>
-            <div style="display:flex; gap:8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18"/></svg> <span>University League — Men’s Football</span></div>
+          <div class="sports-meta">
+            <div class="sports-meta-row">
+              <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18"/></svg>
+              <span class="sports-meta-row__value"><span data-field="sportsDetailDate">17 May 2026</span><span aria-hidden="true"> • </span><span data-field="sportsDetailTime">4:00 PM</span></span>
+            </div>
+            <div class="sports-meta-row">
+              <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 21s7-6 7-11a7 7 0 1 0-14 0c0 5 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+              <span class="sports-meta-row__value" data-field="sportsDetailVenue">MUBS Arena</span>
+            </div>
+            <div class="sports-meta-row">
+              <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18"/></svg>
+              <span class="sports-meta-row__value"><span data-field="sportsDetailSport">Football (Men)</span><span aria-hidden="true"> • </span><span data-field="sportsDetailCompetition">University League</span></span>
+            </div>
           </div>
-          <p class="meta" style="margin-top:12px; text-align:center;">Simple result view. No line-ups, brackets, predictor or fan comments in this prototype.</p>
+          <p class="sports-report-note" data-field="sportsReportNote">Match reports are published by the Guild sports office.</p>
         </article>
       </section>
 

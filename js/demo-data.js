@@ -107,6 +107,7 @@ window.CampusHubDemo = {
     date: "17 May 2026",
     time: "4:00 PM",
     venue: "MUBS Arena",
+    reportNote: "Match reports are published by the Guild sports office.",
     homeCrest: "MUBS",
     awayCrest: "MUK",
     href: "#sports/mubs-mak"

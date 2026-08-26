@@ -208,6 +208,15 @@ test.describe('Phase 7D canonical visual regression baselines', () => {
       await captureMobileViewport(page, 'discover-offline-390.png');
     });
 
+    test('sports-mubs-mak-390', async ({ page }) => {
+      await resetAndGo(page, '#sports/mubs-mak');
+      await expect(page.locator('#sportsDetailTitle')).toHaveText('MUBS 1 — 2 Makerere University');
+      await expect(page.locator('[data-field="sportsStatus"]')).toHaveText('Final');
+      await clearTransientUi(page);
+      await settle(page);
+      await captureMobileViewport(page, 'sports-mubs-mak-390.png');
+    });
+
     test('participate-polls-390', async ({ page }) => {
       await resetAndGo(page, '#participate');
       await captureMobileViewport(page, 'participate-polls-390.png');
@@ -353,6 +362,15 @@ test.describe('Phase 7D canonical visual regression baselines', () => {
       await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe('leaveCampusHubTitle');
       await settle(page);
       await captureViewport(page, 'opportunity-leave-dialog-1280.png');
+    });
+
+    test('sports-mubs-mak-1280', async ({ page }) => {
+      await resetAndGo(page, '#sports/mubs-mak');
+      await expect(page.locator('#sportsDetailTitle')).toHaveText('MUBS 1 — 2 Makerere University');
+      await expect(page.locator('[data-field="sportsStatus"]')).toHaveText('Final');
+      await clearTransientUi(page);
+      await settle(page);
+      await captureViewport(page, 'sports-mubs-mak-1280.png');
     });
   });
 
