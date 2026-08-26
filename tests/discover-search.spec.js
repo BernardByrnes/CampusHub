@@ -67,6 +67,12 @@ test.describe('Phase 8G canonical Discover search and filters', () => {
       { id: 'mubs-mak', kind: 'Sports' }
     ]);
 
+    const eventImage = page.locator('[data-discover-id="guild-debate"] img');
+    await expect(eventImage).toHaveAttribute('src', /assets\/images\/event-debate\.webp$/);
+    await expect(eventImage).toHaveAttribute('alt', 'Makerere University Kampala campus entrance with students walking');
+    await expect(eventImage).toHaveAttribute('loading', 'lazy');
+    await expect(eventImage).toHaveAttribute('decoding', 'async');
+
     const filters = page.locator('#discoverFilters .filter-chip');
     await expect(filters).toHaveCount(5);
     await expect(filters.nth(0)).toHaveAttribute('aria-pressed', 'true');

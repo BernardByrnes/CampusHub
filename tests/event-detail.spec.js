@@ -10,7 +10,7 @@ const EVENT = Object.freeze({
   organiser: 'Makerere University Guild — Debate Union',
   description: "Join leading researchers, Guild leaders and student innovators for a debate on AI opportunities, ethics and skills for Africa's next decade.",
   image: 'event-debate.webp',
-  imageAlt: 'University building exterior in daylight'
+  imageAlt: 'Makerere University Kampala campus entrance with students walking'
 });
 
 const STALE_COPY = [
@@ -65,6 +65,8 @@ async function expectLoadedEventImage(page) {
   ))).toBe(true);
   await expect(image).toHaveAttribute('alt', EVENT.imageAlt);
   await expect(image).toHaveAttribute('src', /assets\/images\/event-debate\.webp$/);
+  await expect(image).toHaveAttribute('loading', 'lazy');
+  await expect(image).toHaveAttribute('decoding', 'async');
 }
 
 async function expectNoHorizontalOverflow(page) {

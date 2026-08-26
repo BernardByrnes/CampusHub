@@ -144,7 +144,7 @@ window.CampusHubDemo = {
     venue: "Senate Building Auditorium",
     organiser: "Makerere University Guild — Debate Union",
     image: "assets/images/event-debate.webp",
-    imageAlt: "University building exterior in daylight",
+    imageAlt: "Makerere University Kampala campus entrance with students walking",
     description: "Join leading researchers, Guild leaders and student innovators for a debate on AI opportunities, ethics and skills for Africa's next decade.",
     requiredAssurance: "L0",
     rsvpEnabled: true,
