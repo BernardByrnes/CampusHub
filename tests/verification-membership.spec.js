@@ -95,6 +95,25 @@ test.describe('Phase 8K Verification and membership trust surface', () => {
     await expect(page.locator('#verificationActionSlot')).toBeHidden();
   });
 
+  test('qualifies typical access examples instead of presenting entitlements', async ({ page }) => {
+    await goTo(page, '#verification');
+    const accessDetails = page.locator('details').filter({ hasText: 'Typical access by assurance' });
+    await expect(accessDetails).toHaveCount(1);
+    await expect(accessDetails.locator('summary')).toHaveText('Typical access by assurance ›');
+    await expect(accessDetails).not.toContainText('What each assurance allows');
+    await accessDetails.locator('summary').click();
+    await expect(accessDetails).toContainText('These are typical defaults.');
+    await expect(accessDetails).toContainText(/Membership status/);
+    await expect(accessDetails).toContainText(/campus service/);
+    await expect(accessDetails).toContainText(/audience/);
+    await expect(accessDetails).toContainText(/requirements/);
+    await expect(accessDetails).toContainText(/L0: Read public tenant content only\. No participation\./);
+    await expect(accessDetails).toContainText(/L1: Read appropriate campus information; save, follow, RSVP and Daily Quiz\./);
+    await expect(accessDetails).toContainText(/L2: Everything at L1, plus polls where the tenant permits L2 participation and Student Voice where enabled\./);
+    await expect(accessDetails).toContainText(/L3: Full student participation, including polls where the tenant sets a high-integrity threshold\./);
+    await expect(page.locator('#view-verification')).not.toContainText('What each assurance allows');
+  });
+
   test('keeps Verification as a Me child with a 44px Back control and route focus', async ({ page }) => {
     await goTo(page, '#me');
     await expect(page.locator('#tab-me')).toHaveAttribute('aria-current', 'page');
@@ -168,7 +187,10 @@ test.describe('Phase 8K Verification and membership trust surface', () => {
     await page.locator('summary').filter({ hasText: 'Why OTP provenance matters' }).click();
     const text = await page.locator('#view-verification').innerText();
     expect(text).toMatch(/channel you provide proves you control that channel/i);
-    expect(text).toMatch(/institutional email supports stronger proof only when the university attests/i);
+    expect(text).toMatch(/institutional email supports L3 only where the university confirms/i);
+    expect(text).toMatch(/bound to the student and reflects current enrolment/i);
+    expect(text).toMatch(/reliable status revocation/i);
+    expect(text).toMatch(/otherwise it supports affiliation or contact only and is capped at L2/i);
     expect(text).toMatch(/domain suffix alone proves nothing/i);
     expect(text).not.toMatch(/institutional email(?: alone)? (?:proves|gives|upgrades).{0,80}L3/i);
   });
