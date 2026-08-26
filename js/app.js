@@ -35,7 +35,9 @@
   const VOICE_TITLE_MAX = 80;
   const VOICE_DESCRIPTION_MAX = 500;
   const DISCOVER_FILTERS = Object.freeze(["All", "Events", "Opportunities", "Sports", "News"]);
+  const DISCOVER_SYSTEM_STATES = Object.freeze(["ready", "loading", "error", "offline"]);
   const discoverSearchState = { query:"", filter:"All" };
+  let discoverSystemState = "ready";
 
   const CANONICAL_PARTICIPATION_SCENARIOS = Object.freeze({
     "assurance-required": {
@@ -361,11 +363,54 @@
     renderDiscover();
   }
 
+  // Production data loading/offline behavior belongs to the production data layer;
+  // this static prototype models the required student-facing states only.
+  function syncDiscoverSystemBanner(){
+    const host = $('#discoverSystemState');
+    if(!host) return;
+    if(discoverSystemState !== "offline"){
+      host.replaceChildren();
+      return;
+    }
+    if(host.querySelector('.discover-offline-banner')) return;
+    host.innerHTML = '<div class="discover-offline-banner" role="status">You’re offline. Showing cached campus information.</div>';
+  }
+
+  function renderDiscoverLoading(list){
+    list.setAttribute('aria-busy', 'true');
+    list.innerHTML = `<div class="discover-loading">
+      <p class="sr-only" role="status">Loading campus information.</p>
+      <div class="discover-skeletons" aria-hidden="true">
+        <div class="discover-skeleton"><span class="discover-skeleton__line discover-skeleton__line--kicker"></span><span class="discover-skeleton__line discover-skeleton__line--title"></span><span class="discover-skeleton__line discover-skeleton__line--body"></span></div>
+        <div class="discover-skeleton"><span class="discover-skeleton__line discover-skeleton__line--kicker"></span><span class="discover-skeleton__line discover-skeleton__line--title"></span><span class="discover-skeleton__line discover-skeleton__line--body"></span></div>
+        <div class="discover-skeleton"><span class="discover-skeleton__line discover-skeleton__line--kicker"></span><span class="discover-skeleton__line discover-skeleton__line--title"></span><span class="discover-skeleton__line discover-skeleton__line--body"></span></div>
+      </div>
+    </div>`;
+  }
+
+  function renderDiscoverError(list){
+    list.removeAttribute('aria-busy');
+    list.innerHTML = `<div class="discover-state discover-error" role="status">
+      <p>We couldn’t load campus information.</p>
+      <button id="discoverTryAgain" class="btn" type="button">Try again</button>
+    </div>`;
+  }
+
   // Discover rendering: filter and normalized query are one deterministic intersection.
   function renderDiscover(){
     const list = $('#discoverList');
     if(!list) return;
     syncDiscoverSearchControls();
+    syncDiscoverSystemBanner();
+    if(discoverSystemState === "loading"){
+      renderDiscoverLoading(list);
+      return;
+    }
+    if(discoverSystemState === "error"){
+      renderDiscoverError(list);
+      return;
+    }
+    list.removeAttribute('aria-busy');
     let items = D.discoverItems.slice();
     const filter = discoverSearchState.filter;
     const query = normalizeDiscoverQuery(discoverSearchState.query);
@@ -2352,10 +2397,17 @@
       });
     });
     list?.addEventListener('click', event=>{
-      if(!event.target.closest('#discoverClearSearch')) return;
-      discoverSearchState.query = "";
-      renderDiscover();
-      input.focus({preventScroll:true});
+      if(event.target.closest('#discoverClearSearch')){
+        discoverSearchState.query = "";
+        renderDiscover();
+        input.focus({preventScroll:true});
+        return;
+      }
+      if(event.target.closest('#discoverTryAgain')){
+        discoverSystemState = "ready";
+        renderDiscover();
+        input.focus({preventScroll:true});
+      }
     });
     filterButton?.addEventListener('click', ()=>{
       discoverSearchState.query = input.value;
@@ -2697,6 +2749,7 @@
   function resetDiscoverSearchState(){
     discoverSearchState.query = "";
     discoverSearchState.filter = "All";
+    discoverSystemState = "ready";
     pendingDiscoverSearchFocus = false;
     pendingDiscoverFilterFocus = false;
     renderDiscover();
@@ -2781,6 +2834,16 @@
       },
       setVoiceStatusScenario(name){
         applyVoiceStatusScenario(name, true);
+      },
+      getDiscoverState(){
+        return discoverSystemState;
+      },
+      setDiscoverState(name){
+        if(!DISCOVER_SYSTEM_STATES.includes(name)){
+          throw new TypeError(`Unknown Discover system state: ${name}`);
+        }
+        discoverSystemState = name;
+        renderDiscover();
       }
     };
     if(debugEnabled){

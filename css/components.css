@@ -853,6 +853,29 @@
   text-align:center; color: var(--text-muted); font-size:var(--type-body-size);
 }
 
+/* Discover resilient states */
+.discover-skeletons { display:grid; gap:10px; }
+.discover-skeleton {
+  display:grid; gap:10px; padding:var(--card-pad);
+  border:1px solid var(--border); border-radius:var(--card-radius); background:var(--surface);
+}
+.discover-skeleton__line {
+  display:block; height:12px; border:1px solid var(--border); border-radius:999px; background:var(--surface-muted);
+}
+.discover-skeleton__line--kicker { width:28%; height:10px; }
+.discover-skeleton__line--title { width:78%; height:16px; }
+.discover-skeleton__line--body { width:58%; }
+.discover-offline-banner {
+  margin:10px 0 12px; padding:8px 12px; border:1px solid var(--info-border); border-radius:12px;
+  background:var(--info-soft); color:var(--info); font-size:var(--type-meta-size); line-height:1.4;
+}
+.discover-state {
+  padding:18px; border:1px solid var(--border); border-radius:var(--card-radius); background:var(--surface-muted);
+  text-align:center; color:var(--text-muted); font-size:var(--type-body-size);
+}
+.discover-state p { margin:0 0 12px; }
+.discover-error .btn { min-height:var(--control-min-h); }
+
 /* sports vs */
 .vs { display:flex; align-items:center; gap:10px; }
 .crest {

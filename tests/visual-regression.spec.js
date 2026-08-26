@@ -178,6 +178,36 @@ test.describe('Phase 7D canonical visual regression baselines', () => {
       await captureMobileViewport(page, 'discover-search-empty-390.png');
     });
 
+    test('discover-loading-390', async ({ page }) => {
+      await resetAndGo(page, '#discover');
+      await page.evaluate(() => window.CampusHubDebug.setDiscoverState('loading'));
+      await expect(page.locator('#discoverList')).toHaveAttribute('aria-busy', 'true');
+      await expect(page.locator('#discoverList .discover-skeleton')).toHaveCount(3);
+      await clearTransientUi(page);
+      await settle(page);
+      await captureMobileViewport(page, 'discover-loading-390.png');
+    });
+
+    test('discover-error-390', async ({ page }) => {
+      await resetAndGo(page, '#discover');
+      await page.evaluate(() => window.CampusHubDebug.setDiscoverState('error'));
+      await expect(page.locator('#discoverList')).toContainText('We couldn’t load campus information.');
+      await expect(page.getByRole('button', { name:'Try again' })).toBeVisible();
+      await clearTransientUi(page);
+      await settle(page);
+      await captureMobileViewport(page, 'discover-error-390.png');
+    });
+
+    test('discover-offline-390', async ({ page }) => {
+      await resetAndGo(page, '#discover');
+      await page.evaluate(() => window.CampusHubDebug.setDiscoverState('offline'));
+      await expect(page.locator('#discoverSystemState')).toContainText('You’re offline. Showing cached campus information.');
+      await expect(page.locator('#discoverList [data-discover-id]')).toHaveCount(4);
+      await clearTransientUi(page);
+      await settle(page);
+      await captureMobileViewport(page, 'discover-offline-390.png');
+    });
+
     test('participate-polls-390', async ({ page }) => {
       await resetAndGo(page, '#participate');
       await captureMobileViewport(page, 'participate-polls-390.png');
