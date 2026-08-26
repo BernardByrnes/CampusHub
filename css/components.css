@@ -258,8 +258,8 @@
   border-radius:inherit;
   background:var(--surface);
 }
-.filter-chip[aria-selected="true"] { background:transparent; color:#fff; border-color:transparent; }
-.filter-chip[aria-selected="true"]::before { background:var(--brand); border-color:var(--brand); }
+.filter-chip[aria-pressed="true"] { background:transparent; color:#fff; border-color:transparent; }
+.filter-chip[aria-pressed="true"]::before { background:var(--brand); border-color:var(--brand); }
 
 /* bottom nav */
 .bottom-nav {

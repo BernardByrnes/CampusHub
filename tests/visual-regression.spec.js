@@ -168,6 +168,16 @@ test.describe('Phase 7D canonical visual regression baselines', () => {
       await captureMobileViewport(page, 'discover-390.png');
     });
 
+    test('discover-search-empty-390', async ({ page }) => {
+      await resetAndGo(page, '#discover');
+      await page.getByLabel('Search campus content').fill('zz-campus-no-match');
+      await expect(page.locator('#discoverList')).toContainText('No campus information matches that search.');
+      await expect(page.getByRole('button', { name:'Clear search' })).toBeVisible();
+      await clearTransientUi(page);
+      await settle(page);
+      await captureMobileViewport(page, 'discover-search-empty-390.png');
+    });
+
     test('participate-polls-390', async ({ page }) => {
       await resetAndGo(page, '#participate');
       await captureMobileViewport(page, 'participate-polls-390.png');

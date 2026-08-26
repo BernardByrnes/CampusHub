@@ -34,6 +34,8 @@
   const VOICE_DRAFT_SESSION_KEY = "campushub:voice-draft";
   const VOICE_TITLE_MAX = 80;
   const VOICE_DESCRIPTION_MAX = 500;
+  const DISCOVER_FILTERS = Object.freeze(["All", "Events", "Opportunities", "Sports", "News"]);
+  const discoverSearchState = { query:"", filter:"All" };
 
   const CANONICAL_PARTICIPATION_SCENARIOS = Object.freeze({
     "assurance-required": {
@@ -319,31 +321,67 @@
     setEntityField('[data-field="homeXp"]', `${D.student.xp} XP`);
   }
 
-  // Discover rendering
-  function renderDiscover(filter="All", search=""){
+  // Discover search is deliberately bounded to the already-permitted derived index.
+  function normalizeDiscoverQuery(value){
+    return String(value == null ? "" : value).trim().toLowerCase();
+  }
+
+  function discoverSearchText(item){
+    return [
+      item.kind,
+      item.kicker,
+      item.title,
+      item.body,
+      item.summary,
+      item.provider,
+      item.source,
+      item.organiser,
+      item.venue,
+      item.location,
+      item.deadline,
+      item.sport,
+      item.competition,
+      item.meta
+    ].filter(value => value != null && String(value).trim()).join(" ").toLowerCase();
+  }
+
+  function syncDiscoverSearchControls(){
+    const input = $('#globalSearch');
+    if(input && input.value !== discoverSearchState.query) input.value = discoverSearchState.query;
+    $$('#discoverFilters .filter-chip').forEach(button=>{
+      const pressed = button.getAttribute('data-filter') === discoverSearchState.filter;
+      button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+    });
+  }
+
+  function updateDiscoverSearchState(next={}){
+    const filter = next.filter == null ? discoverSearchState.filter : next.filter;
+    discoverSearchState.filter = DISCOVER_FILTERS.includes(filter) ? filter : "All";
+    if(next.query !== undefined) discoverSearchState.query = String(next.query == null ? "" : next.query);
+    renderDiscover();
+  }
+
+  // Discover rendering: filter and normalized query are one deterministic intersection.
+  function renderDiscover(){
     const list = $('#discoverList');
+    if(!list) return;
+    syncDiscoverSearchControls();
     let items = D.discoverItems.slice();
+    const filter = discoverSearchState.filter;
+    const query = normalizeDiscoverQuery(discoverSearchState.query);
 
-    // keep canonical sports state: sports appears as upcoming fixture in Discover? But spec says if Final on Home, must NOT appear as upcoming elsewhere.
-    // So show as Sports Result card same identity, not mismatched fixture time.
-    // Ensure discover sports item reflects same result (already does via Demo).
-
-    if(filter !== "All"){
-      items = items.filter(i=> i.kind===filter);
-    }
-    if(search.trim()){
-      const q = search.trim().toLowerCase();
-      items = items.filter(i=> (i.title+" "+(i.body||"")+" "+(i.provider||"")).toLowerCase().includes(q));
-    }
+    if(filter !== "All") items = items.filter(item => item.kind === filter);
+    if(query) items = items.filter(item => discoverSearchText(item).includes(query));
 
     if(items.length===0){
-      list.innerHTML = `<div class="empty">No results for “${escapeHtml(search)}” in ${escapeHtml(filter)}. Try another search.</div>`;
+      list.innerHTML = `<div class="empty discover-empty"><p>No campus information matches that search.</p><button id="discoverClearSearch" class="btn btn--small" type="button">Clear search</button></div>`;
       return;
     }
 
     list.innerHTML = items.map(item=>{
+      const identity = `data-discover-id="${escapeHtml(item.id)}" data-discover-kind="${escapeHtml(item.kind)}"`;
       if(item.kind==="Events"){
-        return `<article class="card list-card">
+        return `<article class="card list-card" ${identity}>
           <div style="display:flex; gap:12px;">
             <div style="flex:1; min-width:0;">
               <div class="kicker kicker--info">${escapeHtml(item.kicker)}</div>
@@ -361,7 +399,7 @@
         </article>`;
       }
       if(item.kind==="News"){
-        return `<article class="card list-card">
+        return `<article class="card list-card" ${identity}>
           <div style="display:flex; gap:12px;">
             <div style="flex:1; min-width:0;">
               <div class="kicker">${escapeHtml(item.kicker)}</div>
@@ -376,7 +414,7 @@
         </article>`;
       }
       if(item.kind==="Opportunities"){
-        return `<article class="card list-card">
+        return `<article class="card list-card" ${identity}>
           <div class="row">
             <div class="icon-tile icon-tile--brand" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 12h18"/></svg></div>
             <div style="flex:1; min-width:0;">
@@ -391,7 +429,7 @@
       }
       if(item.kind==="Sports"){
         // Canonical: result 1 — 2 Final on Home and Discover (no contradictory upcoming fixture)
-        return `<article class="card list-card">
+        return `<article class="card list-card" ${identity}>
           <div style="display:flex; gap:12px; align-items:center; justify-content:space-between;">
             <div style="min-width:0; flex:1;">
               <div class="kicker">${escapeHtml(item.kicker)}</div>
@@ -408,9 +446,6 @@
       }
       return "";
     }).join("");
-
-    // Update sports card on Home to ensure same date venue consistent
-    // Attach lazy behaviour
   }
 
   function voiceDetailRoute(issueId){
@@ -1946,6 +1981,8 @@
   let pendingRsvpAction = null;
   let pendingQuizFocus = false;
   let pendingNewsDetailFocus = false;
+  let pendingDiscoverSearchFocus = false;
+  let pendingDiscoverFilterFocus = false;
 
   function showView(name){
     const target = views.includes(name) ? name : "home";
@@ -1982,7 +2019,8 @@
       if(target==="home"){
         $('#globalSearch').placeholder = "Search news, events, opportunities...";
       } else {
-        $('#globalSearch').placeholder = "Search events, opportunities, sports, news...";
+        $('#globalSearch').placeholder = "Search news, events, opportunities, sports...";
+        renderDiscover();
       }
     } else {
       searchWrap.style.display = "none";
@@ -2020,6 +2058,17 @@
     } else if(target==="news" && pendingNewsDetailFocus){
       pendingNewsDetailFocus = false;
       setTimeout(focusNewsDetailTitle, 60);
+    } else if(target==="discover" && (pendingDiscoverSearchFocus || pendingDiscoverFilterFocus)) {
+      const focusSearch = pendingDiscoverSearchFocus;
+      pendingDiscoverSearchFocus = false;
+      pendingDiscoverFilterFocus = false;
+      if(focusSearch){
+        $('#globalSearch')?.focus({preventScroll:true});
+      } else {
+        const activeFilter = $('#discoverFilters .filter-chip[aria-pressed="true"]');
+        activeFilter?.scrollIntoView({block:'nearest', inline:'nearest'});
+        activeFilter?.focus({preventScroll:true});
+      }
     } else if(main) {
       main.focus({preventScroll:true});
     }
@@ -2270,34 +2319,57 @@
   // Search
   function initSearch(){
     const input = $('#globalSearch');
-    let currentFilter = "All";
+    const filterButton = $('#searchFilterBtn');
+    const list = $('#discoverList');
+    if(!input) return;
     const update = ()=>{
       const isDiscover = !$('#view-discover').hidden;
       const q = input.value;
       if(isDiscover){
-        renderDiscover(currentFilter, q);
+        updateDiscoverSearchState({ query:q });
       } else {
-        // if on home, typing should filter discover list? keep simple: jump to discover
-        if(q.trim()){
+        if(normalizeDiscoverQuery(q)){
+          discoverSearchState.filter = "All";
+          discoverSearchState.query = q;
+          pendingDiscoverSearchFocus = true;
+          pendingDiscoverFilterFocus = false;
           location.hash = "#discover";
-          setTimeout(()=> renderDiscover("All", q), 50);
+        } else {
+          discoverSearchState.query = q;
         }
       }
     };
-    input.addEventListener('input', debounce(update, 250));
+    input.addEventListener('input', update);
     input.addEventListener('keydown', (e)=>{
       if(e.key==='Enter'){
         e.preventDefault();
         update();
       }
     });
-    $$('[data-filter]').forEach(btn=>{
+    $$('#discoverFilters .filter-chip').forEach(btn=>{
       btn.addEventListener('click', ()=>{
-        $$('[data-filter]').forEach(b=> b.setAttribute('aria-selected','false'));
-        btn.setAttribute('aria-selected','true');
-        currentFilter = btn.getAttribute('data-filter');
-        renderDiscover(currentFilter, input.value);
+        updateDiscoverSearchState({ filter:btn.getAttribute('data-filter'), query:input.value });
       });
+    });
+    list?.addEventListener('click', event=>{
+      if(!event.target.closest('#discoverClearSearch')) return;
+      discoverSearchState.query = "";
+      renderDiscover();
+      input.focus({preventScroll:true});
+    });
+    filterButton?.addEventListener('click', ()=>{
+      discoverSearchState.query = input.value;
+      if(!$('#view-discover').hidden){
+        renderDiscover();
+        const activeFilter = $('#discoverFilters .filter-chip[aria-pressed="true"]');
+        activeFilter?.scrollIntoView({block:'nearest', inline:'nearest'});
+        activeFilter?.focus({preventScroll:true});
+        return;
+      }
+      discoverSearchState.filter = "All";
+      pendingDiscoverSearchFocus = false;
+      pendingDiscoverFilterFocus = true;
+      location.hash = "#discover";
     });
   }
 
@@ -2622,6 +2694,14 @@
     });
   }
 
+  function resetDiscoverSearchState(){
+    discoverSearchState.query = "";
+    discoverSearchState.filter = "All";
+    pendingDiscoverSearchFocus = false;
+    pendingDiscoverFilterFocus = false;
+    renderDiscover();
+  }
+
   // Debug helper (not visible in normal prototype)
   function initDebug(){
     const params = new URLSearchParams(location.search);
@@ -2662,6 +2742,7 @@
         clearVoiceDraftSession();
         syncStudentTrustState(state);
         hydrateTenant(state);
+        resetDiscoverSearchState();
         renderQuiz();
         renderSaves();
         renderVoiceLists();
@@ -2726,7 +2807,7 @@
     saveState(initialParticipationState);
     syncStudentTrustState(initialParticipationState);
     hydrateTenant(initialParticipationState);
-    renderDiscover("All","");
+    renderDiscover();
     renderVoiceLists();
     renderNotifications();
     renderQuiz();

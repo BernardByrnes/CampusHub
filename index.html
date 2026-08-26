@@ -45,12 +45,12 @@
 
       <!-- Search - injected per-view visibility; keep live but hide on some views -->
       <div class="search-wrap" id="searchWrap" role="search">
-        <label class="visually-hidden" for="globalSearch">Search</label>
+        <label class="visually-hidden" for="globalSearch">Search campus content</label>
         <div class="search">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
           <input id="globalSearch" type="search" placeholder="Search news, events, opportunities..." autocomplete="off" />
         </div>
-        <button class="filter-btn" type="button" aria-label="Filters">
+        <button class="filter-btn" id="searchFilterBtn" type="button" aria-label="Filters" aria-controls="discoverFilters">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M3 6h18"/><path d="M7 12h10"/><path d="M10 18h4"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="14" cy="18" r="2"/></svg>
         </button>
       </div>
@@ -220,12 +220,12 @@
           <p class="view-sub">News, events, opportunities and sports from across your campus.</p>
         </div>
 
-        <div class="filters" role="tablist" aria-label="Discover filters" id="discoverFilters">
-          <button class="filter-chip" role="tab" aria-selected="true" data-filter="All">All</button>
-          <button class="filter-chip" role="tab" aria-selected="false" data-filter="Events">Events</button>
-          <button class="filter-chip" role="tab" aria-selected="false" data-filter="Opportunities">Opportunities</button>
-          <button class="filter-chip" role="tab" aria-selected="false" data-filter="Sports">Sports</button>
-          <button class="filter-chip" role="tab" aria-selected="false" data-filter="News">News</button>
+        <div class="filters" role="group" aria-label="Discover filters" id="discoverFilters">
+          <button class="filter-chip" type="button" aria-pressed="true" data-filter="All">All</button>
+          <button class="filter-chip" type="button" aria-pressed="false" data-filter="Events">Events</button>
+          <button class="filter-chip" type="button" aria-pressed="false" data-filter="Opportunities">Opportunities</button>
+          <button class="filter-chip" type="button" aria-pressed="false" data-filter="Sports">Sports</button>
+          <button class="filter-chip" type="button" aria-pressed="false" data-filter="News">News</button>
         </div>
 
         <div id="discoverList" class="stack-10" aria-live="polite"></div>

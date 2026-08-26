@@ -359,13 +359,15 @@ window.CampusHubDemo = {
   d.campusStory = publicationById("cocis-innovation-lab");
 })();
 
-// Build discoverItems index
+// Build discoverItems index. Production search results must be
+// visibility/audience filtered server-side before records reach the client;
+// this derived index contains only resources permitted for the demo member.
 (function(){
   const d = window.CampusHubDemo;
   d.discoverItems = [
-    { id:d.featuredEvent.id, kind:"Events", kicker:"Upcoming Event", title:d.featuredEvent.title, meta:`${d.featuredEvent.date} • ${d.featuredEvent.time}`, venue:d.featuredEvent.venue, image:d.featuredEvent.image, imageAlt:d.featuredEvent.imageAlt, href:d.featuredEvent.href },
-    { id:d.campusStory.id, kind:"News", kicker:d.campusStory.kicker, title:d.campusStory.title, body:d.campusStory.excerpt, meta:`${d.campusStory.date} • ${d.campusStory.source}`, image:d.campusStory.image, imageAlt:d.campusStory.imageAlt, href:d.campusStory.href },
-    { id:d.opportunity.id, kind:"Opportunities", kicker:"Verified Opportunity", title:d.opportunity.title, provider:d.opportunity.provider, body:d.opportunity.summary, deadline:d.opportunity.deadline, href:d.opportunity.href, verified:true },
-    { id:d.sportsResult.id, kind:"Sports", kicker:"Sports Result", title:`${d.sportsResult.homeTeam} ${d.sportsResult.homeScore} — ${d.sportsResult.awayScore} ${d.sportsResult.awayTeam}`, provider:`${d.sportsResult.sport} • ${d.sportsResult.competition}`, meta:`${d.sportsResult.date} • ${d.sportsResult.status}`, href:d.sportsResult.href, isResult:true, score:`${d.sportsResult.homeScore} — ${d.sportsResult.awayScore}` }
+    { id:d.featuredEvent.id, kind:"Events", kicker:"Upcoming Event", title:d.featuredEvent.title, body:d.featuredEvent.description, organiser:d.featuredEvent.organiser, meta:`${d.featuredEvent.date} • ${d.featuredEvent.time}`, venue:d.featuredEvent.venue, image:d.featuredEvent.image, imageAlt:d.featuredEvent.imageAlt, href:d.featuredEvent.href },
+    { id:d.campusStory.id, kind:"News", kicker:d.campusStory.kicker, title:d.campusStory.title, body:d.campusStory.excerpt, source:d.campusStory.source, meta:`${d.campusStory.date} • ${d.campusStory.source}`, image:d.campusStory.image, imageAlt:d.campusStory.imageAlt, href:d.campusStory.href },
+    { id:d.opportunity.id, kind:"Opportunities", kicker:"Verified Opportunity", title:d.opportunity.title, provider:d.opportunity.provider, body:d.opportunity.summary, location:d.opportunity.location, deadline:d.opportunity.deadline, href:d.opportunity.href, verified:true },
+    { id:d.sportsResult.id, kind:"Sports", kicker:"Sports Result", title:`${d.sportsResult.homeTeam} ${d.sportsResult.homeScore} — ${d.sportsResult.awayScore} ${d.sportsResult.awayTeam}`, provider:`${d.sportsResult.sport} • ${d.sportsResult.competition}`, sport:d.sportsResult.sport, competition:d.sportsResult.competition, venue:d.sportsResult.venue, meta:`${d.sportsResult.date} • ${d.sportsResult.status}`, href:d.sportsResult.href, isResult:true, score:`${d.sportsResult.homeScore} — ${d.sportsResult.awayScore}` }
   ];
 })();
