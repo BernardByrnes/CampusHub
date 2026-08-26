@@ -913,6 +913,17 @@
   .sports-crest { width:40px; height:40px; }
 }
 
+/* Event detail */
+.event-subheader { padding:2px 0 10px; }
+.event-back { width:44px; height:44px; flex:0 0 44px; }
+.event-route-label { color:var(--text-strong); }
+.event-detail-title { margin:6px 0 0; line-height:1.2; }
+.event-detail-meta { color:var(--text-muted); font-size:var(--type-body-size); line-height:var(--type-body-leading); }
+.event-detail-meta-row { display:flex; align-items:flex-start; gap:8px; min-width:0; }
+.event-detail-meta-row > svg { flex:0 0 16px; margin-top:2px; }
+.event-detail-meta-row > span { min-width:0; overflow-wrap:anywhere; }
+.event-rsvp-actions { min-width:0; }
+
 /* progress */
 .progress { height:8px; background:#e9ece8; border-radius:999px; overflow:hidden; }
 .progress-bar { height:100%; background: var(--brand); border-radius:999px; }

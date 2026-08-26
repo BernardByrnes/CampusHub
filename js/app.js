@@ -139,8 +139,15 @@
 
   function renderEventEntity(event){
     if(!event) return;
+    const eventView = $('#view-event');
+    if(eventView){
+      eventView.dataset.eventId = event.id || '';
+      eventView.dataset.requiredAssurance = event.requiredAssurance || '';
+    }
+    setEntityField('[data-field="eventKicker"]', event.kicker);
     setEntityField('[data-field="eventTitle"]', event.title);
-    setEntityField('[data-field="eventDate"]', `${event.date} • ${event.time}`);
+    setEntityField('[data-field="eventDate"]', event.date);
+    setEntityField('[data-field="eventTime"]', event.time);
     setEntityField('[data-field="eventVenue"]', event.venue);
     setEntityField('[data-field="eventOrg"]', event.organiser);
     setEntityField('[data-field="eventDescription"]', event.description);
@@ -652,6 +659,13 @@
 
   function focusSportsDetailTitle(){
     const title = $('#sportsDetailTitle');
+    if(!title) return;
+    title.focus({preventScroll:true});
+    title.scrollIntoView({block:"start", behavior:"auto"});
+  }
+
+  function focusEventDetailTitle(){
+    const title = $('#eventDetailTitle');
     if(!title) return;
     title.focus({preventScroll:true});
     title.scrollIntoView({block:"start", behavior:"auto"});
@@ -2045,6 +2059,7 @@
   let pendingQuizFocus = false;
   let pendingNewsDetailFocus = false;
   let pendingSportsDetailFocus = false;
+  let pendingEventDetailFocus = false;
   let pendingDiscoverSearchFocus = false;
   let pendingDiscoverFilterFocus = false;
 
@@ -2113,6 +2128,7 @@
       setTimeout(()=> action === "voice-support" ? $('#voiceSupportButton')?.focus({preventScroll:true}) : focusVoiceDetailTitle(), 60);
     } else if(target==="event" && pendingRsvpFocus){
       pendingRsvpFocus = false;
+      pendingEventDetailFocus = false;
       const action = pendingRsvpAction;
       pendingRsvpAction = null;
       setTimeout(()=> $(action === "rsvp-interested" ? '#rsvpInterested' : '#rsvpGoing')?.focus({preventScroll:true}), 60);
@@ -2125,6 +2141,9 @@
     } else if(target==="sports" && pendingSportsDetailFocus){
       pendingSportsDetailFocus = false;
       setTimeout(focusSportsDetailTitle, 60);
+    } else if(target==="event" && pendingEventDetailFocus){
+      pendingEventDetailFocus = false;
+      setTimeout(focusEventDetailTitle, 60);
     } else if(target==="discover" && (pendingDiscoverSearchFocus || pendingDiscoverFilterFocus)) {
       const focusSearch = pendingDiscoverSearchFocus;
       pendingDiscoverSearchFocus = false;
@@ -2161,7 +2180,12 @@
         showView(route.definition.parent === "participate" ? "voice" : "discover");
         return;
       }
-      if(route.definition.view === "event") renderEventEntity(route.entity);
+      if(route.definition.view === "event"){
+        renderEventEntity(route.entity);
+        // RSVP continuation restores focus to the attempted action; normal
+        // route entry moves focus to the canonical Event heading instead.
+        pendingEventDetailFocus = !pendingRsvpFocus;
+      }
       if(route.definition.view === "opportunity") renderOpportunityEntity(route.entity);
       if(route.definition.view === "sports"){
         renderSportsEntity(route.entity);

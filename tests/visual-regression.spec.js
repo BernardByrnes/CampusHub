@@ -239,7 +239,10 @@ test.describe('Phase 7D canonical visual regression baselines', () => {
 
     test('event-guild-debate-390', async ({ page }) => {
       await resetAndGo(page, '#events/guild-debate');
-      await captureMobileViewport(page, 'event-guild-debate-390.png');
+      // Phase 7D already owns event-guild-debate-390.png. Keep that frozen
+      // artifact untouched while the canonical Event detail gets its Phase 8J
+      // checkpoint in a separate snapshot namespace.
+      await captureMobileViewport(page, 'event-detail/event-guild-debate-390.png');
     });
 
     test('opportunity-ra-climate-390', async ({ page }) => {
@@ -371,6 +374,14 @@ test.describe('Phase 7D canonical visual regression baselines', () => {
       await clearTransientUi(page);
       await settle(page);
       await captureViewport(page, 'sports-mubs-mak-1280.png');
+    });
+
+    test('event-guild-debate-1280', async ({ page }) => {
+      await resetAndGo(page, '#events/guild-debate');
+      await expect(page.locator('#eventDetailTitle')).toHaveText('Guild Public Debate: The Future of AI in Africa');
+      await clearTransientUi(page);
+      await settle(page);
+      await captureViewport(page, 'event-detail/event-guild-debate-1280.png');
     });
   });
 
