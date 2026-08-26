@@ -45,8 +45,6 @@ window.CampusHubDemo = {
     level: 4,
     streak: 3,
     streakLabel: "Active on Monday, Tuesday and Wednesday",
-    savesCount: 6,
-    rsvpsCount: 3
   },
 
   // Phase 8B starting fixture. This historical demo fact preserves the

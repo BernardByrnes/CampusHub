@@ -417,54 +417,51 @@
               <div class="meta" data-field="studentCampus">Main Campus • Mary Stuart Hall</div>
               <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
                 <span class="pill pill--brand" data-field="assuranceBadge">L2 — Roster Match</span>
-                <span class="pill">Level 4 • 340 XP</span>
+                <span class="pill" data-field="meLevelXp">Level 4 • 340 XP</span>
               </div>
             </div>
-          </div>
-          <div class="divider"></div>
-          <div style="display:flex; gap:8px;">
-            <a href="#verification" class="btn btn--soft btn--small" style="flex:1;">Verification &amp; membership</a>
-            <a href="#privacy" class="btn btn--small" style="flex:1;">Privacy</a>
           </div>
         </article>
 
-        <div class="section-head"><h2 class="section-title">Account</h2></div>
-        <div class="list">
-          <div class="card" style="padding:0; overflow:clip;">
-            <div style="padding:12px 14px; border-bottom:1px solid var(--border);">
-              <div class="kicker kicker--muted">Provided by your university</div>
-              <div style="margin-top:8px; display:grid; gap:6px; font-size:13px;">
-                <div style="display:flex; justify-content:space-between; gap:12px;"><span class="meta">Student number</span><span style="font-weight:600;" data-field="studentNo">21/U/04218</span></div>
-                <div style="display:flex; justify-content:space-between; gap:12px;"><span class="meta">Faculty</span><span style="font-weight:600; text-align:right;" data-field="studentFaculty">College of Computing &amp; Info. Sci.</span></div>
-                <div style="display:flex; justify-content:space-between; gap:12px;"><span class="meta">Enrolment status</span><span style="font-weight:600; color: var(--brand);">Current</span></div>
-              </div>
-            </div>
-            <div style="padding:12px 14px;">
-              <div class="kicker kicker--muted">Provided by you</div>
-              <div style="margin-top:8px; display:grid; gap:6px; font-size:13px;">
-                <div style="display:flex; justify-content:space-between; gap:12px;"><span class="meta">Display name</span><span style="font-weight:600;">Nakato Grace</span></div>
-                <div style="display:flex; justify-content:space-between; gap:12px;"><span class="meta">Personal email</span><span style="font-weight:600;">n.grace@…</span></div>
-                <div style="display:flex; justify-content:space-between; gap:12px;"><span class="meta">Phone</span><span style="font-weight:600;">+256 7•• ••• 321</span></div>
-                <div style="display:flex; justify-content:space-between; gap:12px;"><span class="meta">Notification prefs</span><a href="#me" class="section-action" style="font-size:12px;">Manage</a></div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <div class="section-head"><h2 class="section-title">Provided by your university</h2></div>
+        <section class="card card-pad" aria-label="Provided by your university">
+          <dl class="me-fields">
+            <div class="me-field-row"><dt>Student number</dt><dd data-field="studentNo">21/U/04218</dd></div>
+            <div class="me-field-row"><dt>Faculty</dt><dd data-field="studentFaculty">College of Computing &amp; Information Sciences</dd></div>
+            <div class="me-field-row"><dt>Enrolment status</dt><dd data-field="studentEnrolment">Current</dd></div>
+          </dl>
+        </section>
 
-        <div class="list" style="margin-top:10px;">
-          <a class="list-row" href="#me" data-save-link><span><span class="row-label">Saves</span><span class="row-meta" style="display:block;" data-field="savesMeta">6 saved • Events, opportunities, news</span></span><span>›</span></a>
-          <a class="list-row" href="#me" data-rsvp-link><span><span class="row-label">RSVPs</span><span class="row-meta" style="display:block;">3 upcoming • 1 interested</span></span><span>›</span></a>
-          <a class="list-row" href="#play"><span><span class="row-label">Play</span><span class="row-meta" style="display:block;">Level 4 • <span data-field="meStreak">Streak 3 days</span></span></span><span>›</span></a>
-          <a class="list-row" href="#notifications"><span><span class="row-label">Notifications</span><span class="row-meta" style="display:block;">2 unread • Grouped by Today / Yesterday</span></span><span>›</span></a>
-          <a class="list-row" href="#privacy"><span><span class="row-label">Privacy &amp; transparency</span><span class="row-meta" style="display:block;">What we collect • Who can see what</span></span><span>›</span></a>
-          <a class="list-row" href="#me"><span><span class="row-label">Sessions &amp; security</span><span class="row-meta" style="display:block;">Review devices • End sessions</span></span><span>›</span></a>
-          <a class="list-row" href="#me"><span><span class="row-label">Help &amp; support</span><span class="row-meta" style="display:block;">Guild contacts • Report a problem</span></span><span>›</span></a>
-        </div>
+        <div class="section-head"><h2 class="section-title">Provided by you</h2></div>
+        <section class="card card-pad" aria-label="Provided by you">
+          <dl class="me-fields">
+            <div class="me-field-row"><dt>Display name</dt><dd data-field="studentDisplayName">Nakato Grace</dd></div>
+            <div class="me-field-row"><dt>Personal email</dt><dd data-field="studentEmail">n.grace@…</dd></div>
+            <div class="me-field-row"><dt>Phone</dt><dd data-field="studentPhone">+256 7•• ••• 321</dd></div>
+            <div class="me-field-row"><dt>Notification preferences</dt><dd data-field="notificationPrefs">In-app first</dd></div>
+          </dl>
+        </section>
 
-        <div id="meSaves" class="card card-pad" style="margin-top:10px;">
-          <h3 class="section-title" style="font-size:12px;">Your saves</h3>
+        <nav id="meActivity" aria-label="Activity and account">
+          <div class="section-head"><h2 class="section-title">Activity &amp; account</h2></div>
+          <ul class="list me-activity-list">
+            <li><button id="meSaveLink" type="button" class="list-row me-activity-row" data-save-link><span><span class="row-label">Saves</span><span class="row-meta" style="display:block;" data-field="savesMeta">3 saved</span></span><span aria-hidden="true">›</span></button></li>
+            <li><button id="meRsvpLink" type="button" class="list-row me-activity-row" data-rsvp-link><span><span class="row-label">RSVPs</span><span class="row-meta" style="display:block;" data-field="meRsvpMeta">No RSVPs yet.</span></span><span aria-hidden="true">›</span></button></li>
+            <li><a class="list-row me-activity-row" href="#play"><span><span class="row-label">Play</span><span class="row-meta" style="display:block;"><span data-field="mePlayLevel">Level 4</span> • <span data-field="meStreak">Streak 3 days</span></span></span><span aria-hidden="true">›</span></a></li>
+            <li><a class="list-row me-activity-row" href="#privacy"><span><span class="row-label">Privacy &amp; transparency</span><span class="row-meta" style="display:block;">What we collect • Who can see what</span></span><span aria-hidden="true">›</span></a></li>
+            <li><a class="list-row me-activity-row" href="#verification"><span><span class="row-label">Verification &amp; membership</span><span class="row-meta" style="display:block;" data-field="meVerificationMeta">L2 — Roster Match • Current</span></span><span aria-hidden="true">›</span></a></li>
+          </ul>
+        </nav>
+
+        <section id="meSaves" class="card card-pad" style="margin-top:10px;" hidden aria-labelledby="meSavesHeading">
+          <h2 id="meSavesHeading" class="section-title" style="font-size:12px;" tabindex="-1">Your saves</h2>
           <div id="savesList" class="stack-8" style="margin-top:8px;"></div>
-        </div>
+        </section>
+
+        <section id="meRsvps" class="card card-pad" style="margin-top:10px;" hidden aria-labelledby="meRsvpsHeading">
+          <h2 id="meRsvpsHeading" class="section-title" style="font-size:12px;" tabindex="-1">Your RSVPs</h2>
+          <div id="meRsvpsList" class="me-detail-list" style="margin-top:8px;"></div>
+        </section>
       </section>
 
       <!-- VERIFICATION -->

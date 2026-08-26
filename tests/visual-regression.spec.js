@@ -385,6 +385,11 @@ test.describe('Phase 7D canonical visual regression baselines', () => {
       await settle(page);
       await captureViewport(page, 'event-guild-debate-1280.png');
     });
+
+    test('me-1280', async ({ page }) => {
+      await resetAndGo(page, '#me');
+      await captureViewport(page, 'me-1280.png');
+    });
   });
 
   test.describe('small-mobile 320x844', () => {

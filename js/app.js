@@ -38,6 +38,8 @@
   const DISCOVER_SYSTEM_STATES = Object.freeze(["ready", "loading", "error", "offline"]);
   const discoverSearchState = { query:"", filter:"All" };
   let discoverSystemState = "ready";
+  let meSavesOpen = false;
+  let meRsvpsOpen = false;
 
   const CANONICAL_PARTICIPATION_SCENARIOS = Object.freeze({
     "assurance-required": {
@@ -311,14 +313,7 @@
     renderOpportunityEntity(D.opportunity);
     renderEventEntity(D.featuredEvent);
     // me
-    $('[data-field="studentName"]').textContent = D.student.displayName;
-    $('[data-field="studentProg"]').textContent = `${D.student.programme} • ${D.student.year}`;
-    $('[data-field="studentCampus"]').textContent = `${D.student.campus} • ${D.student.residence}`;
-    $('[data-field="studentNo"]').textContent = D.student.studentNumber;
-    $('[data-field="studentFaculty"]').textContent = D.student.faculty.replace("College of Computing & Information Sciences","College of Computing & Info. Sci.");
-    $('[data-field="assuranceBadge"]').textContent = D.student.assurance;
-    $('[data-field="assuranceTitle"]') && ($('[data-field="assuranceTitle"]').textContent = D.student.assurance);
-    $('[data-field="savesMeta"]').textContent = `${D.student.savesCount} saved • Events, opportunities, news`;
+    renderMe(state);
     // play header
     const levelInfo = D.levels.find(l=> l.level===D.student.level) || D.levels[3];
     const next = D.levels.find(l=> l.level===D.student.level+1);
@@ -929,28 +924,133 @@
     `).join("");
   }
 
-  // Saves
-  function renderSaves(){
+  function studentLevelForXp(xp){
+    const levels = Array.isArray(D.levels) ? D.levels : [];
+    const match = levels.find(level => xp >= Number(level.xpMin) && xp <= Number(level.xpMax));
+    return match || levels.slice(-1)[0] || { level:Number(D.student.level) || 1 };
+  }
+
+  function savedItems(state){
+    return Array.isArray(state?.saves) ? state.saves : D.saves.slice();
+  }
+
+  function saveRecordMatches(item, kind){
+    const id = String(item?.id || "");
+    const title = String(item?.title || "");
+    if(kind === "event") return id === "s1" || id === "evt1" || title === String(D.featuredEvent?.title || "");
+    if(kind === "opportunity") return id === "s2" || id === "opp1" || title === String(D.opportunity?.title || "");
+    return false;
+  }
+
+  function renderSavesList(state){
     const wrap = $('#savesList');
-    const state = loadState();
-    const items = (state.saves || D.saves).map(s=> `
+    if(!wrap) return;
+    const items = savedItems(state);
+    wrap.innerHTML = items.map(s=> `
       <div class="list-row" style="gap:10px;">
         <div style="flex:1; min-width:0;">
           <div style="font-size:11px; letter-spacing:.06em; text-transform:uppercase; font-weight:700; color:var(--text-muted);">${escapeHtml(s.type)}</div>
           <div class="title" style="font-size:13px; margin-top:2px;">${escapeHtml(s.title)}</div>
           <div class="meta">${escapeHtml(s.meta)}</div>
         </div>
-        <button class="btn btn--small" data-unsave="${s.id}">Remove</button>
+        <button class="btn btn--small" data-unsave="${escapeHtml(s.id)}">Remove</button>
       </div>
-    `).join("");
-    wrap.innerHTML = items || `<div class="empty">No saves yet — tap Save on any event or opportunity.</div>`;
-    wrap.querySelectorAll('[data-unsave]').forEach(b=> b.addEventListener('click', ()=>{
-      const id=b.getAttribute('data-unsave');
-      state.saves = (state.saves||D.saves).filter(x=> x.id!==id);
-      saveState(state);
-      renderSaves();
+    `).join("") || `<div class="empty">Nothing saved yet.</div>`;
+    wrap.querySelectorAll('[data-unsave]').forEach(button=> button.addEventListener('click', ()=>{
+      const id = button.getAttribute('data-unsave');
+      const nextState = participationState();
+      nextState.saves = savedItems(nextState).filter(item => String(item.id) !== String(id));
+      if(nextState.saves.some(item => saveRecordMatches(item, "event")) === false) nextState.saveEvent = false;
+      if(nextState.saves.some(item => saveRecordMatches(item, "opportunity")) === false) nextState.saveOpp = false;
+      saveState(nextState);
+      renderMe(nextState);
       toast("Removed from saves.");
     }));
+  }
+
+  function renderMeRsvps(state){
+    const list = $('#meRsvpsList');
+    if(!list) return;
+    const event = D.featuredEvent;
+    if(!state.rsvp){
+      list.innerHTML = '<p class="empty">No RSVPs yet.</p>';
+      return;
+    }
+    const status = state.rsvp === "interested" ? "Interested" : "Going";
+    list.innerHTML = `
+      <div class="list-row" style="gap:10px; align-items:flex-start;">
+        <div style="min-width:0; flex:1;">
+          <a class="title" style="font-size:13px;" href="#events/guild-debate">${escapeHtml(event.title)}</a>
+          <div class="meta" style="margin-top:3px;">${escapeHtml(event.date)} • ${escapeHtml(event.time)}</div>
+          <div class="meta">${escapeHtml(event.venue)}</div>
+        </div>
+        <span class="pill pill--brand">${status}</span>
+      </div>
+    `;
+  }
+
+  function renderMe(state=participationState()){
+    const normalizedState = ensureParticipationState(state || {});
+    const membershipStatus = normalizedState.membership.status === "refresh" ? "Needs refreshing" : "Current";
+    D.student.assuranceLevel = normalizedState.membership.assuranceLevel;
+    D.student.assurance = assuranceLabel(normalizedState.membership.assuranceLevel);
+    const level = Number(D.student.level) || 1;
+    const xp = Number(D.student.xp) || 0;
+    const items = savedItems(normalizedState);
+    const rsvpSummary = normalizedState.rsvp === "going"
+      ? "1 RSVP • Going"
+      : normalizedState.rsvp === "interested"
+        ? "1 RSVP • Interested"
+        : "No RSVPs yet.";
+
+    setEntityField('[data-field="studentName"]', D.student.displayName);
+    setEntityField('[data-field="studentProg"]', `${D.student.programme} • ${D.student.year}`);
+    setEntityField('[data-field="studentCampus"]', `${D.student.campus} • ${D.student.residence}`);
+    setEntityField('[data-field="studentNo"]', D.student.studentNumber);
+    setEntityField('[data-field="studentFaculty"]', D.student.faculty);
+    setEntityField('[data-field="studentEnrolment"]', membershipStatus);
+    setEntityField('[data-field="studentDisplayName"]', D.student.displayName);
+    setEntityField('[data-field="assuranceBadge"]', D.student.assurance);
+    setEntityField('[data-field="meLevelXp"]', `Level ${level} • ${xp} XP`);
+    setEntityField('[data-field="savesMeta"]', items.length ? `${items.length} saved` : "Nothing saved yet.");
+    setEntityField('[data-field="meRsvpMeta"]', rsvpSummary);
+    setEntityField('[data-field="mePlayLevel"]', `Level ${level}`);
+    setEntityField('[data-field="meVerificationMeta"]', `${D.student.assurance} • ${membershipStatus}`);
+
+    const savesPanel = $('#meSaves');
+    if(savesPanel) savesPanel.hidden = !meSavesOpen;
+    const rsvpsPanel = $('#meRsvps');
+    if(rsvpsPanel) rsvpsPanel.hidden = !meRsvpsOpen;
+    [['#eventSave', 'saveEvent'], ['#oppSave', 'saveOpp']].forEach(([selector, key])=>{
+      const button = $(selector);
+      if(!button) return;
+      const on = normalizedState[key] === true;
+      button.setAttribute('aria-pressed', on ? 'true' : 'false');
+      button.textContent = on ? 'Saved ✓' : 'Save';
+      button.classList.toggle('is-saved', on);
+    });
+    renderSavesList(normalizedState);
+    renderMeRsvps(normalizedState);
+  }
+
+  function renderSaves(){
+    renderMe(participationState());
+  }
+
+  function openMeActivity(section){
+    if(section === "saves") { meSavesOpen = true; meRsvpsOpen = false; }
+    if(section === "rsvps") { meRsvpsOpen = true; meSavesOpen = false; }
+    const state = participationState();
+    renderMe(state);
+    const panel = section === "saves" ? $('#meSaves') : $('#meRsvps');
+    const heading = section === "saves" ? $('#meSavesHeading') : $('#meRsvpsHeading');
+    panel?.scrollIntoView({block:"start", behavior:"auto"});
+    setTimeout(()=> heading?.focus({preventScroll:true}), 0);
+  }
+
+  function initMeActivity(){
+    $('#meSaveLink')?.addEventListener('click', ()=> openMeActivity("saves"));
+    $('#meRsvpLink')?.addEventListener('click', ()=> openMeActivity("rsvps"));
   }
 
   // Contextual participation gating — demo-only local state, ordered by the canonical decision path.
@@ -1054,6 +1154,11 @@
     const parsedXp = Number(state.xp);
     state.xp = Number.isFinite(parsedXp) && parsedXp>=0 ? parsedXp : Number(D.student.xp) || 0;
     D.student.xp = state.xp;
+    D.student.level = studentLevelForXp(state.xp).level;
+    if(!Array.isArray(state.saves)) state.saves = D.saves.slice();
+    if(typeof state.saveEvent !== "boolean") state.saveEvent = false;
+    if(typeof state.saveOpp !== "boolean") state.saveOpp = false;
+    if(state.rsvp !== "going" && state.rsvp !== "interested") state.rsvp = null;
 
     Object.keys(membershipDefaults).forEach(key=>{
       if(state.membership[key]===undefined || state.membership[key]===null) state.membership[key] = membershipDefaults[key];
@@ -2099,6 +2204,7 @@
     if(target==="voice-new") renderVoiceComposer();
     if(target==="voice-detail") renderVoiceDetail();
     if(target==="verification") syncVerificationUi();
+    if(target==="me") renderMe(participationState());
     // Secondary screens inherit the active primary destination.
     const primary = primaryTabs.includes(target) ? target : (parentPrimaryTabs[target] || null);
     $$('.nav-item').forEach(a=>{
@@ -2249,45 +2355,47 @@
   function initSavesToggles(){
     const s1 = $('#eventSave');
     const s2 = $('#oppSave');
-    const state = loadState();
-    function reflect(btn, key){
+    if(!s1 || !s2) return;
+    function reflect(btn, key, state){
       const on = !!state[key];
       btn.setAttribute('aria-pressed', on ? 'true':'false');
       btn.textContent = on ? 'Saved ✓' : 'Save';
       if(on) { btn.classList.add('is-saved'); } else { btn.classList.remove('is-saved'); }
     }
-    reflect(s1,'saveEvent');
-    reflect(s2,'saveOpp');
+    const initialState = participationState();
+    reflect(s1,'saveEvent', initialState);
+    reflect(s2,'saveOpp', initialState);
     s1.addEventListener('click', ()=>{
+      const state = participationState();
       state.saveEvent = !state.saveEvent;
-      // update saves list
+      state.saves = savedItems(state);
       if(state.saveEvent){
-        state.saves = state.saves || D.saves.slice();
-        if(!state.saves.find(x=> x.id==='evt1')){
+        if(!state.saves.some(item => saveRecordMatches(item, "event"))){
           state.saves.unshift({id:'evt1', type:'Event', title:D.featuredEvent.title, meta: `${D.featuredEvent.date} • ${D.featuredEvent.venue}`});
         }
       } else {
-        state.saves = (state.saves||[]).filter(x=> x.id!=='evt1');
+        state.saves = state.saves.filter(item => !saveRecordMatches(item, "event"));
       }
       saveState(state);
-      reflect(s1,'saveEvent');
-      renderSaves();
-      toast(state.saveEvent? "Saved." : "Removed from saves.");
+      reflect(s1,'saveEvent', state);
+      renderMe(state);
+      toast(state.saveEvent ? "Saved." : "Removed from saves.");
     });
     s2.addEventListener('click', ()=>{
+      const state = participationState();
       state.saveOpp = !state.saveOpp;
+      state.saves = savedItems(state);
       if(state.saveOpp){
-        state.saves = state.saves || D.saves.slice();
-        if(!state.saves.find(x=> x.id==='opp1')){
+        if(!state.saves.some(item => saveRecordMatches(item, "opportunity"))){
           state.saves.unshift({id:'opp1', type:'Opportunity', title:D.opportunity.title, meta: D.opportunity.deadline});
         }
       } else {
-        state.saves = (state.saves||[]).filter(x=> x.id!=='opp1');
+        state.saves = state.saves.filter(item => !saveRecordMatches(item, "opportunity"));
       }
       saveState(state);
-      reflect(s2,'saveOpp');
-      renderSaves();
-      toast(state.saveOpp? "Saved." : "Removed from saves.");
+      reflect(s2,'saveOpp', state);
+      renderMe(state);
+      toast(state.saveOpp ? "Saved." : "Removed from saves.");
     });
   }
 
@@ -2412,6 +2520,7 @@
       saveState(currentState);
       syncStreakPresentation(currentState);
       reflect();
+      renderMe(currentState);
       toast(successMessage);
     }
     going.addEventListener('click', eventTrigger=>{
@@ -2861,6 +2970,8 @@
         state.supportedVoiceIssues = [];
         state.streakState = { count:3, lastQualifiedTenantDay:"2026-05-19" };
         state.xp = 340;
+        meSavesOpen = false;
+        meRsvpsOpen = false;
         lastParticipationDecision = null;
         saveState(state);
         clearVoiceDraftSession();
@@ -2953,6 +3064,7 @@
     initVoiceComposer();
     initVoiceDetail();
     initSavesToggles();
+    initMeActivity();
     initLeaveCampusHubFlow();
     initRSVP();
     initBack();
