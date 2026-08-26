@@ -671,6 +671,13 @@
     title.scrollIntoView({block:"start", behavior:"auto"});
   }
 
+  function focusVerificationTitle(){
+    const title = $('#verificationTitle');
+    if(!title) return;
+    title.focus({preventScroll:true});
+    title.scrollIntoView({block:"start", behavior:"auto"});
+  }
+
   function renderVoiceDetail(issueId){
     const selected = selectVoiceIssue(issueId || participationState().selectedVoiceIssueId);
     if(!selected) return null;
@@ -1438,45 +1445,55 @@
   function syncVerificationUi(){
     const state = participationState();
     const level = state.membership.assuranceLevel;
-    const membershipRefresh = state.membership.status!=="active";
+    const membershipRefresh = state.membership.status === "refresh";
     const title = assuranceLabel(level);
     const titleEl = $('[data-field="assuranceTitle"]');
     if(!titleEl) return;
 
-    $('#verificationStatusKicker').textContent = membershipRefresh ? "Membership status" : "Current assurance";
-    titleEl.textContent = membershipRefresh ? "Membership needs refreshing" : title;
-    $('#verificationStatusDescription').textContent = membershipRefresh
-      ? "Your university membership needs to be confirmed again before you can participate. Your assurance level is still recorded separately."
-      : level===1
-        ? "Your campus invite code or self-declared details show an affiliation. A current roster match is needed before you can respond to polls or use Student Voice."
-        : level===3
-          ? "Your roster match has been strengthened with institutional proof. You can take part in high-integrity polls where they are available."
-          : "Your details match an approved university roster. A roster match alone does not prove identity where student numbers and surnames are guessable.";
-    $('#assuranceProgressBar').style.width = ({0:"18%",1:"36%",2:"55%",3:"100%"})[level] || "36%";
-    $('#assuranceProgressCurrent').textContent = `L${level}`;
+    const descriptions = {
+      0: "Your account is registered, but there is no credible proof of current university affiliation yet.",
+      1: "Your campus invite or self-declared details show a weak affiliation. A current roster match is needed for higher-assurance participation.",
+      2: "Your membership is matched to the current student roster provided by your university.",
+      3: "Your roster match is supported by strong institutional proof where a university-configured method is available."
+    };
+    $('#verificationStatusKicker').textContent = "Current assurance";
+    titleEl.textContent = title;
+    $('#verificationStatusDescription').textContent = descriptions[level] || descriptions[1];
+    const separation = $('#verificationAssuranceSeparation');
+    if(separation) separation.textContent = "Assurance is separate from enrolment. Your enrolment status is Current.";
 
-    [1,2,3].forEach(tierLevel=>{
+    const refreshBanner = $('#verificationMembershipRefresh');
+    if(refreshBanner) refreshBanner.hidden = !membershipRefresh;
+
+    [0,1,2,3].forEach(tierLevel=>{
       const tier = $(`#verificationTierL${tierLevel}`);
       const badge = tier?.querySelector("[data-tier-badge]");
       const current = tier?.querySelector("[data-tier-current]");
       const isCurrent = level===tierLevel;
       tier?.classList.toggle("tier--active", isCurrent);
+      if(tier){
+        if(isCurrent) tier.setAttribute("aria-current", "step");
+        else tier.removeAttribute("aria-current");
+      }
       if(badge) badge.textContent = isCurrent ? "✓" : String(tierLevel);
       if(current) current.hidden = !isCurrent;
     });
 
     const matchBtn = $('#startRosterMatch');
     const matchHelp = $('#rosterMatchHelp');
+    const actionSlot = $('#verificationActionSlot');
+    const canMatchRoster = membershipRefresh || level===1;
+    if(actionSlot) actionSlot.hidden = !canMatchRoster;
     if(matchBtn){
-      matchBtn.hidden = !(membershipRefresh || level===1);
-      if(!matchBtn.hidden){
+      matchBtn.hidden = !canMatchRoster;
+      if(canMatchRoster){
         matchBtn.disabled = false;
         matchBtn.textContent = membershipRefresh ? "Refresh membership" : "Match my student record";
       }
     }
     if(matchHelp){
-      matchHelp.hidden = !(membershipRefresh || level===1);
-      if(!matchHelp.hidden) matchHelp.textContent = membershipRefresh
+      matchHelp.hidden = !canMatchRoster;
+      if(canMatchRoster) matchHelp.textContent = membershipRefresh
         ? "We will refresh your current membership against the university roster."
         : "We will check your current enrolment against the university roster.";
     }
@@ -2057,6 +2074,7 @@
   let pendingRsvpFocus = false;
   let pendingRsvpAction = null;
   let pendingQuizFocus = false;
+  let pendingVerificationFocus = false;
   let pendingNewsDetailFocus = false;
   let pendingSportsDetailFocus = false;
   let pendingEventDetailFocus = false;
@@ -2113,6 +2131,9 @@
         const pollOption = $('#pollForm input[type="radio"]:not(:disabled)') || $('#pollForm input[type="radio"]');
         if(pollOption) pollOption.focus({preventScroll:true});
       }, 60);
+    } else if(target==="verification" && pendingVerificationFocus){
+      pendingVerificationFocus = false;
+      setTimeout(focusVerificationTitle, 60);
     } else if(target==="voice-new" && pendingVoiceComposerFocus){
       pendingVoiceComposerFocus = false;
       const action = pendingVoiceComposerAction;
@@ -2220,6 +2241,7 @@
       }
       pendingVoiceComposerFocus = true;
     }
+    if(h==="verification") pendingVerificationFocus = true;
     showView(h);
   }
 

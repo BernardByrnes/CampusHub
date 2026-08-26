@@ -469,56 +469,67 @@
 
       <!-- VERIFICATION -->
       <section id="view-verification" data-view="verification" class="view" role="tabpanel" aria-label="Verification and membership" hidden>
-        <div class="view-head" style="display:flex; gap:10px; align-items:center;">
-          <button class="icon-btn" data-back aria-label="Back" style="width:36px; height:36px;">‹</button>
-          <div><h1 class="view-title">Verification &amp; membership</h1><p class="view-sub" style="margin-top:2px;">Honest assurance — evidence, not aspiration.</p></div>
+        <div class="view-head verification-subheader">
+          <button class="icon-btn verification-back" data-back aria-label="Back">‹</button>
+          <h1 id="verificationTitle" class="view-title" tabindex="-1">Verification &amp; membership</h1>
         </div>
 
-        <article class="card card-pad" id="verificationStatusCard" style="background:var(--tenant-softer); border-color:var(--tenant-border);">
+        <article class="card card-pad verification-status-card" id="verificationStatusCard">
           <div class="kicker" id="verificationStatusKicker">Current assurance</div>
-          <div style="margin-top:6px; font-size:18px; font-weight:800; color: var(--brand);" data-field="assuranceTitle">L2 — Roster Match</div>
-          <p class="body-sm" id="verificationStatusDescription">Your details match an approved university roster. A roster match alone does not prove identity where student numbers and surnames are guessable.</p>
-          <div class="progress" style="margin-top:10px;"><div class="progress-bar" id="assuranceProgressBar" style="width:55%;"></div></div>
-          <div class="meta" style="margin-top:6px; display:flex; justify-content:space-between;"><span>L0</span><span id="assuranceProgressCurrent" style="font-weight:700; color: var(--brand);">L2</span><span>L3</span></div>
+          <div class="verification-assurance-title" data-field="assuranceTitle">L2 — Roster Match</div>
+          <p class="body-sm" id="verificationStatusDescription">Your membership is matched to the current student roster provided by your university.</p>
+          <p class="verification-assurance-separation" id="verificationAssuranceSeparation">Assurance is separate from enrolment. Your enrolment status is Current.</p>
         </article>
+
+        <div id="verificationMembershipRefresh" class="verification-banner" hidden role="status" aria-live="polite">
+          <strong>Membership needs refreshing.</strong>
+          <span>Your roster match is from a previous term. Refresh it to keep taking part.</span>
+        </div>
+
+        <div id="verificationActionSlot" class="verification-action-slot" hidden>
+          <button id="startRosterMatch" class="btn btn--primary btn--small" type="button">Match my student record</button>
+          <p id="rosterMatchHelp" class="meta">We will check your current enrolment against the university roster.</p>
+        </div>
 
         <div id="verificationSuccess" class="verification-success" hidden role="status" aria-live="polite" tabindex="-1">
           <strong>Student status confirmed.</strong>
           <span id="verificationSuccessDetail">Your university membership now matches the current student roster.</span>
         </div>
 
-        <div class="timeline" style="margin-top:10px;">
-          <div class="tier tier--active">
-            <div class="tier-badge">✓</div>
-            <div><h3 class="tier-title">L0 — Registered</h3><p class="tier-desc">Authenticated account. Completed.</p></div>
-            <span class="pill pill--brand" style="margin-left:auto; align-self:center;">Done</span>
-          </div>
-          <div class="tier" id="verificationTierL1">
+        <ol id="assuranceLadder" class="timeline verification-ladder">
+          <li class="tier" id="verificationTierL0" data-assurance-level="0">
+            <div class="tier-badge" data-tier-badge="0">0</div>
+            <div><h3 class="tier-title">L0 — Registered</h3><p class="tier-desc">Authenticated account with no credible proof of current university affiliation.</p></div>
+            <span class="pill pill--brand tier-current" data-tier-current="0" hidden>Current</span>
+          </li>
+          <li class="tier" id="verificationTierL1" data-assurance-level="1">
             <div class="tier-badge" data-tier-badge="1">1</div>
-            <div><h3 class="tier-title">L1 — Weak Affiliation</h3><p class="tier-desc">Campus invite code or self-declared info. Not sufficient for polls or Voice.</p></div>
-            <span class="pill pill--brand" data-tier-current="1" style="margin-left:auto; align-self:center;" hidden>You are here</span>
-          </div>
-          <div class="tier tier--active" id="verificationTierL2">
-            <div class="tier-badge" data-tier-badge="2">✓</div>
-            <div><h3 class="tier-title">L2 — Roster Match</h3><p class="tier-desc">You are on the current university roster. You can respond to polls (where L2 is permitted) and use Student Voice.</p></div>
-            <div style="margin-left:auto; align-self:center; text-align:right;">
-              <span class="pill pill--brand" data-tier-current="2">You are here</span>
-              <button id="startRosterMatch" class="btn btn--primary btn--small" type="button" hidden>Match my student record</button>
-              <p id="rosterMatchHelp" class="meta" hidden style="margin:6px 0 0; max-width:190px; font-size:11px;">We will check your current enrolment against the university roster.</p>
-            </div>
-          </div>
-          <div class="tier" id="verificationTierL3">
+            <div><h3 class="tier-title">L1 — Weak Affiliation</h3><p class="tier-desc">Weak affiliation evidence such as a campus invite or self-declared student information.</p></div>
+            <span class="pill pill--brand tier-current" data-tier-current="1" hidden>Current</span>
+          </li>
+          <li class="tier" id="verificationTierL2" data-assurance-level="2">
+            <div class="tier-badge" data-tier-badge="2">2</div>
+            <div><h3 class="tier-title">L2 — Roster Match</h3><p class="tier-desc">Details match the current university roster. A roster match alone does not prove identity where details may be guessable.</p></div>
+            <span class="pill pill--brand tier-current" data-tier-current="2" hidden>Current</span>
+          </li>
+          <li class="tier" id="verificationTierL3" data-assurance-level="3">
             <div class="tier-badge" data-tier-badge="3">3</div>
             <div>
               <h3 class="tier-title">L3 — Strong Institutional Proof</h3>
-              <p class="tier-desc">Roster match plus institutional proof, where available, for high-integrity polls.</p>
+              <p class="tier-desc">Roster match plus strong institutional proof where a university-configured method is available.</p>
             </div>
-            <span class="pill pill--brand" data-tier-current="3" style="margin-left:auto; align-self:center;" hidden>You are here</span>
-          </div>
-        </div>
+            <span class="pill pill--brand tier-current" data-tier-current="3" hidden>Current</span>
+          </li>
+        </ol>
+
+        <article class="card card-pad verification-explanation">
+          <h2 class="section-title">How verification works</h2>
+          <p class="body-sm">CampusHub verifies your membership using university-provided student records and approved institutional contact methods.</p>
+          <p class="body-sm">Each assurance step describes the evidence available for your membership. It does not make a universal claim about who can participate; each campus service sets its own access rules.</p>
+        </article>
 
         <details class="details" style="margin-top:10px;">
-          <summary>What each level can do <span aria-hidden="true">›</span></summary>
+          <summary>What each assurance allows <span aria-hidden="true">›</span></summary>
           <div class="details-body">
             <ul style="margin:0; padding-left:18px;">
               <li>L0: read public content only.</li>
@@ -531,7 +542,7 @@
         <details class="details">
           <summary>Why OTP provenance matters <span aria-hidden="true">›</span></summary>
           <div class="details-body">
-            OTP to an address you typed proves you control that address — not that you are that student. Only OTP to a roster-supplied channel upgrades assurance.
+            A one-time code to a channel you provide proves you control that channel — not that you are that student. A channel supplied by the university or its roster may support stronger institutional proof where that method is configured. An institutional email supports stronger proof only when the university attests that it is bound to a current student record; a domain suffix alone proves nothing.
           </div>
         </details>
         <details class="details">
@@ -540,7 +551,6 @@
             <p style="margin:0;">Membership: <strong>Makerere University — Main Campus</strong> • Academic Year 2026/2027. You belong to one campus at a time; history is preserved by tenant.</p>
           </div>
         </details>
-        <p class="meta" style="margin-top:10px; font-size:11px; text-align:center;">Verification is confirmed using your current enrolment details and, where needed, contact information held by your institution.</p>
       </section>
 
       <!-- NOTIFICATIONS -->

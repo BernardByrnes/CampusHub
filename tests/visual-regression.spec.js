@@ -355,6 +355,11 @@ test.describe('Phase 7D canonical visual regression baselines', () => {
       await captureViewport(page, 'gate-poll-assurance-1280.png');
     });
 
+    test('verification-l2-1280', async ({ page }) => {
+      await resetAndGo(page, '#verification');
+      await captureViewport(page, 'verification-l2-1280.png');
+    });
+
     test('opportunity-leave-dialog-1280', async ({ page }) => {
       await resetAndGo(page, '#opportunities/ra-climate');
       await page.locator('#oppApply').click();
