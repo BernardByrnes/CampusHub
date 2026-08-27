@@ -296,7 +296,32 @@
     if(scoreboard) scoreboard.setAttribute('aria-label', accessibleScore);
   }
 
+  function clearPublicationEntity(){
+    setEntityField('#newsDetailKicker', '');
+    setEntityField('#newsDetailTitle', '');
+    setEntityField('#newsDetailDate', '');
+    setEntityField('#newsDetailSource', '');
+
+    const body = $('#newsDetailBody');
+    if(body) body.textContent = '';
+
+    const media = $('#newsDetailMedia');
+    const image = $('#newsDetailImage');
+    if(media){
+      media.hidden = true;
+      media.removeAttribute('aria-label');
+      media.style.removeProperty('background');
+    }
+    if(image){
+      image.hidden = true;
+      image.removeAttribute('src');
+      image.alt = '';
+      image.style.removeProperty('display');
+    }
+  }
+
   function renderPublicationEntity(publication){
+    clearPublicationEntity();
     if(!publication) return;
     setEntityField('#newsDetailKicker', publication.kicker);
     setEntityField('#newsDetailTitle', publication.title);
@@ -313,11 +338,23 @@
 
     const media = $('#newsDetailMedia');
     const image = $('#newsDetailImage');
-    if(media) media.hidden = !publication.image;
-    if(image && publication.image){
-      image.src = publication.image;
-      image.alt = publication.imageAlt || "";
-      image.hidden = false;
+    const imageSource = typeof publication.image === 'string' ? publication.image.trim() : '';
+    const hasImage = Boolean(imageSource);
+    if(media){
+      media.hidden = !hasImage;
+      media.removeAttribute('aria-label');
+      media.style.removeProperty('background');
+    }
+    if(image){
+      image.hidden = !hasImage;
+      image.style.removeProperty('display');
+      if(hasImage){
+        image.src = imageSource;
+        image.alt = publication.imageAlt || "";
+      } else {
+        image.removeAttribute('src');
+        image.alt = '';
+      }
     }
   }
 
@@ -2605,6 +2642,10 @@
 
     if(route.kind==="detail"){
       if(!route.entity){
+        if(route.definition.view === "news"){
+          clearPublicationEntity();
+          pendingNewsDetailFocus = false;
+        }
         const fallback = route.definition.parent === "participate" ? "#voice" : "#discover";
         history.replaceState(null, "", fallback);
         showView(route.definition.parent === "participate" ? "voice" : "discover");

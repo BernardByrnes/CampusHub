@@ -234,15 +234,15 @@
 
       <!-- NEWS / PUBLICATION DETAIL -->
       <section id="view-news" data-view="news" class="view" role="tabpanel" aria-labelledby="newsDetailTitle" hidden>
-        <div class="view-head" style="display:flex; align-items:center; gap:10px;">
-          <button class="icon-btn" data-back aria-label="Back" style="width:36px; height:36px;">‹</button>
-          <div class="view-title">News</div>
+        <div class="view-head news-subheader">
+          <button class="icon-btn news-back" data-back type="button" aria-label="Back">‹</button>
+          <div class="news-route-label">News</div>
         </div>
 
-        <article aria-labelledby="newsDetailTitle">
+        <article class="news-detail-article" aria-labelledby="newsDetailTitle">
           <div class="kicker kicker--info" id="newsDetailKicker">Campus Story</div>
-          <h1 id="newsDetailTitle" class="detail-title" tabindex="-1" style="margin:6px 0 8px; line-height:1.18;"></h1>
-          <div class="meta" style="display:flex; gap:6px; align-items:center;">
+          <h1 id="newsDetailTitle" class="detail-title news-detail-title" tabindex="-1"></h1>
+          <div class="meta news-detail-meta">
             <time id="newsDetailDate"></time>
             <span aria-hidden="true">•</span>
             <span id="newsDetailSource"></span>
@@ -252,7 +252,7 @@
             <img id="newsDetailImage" src="assets/images/hero-innovation.webp" alt="A group collaborating around a project planning board" width="900" height="500" loading="lazy" decoding="async" />
           </div>
 
-          <div id="newsDetailBody" class="body-sm" style="margin-top:16px; line-height:1.6; color:var(--text-strong);"></div>
+          <div id="newsDetailBody" class="body-sm news-detail-body"></div>
         </article>
       </section>
 

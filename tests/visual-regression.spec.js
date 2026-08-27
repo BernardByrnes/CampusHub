@@ -360,6 +360,11 @@ test.describe('Phase 7D canonical visual regression baselines', () => {
       await captureViewport(page, 'home-1280.png');
     });
 
+    test('news-innovation-week-1280', async ({ page }) => {
+      await resetAndGo(page, '#news/innovation-week');
+      await captureViewport(page, 'news-innovation-week-1280.png');
+    });
+
     test('participate-polls-1280', async ({ page }) => {
       await resetAndGo(page, '#participate');
       await captureViewport(page, 'participate-polls-1280.png');
