@@ -297,13 +297,49 @@ window.CampusHubDemo = {
     noComments: "Student Voice does not include public comments."
   },
 
+  // Canonical content facts. Per-student read state lives in state.notificationReadIds;
+  // these fixture values only describe the deterministic reset defaults.
   notifications: [
-    { id:"notification-poll-closing", group:"Today", title:"Poll closing soon", body:"“Cleanliness of restrooms” closes tomorrow — your response is still pending.", time:"09:12", unread:true, type:"poll", href:"#participate" },
-    { id:"notification-event-reminder", group:"Today", title:"Event reminder", body:"Guild Public Debate is tomorrow at 2:00 PM — Senate Building Auditorium.", time:"08:30", unread:true, type:"event", href:"#events/guild-debate" },
-    { id:"notification-opportunity-deadline", group:"Yesterday", title:"Opportunity deadline", body:"Research Assistant — Climate Resilience: 3 days left to apply.", time:"19:40", unread:false, type:"opportunity", href:"#opportunities/ra-climate" },
-    { id:"notification-sports-result", group:"Yesterday", title:"Sports result", body:"MUBS 1 — 2 Makerere University (Final). Tap to see details.", time:"18:05", unread:false, type:"sports", href:"#sports/mubs-mak" },
-    { id:"notification-verification-updated", group:"This week", title:"Verification updated", body:"Your membership is now L2 — Roster Match.", time:"15 May", unread:false, type:"system", href:"#verification" },
-    { id:"notification-voice-update", group:"This week", title:"Student Voice update", body:"“Irregular water supply in Halls” is now Acknowledged.", time:"14 May", unread:false, type:"voice", href:"#voice" }
+    {
+      id: "notification-priority-rescheduled",
+      group: "Today",
+      title: "Wednesday Classes Rescheduled",
+      body: "Teaching today starts at 2:00 PM because of the Guild General Assembly.",
+      time: "09:30",
+      unread: true,
+      type: "priority",
+      href: "#home"
+    },
+    {
+      id: "notification-poll-opened",
+      group: "Today",
+      title: "New poll available",
+      body: "A new non-binding student sentiment poll is open: “How would you rate the cleanliness of public restrooms on campus?”",
+      time: "09:12",
+      unread: true,
+      type: "poll",
+      href: "#participate"
+    },
+    {
+      id: "notification-cocis-story",
+      group: "Yesterday",
+      title: "New Innovation Lab Opens at CoCIS",
+      body: "The College of Computing and Information Sciences has opened a new innovation lab.",
+      time: "19 May",
+      unread: false,
+      type: "publication",
+      href: "#news/cocis-innovation-lab"
+    },
+    {
+      id: "notification-verification-updated",
+      group: "This Week",
+      title: "Verification updated",
+      body: "Your membership is now L2 — Roster Match.",
+      time: "18 May",
+      unread: false,
+      type: "verification",
+      href: "#verification"
+    }
   ],
 
   quiz: {

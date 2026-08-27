@@ -38,6 +38,8 @@
   const DISCOVER_SYSTEM_STATES = Object.freeze(["ready", "loading", "error", "offline"]);
   const discoverSearchState = { query:"", filter:"All" };
   let discoverSystemState = "ready";
+  // Test-only notification fixtures never alter the canonical content dataset.
+  let notificationTestMode = null;
   let meSavesOpen = false;
   let meRsvpsOpen = false;
 
@@ -684,6 +686,13 @@
     title.focus({preventScroll:true});
   }
 
+  function focusNotificationsTitle(){
+    const title = $('#notifTitle');
+    if(!title) return;
+    title.focus({preventScroll:true});
+    title.scrollIntoView({block:"start", behavior:"auto"});
+  }
+
   function renderVoiceDetail(issueId){
     const selected = selectVoiceIssue(issueId || participationState().selectedVoiceIssueId);
     if(!selected) return null;
@@ -801,41 +810,146 @@
   }
 
   // Notifications
+  const NOTIFICATION_GROUPS = Object.freeze(["Today", "Yesterday", "This Week", "Earlier"]);
+  const NOTIFICATION_ICON_TYPES = Object.freeze({ priority:"brand", poll:"brand", publication:"info", verification:"neutral" });
+
+  function notificationDefaultReadIds(){
+    return (Array.isArray(D.notifications) ? D.notifications : [])
+      .filter(notification => notification && notification.unread === false)
+      .map(notification => notification.id)
+      .filter(id => typeof id === "string" && id);
+  }
+
+  function notificationFixtureList(){
+    if(notificationTestMode === "empty") return [];
+    if(notificationTestMode === "unavailable"){
+      return [
+        ...(Array.isArray(D.notifications) ? D.notifications : []),
+        {
+          id: "notification-source-unavailable",
+          group: "Earlier",
+          title: "Campus story unavailable",
+          body: "The campus story that generated this notice is no longer published.",
+          time: "12 May",
+          unread: false,
+          type: "publication",
+          available: false,
+          href: "#news/removed-story"
+        }
+      ];
+    }
+    return Array.isArray(D.notifications) ? D.notifications : [];
+  }
+
+  function isNotificationUnread(notification, state=participationState()){
+    if(!notification || typeof notification.id !== "string") return false;
+    return Array.isArray(state?.notificationReadIds)
+      ? !state.notificationReadIds.includes(notification.id)
+      : notification.unread === true;
+  }
+
+  function notificationDestination(notification){
+    if(!notification || notification.available === false) return null;
+    const href = typeof notification.href === "string" ? notification.href : "";
+    if(href === "#home" || href === "#participate" || href === "#verification") return href;
+    const match = href.match(/^#news\/([^/?#]+)$/i);
+    if(match){
+      try{
+        if(findPublication(decodeURIComponent(match[1]))) return href;
+      }catch(error){}
+    }
+    return null;
+  }
+
+  function notificationIcon(type){
+    const iconType = NOTIFICATION_ICON_TYPES[type] || "neutral";
+    const icon = type === "priority"
+      ? '<path d="M4 11h5l6-3v8l-6-3H4z"/><path d="M9 14l1.2 5"/><circle cx="19" cy="8" r="1.5" fill="currentColor" stroke="none"/>'
+      : type === "poll"
+        ? '<path d="M5 5h14v14H5z"/><path d="M8 9h8M8 12h5M8 15h8"/>'
+        : type === "publication"
+          ? '<path d="M5 4h14v16H5z"/><path d="M8 8h8M8 12h8M8 16h5"/>'
+          : '<path d="M12 3l7 3v5c0 4.5-3 7.8-7 10-4-2.2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/>';
+    return `<span class="notification-icon notification-icon--${iconType}" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${icon}</svg></span>`;
+  }
+
+  function syncNotificationBell(unread){
+    const badge = $('#notifBadge');
+    const button = $('#notifBtn');
+    if(badge){
+      badge.textContent = String(unread);
+      badge.style.display = unread ? 'grid' : 'none';
+    }
+    if(button) button.setAttribute('aria-label', unread ? `Notifications, ${unread} unread` : 'Notifications');
+  }
+
+  function markNotificationRead(notificationId){
+    const notification = D.notifications.find(item => item?.id === notificationId);
+    if(!notification) return false;
+    const state = participationState();
+    if(!Array.isArray(state.notificationReadIds)) state.notificationReadIds = notificationDefaultReadIds();
+    if(state.notificationReadIds.includes(notificationId)) return false;
+    state.notificationReadIds = [...state.notificationReadIds, notificationId];
+    saveState(state);
+    renderNotifications();
+    return true;
+  }
+
+  function markAllNotificationsRead(){
+    const state = participationState();
+    const ids = D.notifications.map(notification => notification?.id).filter(id => typeof id === "string" && id);
+    const current = new Set(Array.isArray(state.notificationReadIds) ? state.notificationReadIds : notificationDefaultReadIds());
+    const changed = ids.some(id => !current.has(id));
+    if(!changed) return false;
+    ids.forEach(id => current.add(id));
+    state.notificationReadIds = [...current];
+    saveState(state);
+    renderNotifications();
+    return true;
+  }
+
   function renderNotifications(){
     const wrap = $('#notifList');
-    const groups = ["Today","Yesterday","This week","Earlier"];
-    const unread = D.notifications.filter(n=>n.unread).length;
-    $('#notifBadge').textContent = unread;
-    $('#notifBadge').style.display = unread? 'grid':'none';
-    $('#notifBtn').setAttribute('aria-label', unread? `Notifications, ${unread} unread` : 'Notifications');
+    if(!wrap) return;
+    const state = participationState();
+    const notifications = notificationFixtureList();
+    const unread = notifications.filter(notification => isNotificationUnread(notification, state)).length;
+    syncNotificationBell(unread);
+    const markAll = $('#markAllRead');
+    if(markAll) markAll.disabled = unread === 0;
+
+    if(!notifications.length){
+      wrap.innerHTML = '<p class="notification-empty">No notifications yet.</p>';
+      return;
+    }
 
     let html = "";
-    groups.forEach(g=>{
-      const items = D.notifications.filter(n=> n.group===g);
+    NOTIFICATION_GROUPS.forEach(group => {
+      const items = notifications.filter(notification => notification.group === group);
       if(!items.length) return;
-      html += `<div class="group-title">${escapeHtml(g)}</div>`;
-      items.forEach(n=>{
-        html += `<article class="card list-card" style="display:flex; gap:12px; align-items:flex-start;">
-          <span class="${n.unread?'notif-dot':'notif-dot notif-dot--read'}" aria-hidden="true"></span>
-          <div style="flex:1; min-width:0;">
-            <div style="display:flex; justify-content:space-between; gap:8px;">
-              <span class="small-card-title">${escapeHtml(n.title)}</span>
-              <span class="meta" style="white-space:nowrap;">${escapeHtml(n.time)}</span>
-            </div>
-            <p class="body-sm" style="margin:4px 0 0;">${escapeHtml(n.body)}</p>
-            <a href="${n.href}" class="section-action" style="margin-top:6px; font-size:12px;">Open →</a>
-          </div>
-        </article>`;
+      const groupId = `notif-group-${group.toLowerCase().replace(/\s+/g, '-')}`;
+      html += `<section class="notification-group" aria-labelledby="${groupId}"><h2 id="${groupId}" class="notification-group-title">${escapeHtml(group)}</h2><ul class="notification-list">`;
+      items.forEach(notification => {
+        const unreadItem = isNotificationUnread(notification, state);
+        const destination = notificationDestination(notification);
+        const itemClass = `notification-row${unreadItem ? ' notification-row--unread' : ''}`;
+        const stateText = unreadItem ? "Unread notification" : "Read notification";
+        const content = `${notificationIcon(notification.type)}<span class="notification-content"><span class="notification-title">${escapeHtml(notification.title)}</span><span class="notification-body">${escapeHtml(notification.body)}</span><span class="notification-state visually-hidden">${stateText}</span>${destination ? '' : '<span class="notification-state">No longer available.</span>'}</span><span class="notification-status"><span class="notification-time">${escapeHtml(notification.time)}</span><span class="notif-dot${unreadItem ? '' : ' notif-dot--read'}" aria-hidden="true"></span></span>`;
+        if(destination){
+          html += `<li class="notification-item ${itemClass}"><a class="notification-link" href="${escapeHtml(destination)}" data-notification-id="${escapeHtml(notification.id)}">${content}</a></li>`;
+        } else {
+          html += `<li class="notification-item ${itemClass}"><div class="notification-unavailable" data-notification-id="${escapeHtml(notification.id)}">${content}</div></li>`;
+        }
       });
+      html += '</ul></section>';
     });
-    if(!D.notifications.length) html = `<div class="empty">No notifications</div>`;
     wrap.innerHTML = html;
-    // add click handlers to mark read on open
-    $$('#notifList a').forEach(a=> a.addEventListener('click', (e)=>{
-      const title = e.currentTarget.closest('.card').querySelector('.title').textContent.trim();
-      const n = D.notifications.find(x=> x.title===title);
-      if(n) n.unread = false;
-      // allow navigation
+    $$('[data-notification-id][href]', wrap).forEach(link => link.addEventListener('click', event => {
+      const destination = link.getAttribute('href');
+      const notificationId = link.getAttribute('data-notification-id');
+      event.preventDefault();
+      markNotificationRead(notificationId);
+      if(destination) location.hash = destination;
     }));
   }
 
@@ -1215,6 +1329,20 @@
     if(typeof state.saveEvent !== "boolean") state.saveEvent = false;
     if(typeof state.saveOpp !== "boolean") state.saveOpp = false;
     if(state.rsvp !== "going" && state.rsvp !== "interested") state.rsvp = null;
+
+    // Notification content is canonical; only the student's read receipts are
+    // persisted. Migrate the pre-8O notifsRead shape without clearing state.
+    const notificationIds = new Set((Array.isArray(D.notifications) ? D.notifications : [])
+      .map(notification => notification?.id)
+      .filter(id => typeof id === "string" && id));
+    if(!Array.isArray(state.notificationReadIds)){
+      const legacyReadIds = Array.isArray(state.notifsRead)
+        ? state.notifsRead.filter(id => notificationIds.has(id))
+        : [];
+      state.notificationReadIds = [...new Set([...notificationDefaultReadIds(), ...legacyReadIds])];
+    }
+    state.notificationReadIds = [...new Set(state.notificationReadIds.filter(id => notificationIds.has(id)))];
+    delete state.notifsRead;
 
     Object.keys(membershipDefaults).forEach(key=>{
       if(state.membership[key]===undefined || state.membership[key]===null) state.membership[key] = membershipDefaults[key];
@@ -2237,6 +2365,7 @@
   let pendingQuizFocus = false;
   let pendingVerificationFocus = false;
   let pendingPrivacyFocus = false;
+  let pendingNotificationsFocus = false;
   let pendingNewsDetailFocus = false;
   let pendingSportsDetailFocus = false;
   let pendingEventDetailFocus = false;
@@ -2261,6 +2390,7 @@
     if(target==="voice-new") renderVoiceComposer();
     if(target==="voice-detail") renderVoiceDetail();
     if(target==="verification") syncVerificationUi();
+    if(target==="notifications") renderNotifications();
     if(target==="me") renderMe(participationState());
     // Secondary screens inherit the active primary destination.
     const primary = primaryTabs.includes(target) ? target : (parentPrimaryTabs[target] || null);
@@ -2300,6 +2430,9 @@
     } else if(target==="privacy" && pendingPrivacyFocus){
       pendingPrivacyFocus = false;
       setTimeout(focusPrivacyTitle, 60);
+    } else if(target==="notifications" && pendingNotificationsFocus){
+      pendingNotificationsFocus = false;
+      setTimeout(focusNotificationsTitle, 60);
     } else if(target==="voice-new" && pendingVoiceComposerFocus){
       pendingVoiceComposerFocus = false;
       const action = pendingVoiceComposerAction;
@@ -2409,6 +2542,7 @@
     }
     if(h==="verification") pendingVerificationFocus = true;
     if(h==="privacy") pendingPrivacyFocus = true;
+    if(h==="notifications") pendingNotificationsFocus = true;
     showView(h);
   }
 
@@ -2921,7 +3055,7 @@
         saveEvent:false, saveOpp:false,
         reportedOpportunityIds: [],
         saves: D.saves.slice(),
-        notifsRead: []
+        notificationReadIds: notificationDefaultReadIds()
       };
     } else {
       hadLegacyVoiceDraft = Object.prototype.hasOwnProperty.call(state, 'voiceDraft');
@@ -3015,7 +3149,7 @@
         D.student.xp = 340;
         if(D.demoConfig?.calendar) D.demoConfig.calendar.isInRecess = false;
         D.voiceIssues[0].supporters = 124;
-        D.notifications.forEach((n,i)=> n.unread = i<2);
+        notificationTestMode = null;
         const state = participationState();
         state.membership = { ...defaultMembership() };
         state.participation = { ...defaultParticipation(), demoScenario:"normal", returnTo:null, returnAction:null };
@@ -3030,6 +3164,7 @@
         state.voiceStatusScenario = null;
         state.selectedVoiceIssueId = "voice-water-halls";
         state.supportedVoiceIssues = [];
+        state.notificationReadIds = notificationDefaultReadIds();
         state.streakState = { count:3, lastQualifiedTenantDay:"2026-05-19" };
         state.xp = 340;
         state.level = studentLevelForXp(state.xp).level;
@@ -3089,6 +3224,14 @@
         }
         discoverSystemState = name;
         renderDiscover();
+      },
+      setNotificationScenario(name){
+        const normalized = name === "normal" ? null : name;
+        if(normalized !== null && !["empty", "unavailable"].includes(normalized)){
+          throw new TypeError(`Unknown Notifications test scenario: ${name}`);
+        }
+        notificationTestMode = normalized;
+        renderNotifications();
       }
     };
     if(debugEnabled){
@@ -3135,12 +3278,9 @@
     initParticipationGate();
     initDebug();
 
-    // Notif bell -> notifications view
-    $('#notifBtn').addEventListener('click', ()=> location.hash="#notifications");
+    // The header bell is the only Notifications entry point.
     $('#markAllRead')?.addEventListener('click', ()=>{
-      D.notifications.forEach(n=> n.unread=false);
-      renderNotifications();
-      toast("All notifications marked read.");
+      if(markAllNotificationsRead()) toast("All notifications marked read.");
     });
 
     // Student Voice entry points reuse the existing participation-gate decision path.

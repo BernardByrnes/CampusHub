@@ -242,6 +242,11 @@ test.describe('Phase 7D canonical visual regression baselines', () => {
       await captureMobileViewport(page, 'privacy-390.png');
     });
 
+    test('notifications-390', async ({ page }) => {
+      await resetAndGo(page, '#notifications');
+      await captureMobileViewport(page, 'notifications-390.png');
+    });
+
     test('event-guild-debate-390', async ({ page }) => {
       await resetAndGo(page, '#events/guild-debate');
       await captureMobileViewport(page, 'event-guild-debate-390.png');
@@ -399,6 +404,11 @@ test.describe('Phase 7D canonical visual regression baselines', () => {
     test('privacy-1280', async ({ page }) => {
       await resetAndGo(page, '#privacy');
       await captureViewport(page, 'privacy-1280.png');
+    });
+
+    test('notifications-1280', async ({ page }) => {
+      await resetAndGo(page, '#notifications');
+      await captureViewport(page, 'notifications-1280.png');
     });
   });
 
