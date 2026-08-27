@@ -2,6 +2,10 @@ import { expect, test } from '@playwright/test';
 
 const innovationTitle = 'Makerere Innovation Week opens Monday';
 const cocisTitle = 'New Innovation Lab Opens at CoCIS';
+const innovationImageSrc = /assets\/images\/hero-innovation\.webp$/;
+const innovationImageAlt = 'A group collaborating around a project planning board';
+const cocisImageSrc = /assets\/images\/campus-cocis\.webp$/;
+const cocisImageAlt = 'Students walking through a university courtyard';
 
 async function goTo(page, hash) {
   await page.goto(`/${hash}`);
@@ -35,6 +39,15 @@ async function expectLoadedImage(page) {
   }));
   expect(imageState.complete).toBe(true);
   expect(imageState.naturalWidth).toBeGreaterThan(0);
+}
+
+async function expectPublicationImage(page, src, alt) {
+  const image = page.locator('#newsDetailImage');
+  await expect(image).toHaveAttribute('src', src);
+  await expect(image).toHaveAttribute('alt', alt);
+  await expect(image).toHaveAttribute('loading', 'lazy');
+  await expect(image).toHaveAttribute('decoding', 'async');
+  await expectLoadedImage(page);
 }
 
 function captureRuntimeErrors(page) {
@@ -78,7 +91,7 @@ test.describe('Phase 4 publication detail routing', () => {
     await expect(page.locator('#newsDetailDate')).toHaveText('25 May 2026');
     await expect(page.locator('#newsDetailSource')).toHaveText('CampusHub editorial');
     await expect(page.locator('#view-news h1')).toHaveCount(1);
-    await expectLoadedImage(page);
+    await expectPublicationImage(page, innovationImageSrc, innovationImageAlt);
     await expectDiscoverNav(page);
     await expectNoHorizontalOverflow(page, '#news/innovation-week');
     expect(new URL(page.url()).hash).toBe('#news/innovation-week');
@@ -96,7 +109,7 @@ test.describe('Phase 4 publication detail routing', () => {
     );
     await expect(page.locator('#newsDetailDate')).toHaveText('19 May 2026');
     await expect(page.locator('#newsDetailSource')).toHaveText('CoCIS');
-    await expectLoadedImage(page);
+    await expectPublicationImage(page, cocisImageSrc, cocisImageAlt);
     await expectDiscoverNav(page);
     await expectNoHorizontalOverflow(page, '#news/cocis-innovation-lab');
     expect(new URL(page.url()).hash).toBe('#news/cocis-innovation-lab');
@@ -137,6 +150,8 @@ test.describe('Phase 4 publication detail routing', () => {
 
   test('Home Innovation Week hero opens the canonical publication route', async ({ page }) => {
     await goTo(page, '#home');
+    await expect(page.locator('#heroImg')).toHaveAttribute('src', innovationImageSrc);
+    await expect(page.locator('#heroImg')).toHaveAttribute('alt', innovationImageAlt);
     await page.locator('[data-testid="hero-read"]').click();
 
     await expect(page.locator('#view-news')).toBeVisible();
@@ -152,6 +167,8 @@ test.describe('Phase 4 publication detail routing', () => {
   test('Discover CoCIS story opens its publication detail and returns to Discover', async ({ page }) => {
     await goTo(page, '#discover');
     const storyCard = page.locator('#discoverList article').filter({ hasText: cocisTitle });
+    await expect(storyCard.locator('img')).toHaveAttribute('src', cocisImageSrc);
+    await expect(storyCard.locator('img')).toHaveAttribute('alt', cocisImageAlt);
     await storyCard.getByRole('link', { name: /Read more/ }).click();
 
     await expect(page.locator('#view-news')).toBeVisible();

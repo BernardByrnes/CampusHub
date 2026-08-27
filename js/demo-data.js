@@ -73,7 +73,7 @@ window.CampusHubDemo = {
       date: "25 May 2026",
       source: "CampusHub editorial",
       image: "assets/images/hero-innovation.webp",
-      imageAlt: "Students collaborating on a campus project",
+      imageAlt: "A group collaborating around a project planning board",
       visibility: "MEMBERS",
       cta: "Read story",
       href: "#news/innovation-week"
@@ -87,7 +87,7 @@ window.CampusHubDemo = {
       date: "19 May 2026",
       source: "CoCIS",
       image: "assets/images/campus-cocis.webp",
-      imageAlt: "Modern academic building with glass facade",
+      imageAlt: "Students walking through a university courtyard",
       visibility: "MEMBERS",
       href: "#news/cocis-innovation-lab"
     }
