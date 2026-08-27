@@ -851,41 +851,100 @@
 
       <!-- PRIVACY -->
       <section id="view-privacy" data-view="privacy" class="view" role="tabpanel" aria-label="Privacy and transparency" hidden>
-        <div class="view-head" style="display:flex; align-items:center; gap:10px;">
-          <button class="icon-btn" data-back aria-label="Back" style="width:36px; height:36px;">‹</button>
-          <div><h1 class="view-title">Privacy &amp; transparency</h1><p class="view-sub" style="margin-top:2px;">Plain language, before you register.</p></div>
-        </div>
-        <article class="card card-pad prose">
-          <h2>What we collect</h2>
-          <p>Account contact (email/phone), display name, and — when you verify — the roster attributes your university supplies (student number, faculty, programme, campus, year). We do not collect date of birth for advertising.</p>
-
-          <h2>Who can see what</h2>
-          <ul>
-            <li><strong>Other students:</strong> display name and campus only — no contact details, no poll answers, no Voice identity.</li>
-            <li><strong>Guild administrators:</strong> aggregated counts and trends — not how a named student responded to a poll.</li>
-            <li><strong>University officials:</strong> constrained official view — counts, category-level Voice statistics — no individual answers or Voice submitter identity.</li>
-            <li><strong>Sponsors:</strong> never receive student personal data.</li>
-          </ul>
-
-          <h2>Poll privacy</h2>
-          <p>CampusHub does not provide Guild or university users with a way to see how a named student responded to a poll. Results are shown only when privacy thresholds are met.</p>
-
-          <h2>Student Voice identity</h2>
-          <p>Your identity is visible only to authorised handlers and is not shared publicly. Every access is audited. Student Voice is not anonymous — it is accountable.</p>
-
-          <h2>University official access</h2>
-          <p>Limited to official notices where the licence grants it, plus the constrained analytics view. No individual poll answers, no Voice submitter identity, no member contact exports, no audit-log editing.</p>
-
-          <h2>Sponsors</h2>
-          <p>Prohibited categories (betting, predatory lending and others) never appear. No assurance-level or behavioural targeting. Sponsors never receive student personal data.</p>
-
-          <h2>Your rights</h2>
-          <p>You can request your data and request deletion. Deletion preserves auditable history where required and removes public availability. We cannot remotely delete files already downloaded to unmanaged devices.</p>
-
-          <div style="display:flex; gap:8px; margin-top:14px;">
-            <button class="btn btn--soft btn--small" style="flex:1;">Request my data</button>
-            <button class="btn btn--small" style="flex:1;">Request deletion</button>
+        <div class="view-head privacy-subheader">
+          <button class="icon-btn privacy-back" data-back aria-label="Back">‹</button>
+          <div class="privacy-heading">
+            <h1 id="privacyTitle" class="view-title" tabindex="-1">Privacy &amp; transparency</h1>
+            <p class="view-sub">What CampusHub collects, who can see it and the choices you have.</p>
+            <p class="privacy-updated">Last updated: 20 May 2026</p>
           </div>
+        </div>
+
+        <article class="card card-pad prose privacy-card" aria-label="Privacy and transparency details">
+          <section class="privacy-section" aria-labelledby="privacyCollectHeading">
+            <h2 id="privacyCollectHeading">What we collect</h2>
+            <p>CampusHub Pilot collects information needed to run your active university membership and the features you choose to use.</p>
+
+            <h3>Account and profile information</h3>
+            <ul>
+              <li>Display name and the email or phone used for your account.</li>
+            </ul>
+
+            <h3>Membership and verification information</h3>
+            <ul>
+              <li>Student number, faculty or college, programme, year, campus and residence where supplied/relevant.</li>
+              <li>Assurance / verification history, plus membership state.</li>
+            </ul>
+
+            <h3>CampusHub activity</h3>
+            <ul>
+              <li>Saves, RSVPs, notifications, XP, Level and Streak.</li>
+              <li>Whether you participated in a poll, Student Voice submissions where you use Voice, and login or security history where applicable.</li>
+            </ul>
+
+            <p><strong>Why:</strong> Account information runs the account and lets CampusHub contact you where needed. Membership and verification information puts you in the right university and campus context and supports eligibility decisions. Activity information makes the features you use work and keeps your own CampusHub history and state.</p>
+            <p class="privacy-note">CampusHub Pilot does not collect your date of birth.</p>
+          </section>
+
+          <section class="privacy-section" aria-labelledby="privacyVisibilityHeading">
+            <h2 id="privacyVisibilityHeading">Who can see what</h2>
+            <p>Access depends on the role and active university membership involved.</p>
+            <ul>
+              <li><strong>Other students:</strong> do not get your contact details, individual poll answers or Student Voice identity through CampusHub. CampusHub does not provide a student directory.</li>
+              <li><strong>Guild administrators:</strong> can access the membership and verification information needed to run CampusHub under their permissions. Authorised support lookups are limited and audited; they can show display name, assurance level, verification history, membership state and XP total. Contact details are not shown by default, and routine contact-detail bulk export is not available by default.</li>
+              <li><strong>Guild administrators cannot see</strong> individual poll answers, Voice content authored or quiz answers through a support lookup.</li>
+            </ul>
+          </section>
+
+          <section class="privacy-section" aria-labelledby="privacyPollHeading">
+            <h2 id="privacyPollHeading">Poll privacy</h2>
+            <p class="privacy-core">CampusHub does not provide Guild or university users with a way to see how a named student responded to a poll. Results are shown only when privacy thresholds are met.</p>
+            <p>CampusHub knows that you participated in a poll so it can enforce one participation (one response), calculate turnout and award participation XP. That participation knowledge does not expose which answer you selected through CampusHub functionality.</p>
+          </section>
+
+          <section class="privacy-section" aria-labelledby="privacyVoiceHeading">
+            <h2 id="privacyVoiceHeading">Student Voice identity</h2>
+            <p>Your identity is not shown publicly. Student Voice is pseudonymous to other students, but it is not anonymous to authorised handlers.</p>
+            <p>Only an authorised Voice handler with separately granted identity access may reveal the submitter identity. That reveal requires a recorded reason, and every identity access is audited.</p>
+            <p>University Officials do not receive Student Voice submitter identity.</p>
+          </section>
+
+          <section class="privacy-section" aria-labelledby="privacyOfficialHeading">
+            <h2 id="privacyOfficialHeading">University official access</h2>
+            <p>University Officials have only the scoped access granted under the licence. Where licensed, they may publish official notices.</p>
+            <p>They do not receive individual poll answers, Student Voice submitter identity, individual member behavioural records or member contact exports. They cannot edit the audit log.</p>
+            <p>Where a constrained official analytics view is provided, it is limited to counts, trends and category-level Student Voice statistics.</p>
+          </section>
+
+          <section class="privacy-section" aria-labelledby="privacySponsorsHeading">
+            <h2 id="privacySponsorsHeading">Sponsors</h2>
+            <p>Sponsors do not receive named individual student information through CampusHub. Sponsors do not receive student personal data.</p>
+            <p>Sponsors cannot target by assurance, poll participation, Student Voice, quiz activity, browsing behaviour or other prohibited behavioural or personal dimensions.</p>
+            <p>Betting and predatory-lending sponsorship is prohibited.</p>
+          </section>
+
+          <section class="privacy-section" aria-labelledby="privacyRightsHeading">
+            <h2 id="privacyRightsHeading">Your rights</h2>
+            <h3>Access</h3>
+            <p>You can request a copy of your personal data for this active university membership: your profile; membership and verification history; XP ledger and Streak; Saves, Follows and RSVPs; Student Voice issues you authored; notifications; and login history. It excludes another person’s data and individual ballots.</p>
+
+            <h3>Correction</h3>
+            <p>Information you supplied can be corrected through the appropriate profile flow. University or roster-derived fields cannot simply be overwritten by you; they require a correction request.</p>
+
+            <h3>Deletion</h3>
+            <p>A CampusHub membership deletion applies to the active university membership and may delete your profile, contact details, XP ledger, Saves, Follows, RSVPs, notifications and login history. Closing the global CampusHub user account is a separate action.</p>
+            <p>A published Student Voice issue and its status history may remain as an anonymised institutional record after a membership deletion, subject to the final legal position. Aggregate counts may remain, and required audit entries remain for security and accountability.</p>
+            <p>Public harmful content can be removed, restricted or redacted; the audit record of what happened remains.</p>
+
+            <h3>How to exercise these rights</h3>
+            <p>Use the data-rights contact in the Privacy Notice provided during registration to request access, correction or deletion. Pilot fulfilment may be assisted by staff rather than fully automated.</p>
+          </section>
+
+          <section class="privacy-section" aria-labelledby="privacyLimitsHeading">
+            <h2 id="privacyLimitsHeading">Limits we are honest about</h2>
+            <p class="privacy-limit">We cannot remotely delete files already downloaded to unmanaged devices.</p>
+            <p>CampusHub keeps information needed to operate the active membership and the features you use. Security and audit records required for accountability may remain after normal profile deletion. Published Voice history may remain anonymised as described above. CampusHub does not promise remote deletion of unmanaged downloaded copies.</p>
+          </section>
         </article>
       </section>
 

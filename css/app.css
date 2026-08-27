@@ -49,10 +49,22 @@
 .detail-hero--text { padding:0; border:0; background: transparent; }
 
 /* Privacy typography */
-.prose h2 { font-size:var(--type-card-size); font-weight:var(--type-card-weight); letter-spacing:var(--type-card-tracking); margin:18px 0 6px; color: var(--text-strong); }
-.prose h3 { font-size:var(--type-chip-size); font-weight:var(--type-kicker-weight); letter-spacing:var(--type-kicker-tracking); text-transform:uppercase; color: var(--text-strong); margin:16px 0 8px; }
-.prose p, .prose li { font-size:var(--type-body-size); color: var(--text-muted); line-height:1.6; }
-.prose ul { padding-left: 18px; margin: 8px 0; }
+.privacy-subheader { display:flex; align-items:flex-start; gap:10px; }
+.privacy-back { flex:0 0 var(--control-min-h); width:var(--control-min-h); height:var(--control-min-h); }
+.privacy-heading { min-width:0; }
+.privacy-updated { margin:6px 0 0; font-size:12px; color:var(--text-muted); line-height:1.4; }
+.privacy-card { margin-top:2px; }
+.privacy-section + .privacy-section { margin-top:22px; padding-top:20px; border-top:1px solid var(--border); }
+.privacy-section h2 { font-size:15px; font-weight:700; letter-spacing:-.005em; margin:0 0 7px; color:var(--text-strong); }
+.privacy-section h3 { font-size:12.5px; font-weight:700; letter-spacing:.01em; color:var(--text-strong); margin:14px 0 5px; }
+.privacy-section p, .privacy-section li { font-size:var(--type-body-size); color:var(--text-muted); line-height:1.58; overflow-wrap:anywhere; }
+.privacy-section p { margin:8px 0 0; }
+.privacy-section ul { padding-left:18px; margin:7px 0 0; }
+.privacy-section li + li { margin-top:5px; }
+.privacy-section strong { color:var(--text-strong); }
+.privacy-note { color:var(--text) !important; }
+.privacy-core { margin-top:10px !important; padding:12px; border-left:3px solid var(--brand); border-radius:var(--inner-radius); background:var(--tenant-softer); color:var(--text) !important; }
+.privacy-limit { color:var(--text-strong) !important; font-weight:700; }
 
 /* Save toggle */
 .save-btn[aria-pressed="true"] { background: var(--brand-soft); border-color: var(--brand-border); color: var(--brand); }

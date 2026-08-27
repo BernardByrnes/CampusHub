@@ -678,6 +678,12 @@
     title.scrollIntoView({block:"start", behavior:"auto"});
   }
 
+  function focusPrivacyTitle(){
+    const title = $('#privacyTitle');
+    if(!title) return;
+    title.focus({preventScroll:true});
+  }
+
   function renderVoiceDetail(issueId){
     const selected = selectVoiceIssue(issueId || participationState().selectedVoiceIssueId);
     if(!selected) return null;
@@ -2230,6 +2236,7 @@
   let pendingRsvpAction = null;
   let pendingQuizFocus = false;
   let pendingVerificationFocus = false;
+  let pendingPrivacyFocus = false;
   let pendingNewsDetailFocus = false;
   let pendingSportsDetailFocus = false;
   let pendingEventDetailFocus = false;
@@ -2290,6 +2297,9 @@
     } else if(target==="verification" && pendingVerificationFocus){
       pendingVerificationFocus = false;
       setTimeout(focusVerificationTitle, 60);
+    } else if(target==="privacy" && pendingPrivacyFocus){
+      pendingPrivacyFocus = false;
+      setTimeout(focusPrivacyTitle, 60);
     } else if(target==="voice-new" && pendingVoiceComposerFocus){
       pendingVoiceComposerFocus = false;
       const action = pendingVoiceComposerAction;
@@ -2398,6 +2408,7 @@
       pendingVoiceComposerFocus = true;
     }
     if(h==="verification") pendingVerificationFocus = true;
+    if(h==="privacy") pendingPrivacyFocus = true;
     showView(h);
   }
 
