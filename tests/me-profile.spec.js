@@ -14,6 +14,19 @@ async function readState(page) {
   return page.evaluate(key => JSON.parse(localStorage.getItem(key) || 'null'), STATE_KEY);
 }
 
+async function applyStudentProgressState(page, xp, level) {
+  await page.evaluate(({ key, xp: nextXp, level: nextLevel }) => {
+    const state = JSON.parse(localStorage.getItem(key) || '{}');
+    state.xp = nextXp;
+    if (nextLevel === null) delete state.level;
+    else state.level = nextLevel;
+    localStorage.setItem(key, JSON.stringify(state));
+  }, { key: STATE_KEY, xp, level });
+  await page.reload();
+  await page.goto('/#me');
+  await expect(page.locator('#view-me')).toBeVisible();
+}
+
 test.describe('Phase 8M canonical Me profile and activity coherence', () => {
   test.beforeEach(async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'canonical-mobile', 'Me contract coverage runs once at canonical-mobile.');
@@ -138,6 +151,60 @@ test.describe('Phase 8M canonical Me profile and activity coherence', () => {
     await expect(page.locator('[data-field="meLevelXp"]')).toHaveText('Level 4 • 345 XP');
     await expect(page.locator('#meActivity [data-field="mePlayLevel"]')).toHaveText('Level 4');
     await expect(page.locator('#meActivity [data-field="meStreak"]')).toHaveText('Streak 4 days');
+  });
+
+  test('keeps Me, Play, and Home on one threshold-derived level with a non-decreasing floor', async ({ page }) => {
+    await applyStudentProgressState(page, 499, 4);
+    await expect(page.locator('[data-field="meLevelXp"]')).toHaveText('Level 4 • 499 XP');
+    expect((await readState(page)).level).toBe(4);
+
+    await applyStudentProgressState(page, 500, 4);
+    await expect(page.locator('[data-field="meLevelXp"]')).toHaveText('Level 5 • 500 XP');
+    await expect(page.locator('#meActivity [data-field="mePlayLevel"]')).toHaveText('Level 5');
+    expect((await readState(page)).level).toBe(5);
+
+    await page.goto('/#play');
+    await expect(page.locator('[data-field="levelDisplay"]')).toHaveText('Level 5');
+    await expect(page.locator('[data-field="levelTitle"]')).toHaveText('Campus Leader');
+    await expect(page.locator('[data-field="xpCount"]')).toHaveText('500');
+    await expect(page.locator('[data-field="xpNext"]')).toHaveText('Max level');
+
+    await page.goto('/#home');
+    await expect(page.locator('#homePlaySummary [data-field="homeLevel"]')).toHaveText('Level 5');
+    await expect(page.locator('#homePlaySummary [data-field="homeXp"]')).toHaveText('500 XP');
+
+    // A permitted correction can lower XP, but a reached level remains grandfathered.
+    await applyStudentProgressState(page, 340, 5);
+    await expect(page.locator('[data-field="meLevelXp"]')).toHaveText('Level 5 • 340 XP');
+    await expect(page.locator('#meActivity [data-field="mePlayLevel"]')).toHaveText('Level 5');
+    await page.goto('/#play');
+    await expect(page.locator('[data-field="levelDisplay"]')).toHaveText('Level 5');
+    await page.goto('/#home');
+    await expect(page.locator('#homePlaySummary [data-field="homeLevel"]')).toHaveText('Level 5');
+
+    await page.evaluate(() => window.CampusHubDebug.resetDemo());
+    await page.goto('/#me');
+    await expect(page.locator('[data-field="meLevelXp"]')).toHaveText('Level 4 • 340 XP');
+    await page.goto('/#play');
+    await expect(page.locator('[data-field="levelDisplay"]')).toHaveText('Level 4');
+    await page.goto('/#home');
+    await expect(page.locator('#homePlaySummary [data-field="homeLevel"]')).toHaveText('Level 4');
+    expect(await readState(page)).toMatchObject({ xp:340, level:4 });
+  });
+
+  test('migrates an XP-only legacy state to the threshold-derived level without a reset', async ({ page }) => {
+    await applyStudentProgressState(page, 340, null);
+    await expect(page.locator('[data-field="meLevelXp"]')).toHaveText('Level 4 • 340 XP');
+    expect(await readState(page)).toMatchObject({ xp:340, level:4 });
+
+    await applyStudentProgressState(page, 500, null);
+    await expect(page.locator('[data-field="meLevelXp"]')).toHaveText('Level 5 • 500 XP');
+    expect(await readState(page)).toMatchObject({ xp:500, level:5 });
+
+    await page.goto('/#play');
+    await expect(page.locator('[data-field="levelDisplay"]')).toHaveText('Level 5');
+    await page.goto('/#home');
+    await expect(page.locator('#homePlaySummary [data-field="homeLevel"]')).toHaveText('Level 5');
   });
 
   test('keeps membership refresh truthful while preserving L2 assurance', async ({ page }) => {

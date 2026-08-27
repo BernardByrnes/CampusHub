@@ -263,7 +263,9 @@
 
   // Populate tenant header
   function hydrateTenant(state=participationState()){
-    syncStreakPresentation(state);
+    const normalizedState = ensureParticipationState(state || {});
+    const progress = studentProgressForState(normalizedState);
+    syncStreakPresentation(normalizedState, progress);
     $('[data-field="tenantCampus"]').textContent = D.tenant.campusLabel;
     $('[data-field="tenantYear"]').textContent = `Academic Year ${D.tenant.academicYear}`;
     // priority
@@ -313,27 +315,30 @@
     renderOpportunityEntity(D.opportunity);
     renderEventEntity(D.featuredEvent);
     // me
-    renderMe(state);
+    renderMe(normalizedState, progress);
     // play header
-    const levelInfo = D.levels.find(l=> l.level===D.student.level) || D.levels[3];
-    const next = D.levels.find(l=> l.level===D.student.level+1);
-    $('[data-field="levelDisplay"]').textContent = `Level ${D.student.level}`;
+    const levelInfo = progress.levelInfo;
+    const next = D.levels.find(l=> Number(l.level)===progress.level+1);
+    $('[data-field="levelDisplay"]').textContent = `Level ${progress.level}`;
     $('[data-field="levelTitle"]').textContent = levelInfo.title;
-    $('[data-field="xpCount"]').textContent = D.student.xp;
-    $('[data-field="xpNext"]').textContent = next ? `${next.xpMin - D.student.xp} XP to Level ${next.level}` : `Max level`;
+    $('[data-field="xpCount"]').textContent = progress.xp;
+    $('[data-field="xpNext"]').textContent = next ? `${next.xpMin - progress.xp} XP to Level ${next.level}` : `Max level`;
     $('[data-field="levelTitle"]') && void 0;
     // xp bar
-    if(next){
-      const span = next.xpMin - levelInfo.xpMin;
-      const prog = ((D.student.xp - levelInfo.xpMin)/span)*100;
-      $('#xpBar').style.width = Math.max(8, Math.min(100, prog)) + '%';
+    const xpBar = $('#xpBar');
+    if(xpBar){
+      const span = next
+        ? Number(next.xpMin) - Number(levelInfo.xpMin)
+        : Number(levelInfo.xpMax) - Number(levelInfo.xpMin) + 1;
+      const prog = span > 0 ? ((progress.xp - Number(levelInfo.xpMin))/span)*100 : 0;
+      xpBar.style.width = Math.max(8, Math.min(100, prog)) + '%';
     }
     $('[data-field="quizQ"]').textContent = D.quiz.question;
     setEntityField('[data-field="homeQuizQuestion"]', D.quiz.question);
     setEntityField('[data-field="homeQuizXpParticipation"]', `+${D.quiz.xpParticipation || 5} XP`);
     setEntityField('[data-field="homeQuizXpBonus"]', `+${D.quiz.xpBonus || 5} XP`);
-    setEntityField('[data-field="homeLevel"]', `Level ${D.student.level}`);
-    setEntityField('[data-field="homeXp"]', `${D.student.xp} XP`);
+    setEntityField('[data-field="homeLevel"]', `Level ${progress.level}`);
+    setEntityField('[data-field="homeXp"]', `${progress.xp} XP`);
   }
 
   // Discover search is deliberately bounded to the already-permitted derived index.
@@ -924,10 +929,57 @@
     `).join("");
   }
 
+  function configuredStudentLevels(){
+    return (Array.isArray(D.levels) ? D.levels : [])
+      .filter(level => level && Number.isFinite(Number(level.level)))
+      .slice()
+      .sort((a, b) => Number(a.level) - Number(b.level));
+  }
+
   function studentLevelForXp(xp){
-    const levels = Array.isArray(D.levels) ? D.levels : [];
-    const match = levels.find(level => xp >= Number(level.xpMin) && xp <= Number(level.xpMax));
-    return match || levels.slice(-1)[0] || { level:Number(D.student.level) || 1 };
+    const levels = configuredStudentLevels();
+    if(!levels.length) return { level:1, title:"", xpMin:0, xpMax:0 };
+    const parsedXp = Number(xp);
+    const normalizedXp = Number.isFinite(parsedXp) && parsedXp >= 0 ? parsedXp : 0;
+    const match = levels.find(level => normalizedXp >= Number(level.xpMin) && normalizedXp <= Number(level.xpMax));
+    if(match) return match;
+    return normalizedXp < Number(levels[0].xpMin) ? levels[0] : levels[levels.length - 1];
+  }
+
+  function studentLevelRecord(level){
+    const levels = configuredStudentLevels();
+    return levels.find(record => Number(record.level) === Number(level)) || studentLevelForXp(0);
+  }
+
+  // XP is the threshold input; the persisted level is only the highest level
+  // already reached, preserving the frozen non-decrease/grandfathering rule.
+  function studentProgressForState(state){
+    const parsedXp = Number(state?.xp);
+    const fallbackXp = Number(D.student.xp);
+    const xp = Number.isFinite(parsedXp) && parsedXp >= 0
+      ? parsedXp
+      : Number.isFinite(fallbackXp) && fallbackXp >= 0
+        ? fallbackXp
+        : 0;
+    const thresholdRecord = studentLevelForXp(xp);
+    const thresholdLevel = Number(thresholdRecord.level) || 1;
+    const levels = configuredStudentLevels();
+    const maximumLevel = levels.length ? Number(levels[levels.length - 1].level) : thresholdLevel;
+    const parsedStoredLevel = Number(state?.level);
+    const storedLevel = Number.isInteger(parsedStoredLevel) && parsedStoredLevel >= 1
+      ? Math.min(parsedStoredLevel, maximumLevel)
+      : thresholdLevel;
+    const level = Math.max(thresholdLevel, storedLevel);
+    return { xp, level, levelInfo:studentLevelRecord(level) };
+  }
+
+  function ensureStudentProgress(state){
+    const progress = studentProgressForState(state);
+    state.xp = progress.xp;
+    state.level = progress.level;
+    D.student.xp = progress.xp;
+    D.student.level = progress.level;
+    return progress;
   }
 
   function savedItems(state){
@@ -989,13 +1041,14 @@
     `;
   }
 
-  function renderMe(state=participationState()){
+  function renderMe(state=participationState(), progress=null){
     const normalizedState = ensureParticipationState(state || {});
+    const currentProgress = progress || studentProgressForState(normalizedState);
     const membershipStatus = normalizedState.membership.status === "refresh" ? "Needs refreshing" : "Current";
     D.student.assuranceLevel = normalizedState.membership.assuranceLevel;
     D.student.assurance = assuranceLabel(normalizedState.membership.assuranceLevel);
-    const level = Number(D.student.level) || 1;
-    const xp = Number(D.student.xp) || 0;
+    const level = currentProgress.level;
+    const xp = currentProgress.xp;
     const items = savedItems(normalizedState);
     const rsvpSummary = normalizedState.rsvp === "going"
       ? "1 RSVP • Going"
@@ -1151,10 +1204,7 @@
     if(!state.membership || typeof state.membership!=="object") state.membership = {};
     if(!state.participation || typeof state.participation!=="object") state.participation = {};
 
-    const parsedXp = Number(state.xp);
-    state.xp = Number.isFinite(parsedXp) && parsedXp>=0 ? parsedXp : Number(D.student.xp) || 0;
-    D.student.xp = state.xp;
-    D.student.level = studentLevelForXp(state.xp).level;
+    ensureStudentProgress(state);
     if(!Array.isArray(state.saves)) state.saves = D.saves.slice();
     if(typeof state.saveEvent !== "boolean") state.saveEvent = false;
     if(typeof state.saveOpp !== "boolean") state.saveOpp = false;
@@ -2780,8 +2830,9 @@
   }
 
   // All visible streak surfaces are synchronized from persistent state here.
-  function syncStreakPresentation(state){
+  function syncStreakPresentation(state, progress=null){
     const normalizedState = ensureStreakState(state || {});
+    const currentProgress = progress || studentProgressForState(normalizedState);
     const streak = normalizedState.streakState.count;
     const lastQualifiedTenantDay = normalizedState.streakState.lastQualifiedTenantDay;
     const calendar = D.demoConfig?.calendar || {};
@@ -2829,7 +2880,7 @@
     const homePlayLink = $('#homePlaySummary [data-testid="home-play-link"]');
     if(homePlayLink){
       homePlayLink.href = "#play";
-      homePlayLink.setAttribute("aria-label", `Open Play: Level ${D.student.level}, ${D.student.xp} XP, ${streakCopy.compact}`);
+      homePlayLink.setAttribute("aria-label", `Open Play: Level ${currentProgress.level}, ${currentProgress.xp} XP, ${streakCopy.compact}`);
     }
     return normalizedState;
   }
@@ -2970,6 +3021,7 @@
         state.supportedVoiceIssues = [];
         state.streakState = { count:3, lastQualifiedTenantDay:"2026-05-19" };
         state.xp = 340;
+        state.level = studentLevelForXp(state.xp).level;
         meSavesOpen = false;
         meRsvpsOpen = false;
         lastParticipationDecision = null;
