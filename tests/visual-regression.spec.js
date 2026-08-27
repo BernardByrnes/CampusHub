@@ -257,6 +257,16 @@ test.describe('Phase 7D canonical visual regression baselines', () => {
       await captureMobileViewport(page, 'opportunity-ra-climate-390.png');
     });
 
+    test('opportunity-expired-390', async ({ page }) => {
+      await resetAndGo(page, '#home');
+      await page.evaluate(() => window.CampusHubDebug.setOpportunityScenario('expired'));
+      await page.goto('/#opportunities/ra-climate');
+      await expect(page.locator('#oppStatus')).toBeVisible();
+      await settle(page);
+      await clearTransientUi(page);
+      await captureMobileViewport(page, 'opportunity-expired-390.png');
+    });
+
     test('opportunity-leave-dialog-390', async ({ page }) => {
       await resetAndGo(page, '#opportunities/ra-climate');
       await page.locator('#oppApply').click();
@@ -377,6 +387,11 @@ test.describe('Phase 7D canonical visual regression baselines', () => {
       await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe('leaveCampusHubTitle');
       await settle(page);
       await captureViewport(page, 'opportunity-leave-dialog-1280.png');
+    });
+
+    test('opportunity-ra-climate-1280', async ({ page }) => {
+      await resetAndGo(page, '#opportunities/ra-climate');
+      await captureViewport(page, 'opportunity-ra-climate-1280.png');
     });
 
     test('sports-mubs-mak-1280', async ({ page }) => {

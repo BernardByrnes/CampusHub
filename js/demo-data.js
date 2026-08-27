@@ -120,6 +120,7 @@ window.CampusHubDemo = {
     description: "Support ongoing research on climate adaptation strategies in East Africa.",
     deadline: "Apply by 30 May 2026",
     deadlineDate: "30 May 2026",
+    deadlineTenantDay: "2026-05-30",
     location: "Main Campus",
     stipend: "UGX 600,000 / month",
     type: "campus_role",
@@ -379,7 +380,7 @@ window.CampusHubDemo = {
 
   saves: [
     { id:"s1", type:"Event", title:"Guild Public Debate: The Future of AI in Africa", meta:"22 May • Senate Building" },
-    { id:"s2", type:"Opportunity", title:"Research Assistant — Climate Resilience", meta:"Apply by 30 May" },
+    { id:"s2", type:"Opportunity", sourceId:"ra-climate", title:"Research Assistant — Climate Resilience", meta:"Apply by 30 May" },
     { id:"s3", type:"Campus Story", title:"New Innovation Lab Opens at CoCIS", meta:"19 May • CoCIS" }
   ],
 

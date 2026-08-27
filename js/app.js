@@ -40,6 +40,8 @@
   let discoverSystemState = "ready";
   // Test-only notification fixtures never alter the canonical content dataset.
   let notificationTestMode = null;
+  // Test-only Opportunity lifecycle scenarios never alter the tenant calendar.
+  let opportunityTestScenario = "normal";
   let meSavesOpen = false;
   let meRsvpsOpen = false;
 
@@ -78,6 +80,36 @@
     const entity = D[key];
     if(!entity || !entityId) return null;
     return entity.id.toLowerCase() === entityId.toLowerCase() ? entity : null;
+  }
+
+  const OPPORTUNITY_SCENARIO_DAYS = Object.freeze({
+    normal: null,
+    expired: "2026-05-31"
+  });
+
+  function opportunityEffectiveTenantDay(){
+    return OPPORTUNITY_SCENARIO_DAYS[opportunityTestScenario]
+      || D.demoConfig?.calendar?.currentTenantDay
+      || null;
+  }
+
+  function isOpportunityExpired(opportunity=D.opportunity, tenantDay=opportunityEffectiveTenantDay()){
+    const deadline = opportunity?.deadlineTenantDay;
+    if(!isCanonicalTenantDay(deadline) || !isCanonicalTenantDay(tenantDay)) return false;
+    // ISO tenant days compare chronologically; the deadline day itself remains active.
+    return tenantDay > deadline;
+  }
+
+  function opportunityLifecycle(opportunity=D.opportunity){
+    const tenantDay = opportunityEffectiveTenantDay();
+    const expired = isOpportunityExpired(opportunity, tenantDay);
+    return {
+      status: expired ? "expired" : "active",
+      active: !expired,
+      expired,
+      tenantDay,
+      deadlineTenantDay: opportunity?.deadlineTenantDay || null
+    };
   }
 
   function findPublication(entityId){
@@ -164,6 +196,14 @@
 
   function renderOpportunityEntity(opportunity){
     if(!opportunity) return;
+    const lifecycle = opportunityLifecycle(opportunity);
+    const view = $('#view-opportunity');
+    if(view){
+      view.dataset.opportunityId = opportunity.id || '';
+      view.dataset.opportunityLifecycle = lifecycle.status;
+      view.dataset.opportunityTenantDay = lifecycle.tenantDay || '';
+    }
+    setEntityField('[data-field="oppKicker"]', opportunity.kicker || "Verified Opportunity");
     setEntityField('[data-field="oppTitle"]', opportunity.title);
     setEntityField('[data-field="oppProvider"]', opportunity.provider);
     setEntityField('[data-field="oppDeadline"]', opportunity.deadline);
@@ -177,6 +217,16 @@
     setEntityField('[data-field="oppEligibility"]', opportunity.eligibility);
     setEntityField('[data-field="oppRequiredAssurance"]', `${opportunity.requiredAssurance || "L2"} required`);
 
+    const status = $('#oppStatus');
+    if(status){
+      status.hidden = !lifecycle.expired;
+      status.textContent = lifecycle.expired ? "Expired" : "";
+    }
+    const expiredCopy = $('#oppExpiredCopy');
+    if(expiredCopy){
+      expiredCopy.hidden = !lifecycle.expired;
+    }
+
     const requirements = $('#oppRequirements');
     if(requirements){
       requirements.replaceChildren();
@@ -188,7 +238,7 @@
     }
 
     const apply = $('#oppApply');
-    const destination = isSafeExternalHttpsUrl(opportunity.externalUrl) ? opportunity.externalUrl : "";
+    const destination = !lifecycle.expired && isSafeExternalHttpsUrl(opportunity.externalUrl) ? opportunity.externalUrl : "";
     if(apply){
       apply.hidden = !destination;
       apply.disabled = !destination;
@@ -197,7 +247,15 @@
     if(continueLink){
       continueLink.hidden = !destination;
       if(destination) continueLink.href = destination;
-      else continueLink.removeAttribute("href");
+      else {
+        continueLink.removeAttribute("href");
+        continueLink.removeAttribute("target");
+        continueLink.removeAttribute("rel");
+      }
+    }
+    if(!destination){
+      const dialog = $('#leaveCampusHubDialog');
+      if(dialog?.open && typeof dialog.close === "function") dialog.close();
     }
     syncOpportunityReportButton(opportunity);
   }
@@ -302,6 +360,20 @@
       setEntityField('[data-field="homeEventVenue"]', homeEvent.venue);
       const eventLink = $('#homeEvent [data-testid="home-event-link"]');
       if(eventLink) eventLink.href = homeEvent.href;
+    }
+    const homeOpportunity = D.opportunity;
+    if(homeOpportunity){
+      const lifecycle = opportunityLifecycle(homeOpportunity);
+      const homeOpp = $('#homeOpp');
+      if(homeOpp){
+        homeOpp.hidden = lifecycle.expired;
+        homeOpp.dataset.opportunityLifecycle = lifecycle.status;
+      }
+      setEntityField('[data-field="oppTitle"]', homeOpportunity.title);
+      setEntityField('[data-field="oppProvider"]', homeOpportunity.provider);
+      setEntityField('[data-field="oppDeadline"]', homeOpportunity.deadline);
+      const homeOpportunityLink = $('#homeOpp [data-testid="home-opportunity-link"]');
+      if(homeOpportunityLink) homeOpportunityLink.href = homeOpportunity.href;
     }
     const homeVoice = D.voiceIssues.find(issue => issue.id === "voice-water-halls") || D.voiceIssues[0];
     if(homeVoice){
@@ -431,7 +503,14 @@
       return;
     }
     list.removeAttribute('aria-busy');
-    let items = D.discoverItems.slice();
+    const opportunityState = opportunityLifecycle(D.opportunity);
+    // Lifecycle filtering happens before category/search presentation so expired
+    // Opportunity facts cannot leak through cards, snippets, counts, or search.
+    let items = D.discoverItems.filter(item => (
+      item.kind !== "Opportunities"
+      || item.id !== D.opportunity?.id
+      || opportunityState.active
+    ));
     const filter = discoverSearchState.filter;
     const query = normalizeDiscoverQuery(discoverSearchState.query);
 
@@ -688,6 +767,13 @@
 
   function focusNotificationsTitle(){
     const title = $('#notifTitle');
+    if(!title) return;
+    title.focus({preventScroll:true});
+    title.scrollIntoView({block:"start", behavior:"auto"});
+  }
+
+  function focusOpportunityDetailTitle(){
+    const title = $('#opportunityDetailTitle');
     if(!title) return;
     title.focus({preventScroll:true});
     title.scrollIntoView({block:"start", behavior:"auto"});
@@ -1106,11 +1192,19 @@
     return Array.isArray(state?.saves) ? state.saves : D.saves.slice();
   }
 
+  function canonicalOpportunitySourceId(item){
+    if(item?.sourceId === D.opportunity?.id) return D.opportunity.id;
+    const id = String(item?.id || "");
+    const title = String(item?.title || "");
+    if(id === "s2" || id === "opp1" || title === String(D.opportunity?.title || "")) return D.opportunity?.id || null;
+    return null;
+  }
+
   function saveRecordMatches(item, kind){
     const id = String(item?.id || "");
     const title = String(item?.title || "");
     if(kind === "event") return id === "s1" || id === "evt1" || title === String(D.featuredEvent?.title || "");
-    if(kind === "opportunity") return id === "s2" || id === "opp1" || title === String(D.opportunity?.title || "");
+    if(kind === "opportunity") return canonicalOpportunitySourceId(item) === D.opportunity?.id;
     return false;
   }
 
@@ -1118,12 +1212,18 @@
     const wrap = $('#savesList');
     if(!wrap) return;
     const items = savedItems(state);
+    const opportunityState = opportunityLifecycle(D.opportunity);
     wrap.innerHTML = items.map(s=> `
       <div class="list-row" style="gap:10px;">
         <div style="flex:1; min-width:0;">
           <div style="font-size:11px; letter-spacing:.06em; text-transform:uppercase; font-weight:700; color:var(--text-muted);">${escapeHtml(s.type)}</div>
-          <div class="title" style="font-size:13px; margin-top:2px;">${escapeHtml(s.title)}</div>
+          ${canonicalOpportunitySourceId(s) === D.opportunity?.id
+            ? `<a class="title saves-list-link" data-save-source-id="${escapeHtml(D.opportunity.id)}" href="#opportunities/${encodeURIComponent(D.opportunity.id)}" style="font-size:13px; margin-top:2px;">${escapeHtml(s.title)}</a>`
+            : `<div class="title" style="font-size:13px; margin-top:2px;">${escapeHtml(s.title)}</div>`}
           <div class="meta">${escapeHtml(s.meta)}</div>
+          ${canonicalOpportunitySourceId(s) === D.opportunity?.id && opportunityState.expired
+            ? '<span class="pill pill--info save-expired-status">Expired</span>'
+            : ''}
         </div>
         <button class="btn btn--small" data-unsave="${escapeHtml(s.id)}">Remove</button>
       </div>
@@ -1326,6 +1426,12 @@
 
     ensureStudentProgress(state);
     if(!Array.isArray(state.saves)) state.saves = D.saves.slice();
+    // Keep the canonical saved Opportunity addressable by entity ID while
+    // preserving older records and unrelated legitimate saves.
+    state.saves = state.saves.map(item => {
+      if(canonicalOpportunitySourceId(item) !== D.opportunity?.id || item?.sourceId === D.opportunity.id) return item;
+      return { ...item, sourceId: D.opportunity.id };
+    });
     if(typeof state.saveEvent !== "boolean") state.saveEvent = false;
     if(typeof state.saveOpp !== "boolean") state.saveOpp = false;
     if(state.rsvp !== "going" && state.rsvp !== "interested") state.rsvp = null;
@@ -2366,6 +2472,7 @@
   let pendingVerificationFocus = false;
   let pendingPrivacyFocus = false;
   let pendingNotificationsFocus = false;
+  let pendingOpportunityDetailFocus = false;
   let pendingNewsDetailFocus = false;
   let pendingSportsDetailFocus = false;
   let pendingEventDetailFocus = false;
@@ -2433,6 +2540,9 @@
     } else if(target==="notifications" && pendingNotificationsFocus){
       pendingNotificationsFocus = false;
       setTimeout(focusNotificationsTitle, 60);
+    } else if(target==="opportunity" && pendingOpportunityDetailFocus){
+      pendingOpportunityDetailFocus = false;
+      setTimeout(focusOpportunityDetailTitle, 60);
     } else if(target==="voice-new" && pendingVoiceComposerFocus){
       pendingVoiceComposerFocus = false;
       const action = pendingVoiceComposerAction;
@@ -2506,7 +2616,10 @@
         // route entry moves focus to the canonical Event heading instead.
         pendingEventDetailFocus = !pendingRsvpFocus;
       }
-      if(route.definition.view === "opportunity") renderOpportunityEntity(route.entity);
+      if(route.definition.view === "opportunity"){
+        renderOpportunityEntity(route.entity);
+        pendingOpportunityDetailFocus = true;
+      }
       if(route.definition.view === "sports"){
         renderSportsEntity(route.entity);
         pendingSportsDetailFocus = true;
@@ -2582,7 +2695,7 @@
       state.saves = savedItems(state);
       if(state.saveOpp){
         if(!state.saves.some(item => saveRecordMatches(item, "opportunity"))){
-          state.saves.unshift({id:'opp1', type:'Opportunity', title:D.opportunity.title, meta: D.opportunity.deadline});
+          state.saves.unshift({id:'opp1', sourceId:D.opportunity.id, type:'Opportunity', title:D.opportunity.title, meta: D.opportunity.deadline});
         }
       } else {
         state.saves = state.saves.filter(item => !saveRecordMatches(item, "opportunity"));
@@ -2626,7 +2739,7 @@
     apply?.addEventListener('click', event=>{
       event.preventDefault();
       const opportunity = D.opportunity;
-      if(!isSafeExternalHttpsUrl(opportunity?.externalUrl)){
+      if(opportunityLifecycle(opportunity).expired || !isSafeExternalHttpsUrl(opportunity?.externalUrl)){
         renderOpportunityEntity(opportunity);
         return;
       }
@@ -2645,7 +2758,7 @@
       // Keep the validated destination on the dedicated anchor; the browser
       // owns opening it in a new tab and applies noopener protection.
       const opportunity = D.opportunity;
-      if(!isSafeExternalHttpsUrl(opportunity?.externalUrl)){
+      if(opportunityLifecycle(opportunity).expired || !isSafeExternalHttpsUrl(opportunity?.externalUrl)){
         event.preventDefault();
         return;
       }
@@ -2845,7 +2958,12 @@
   // Back buttons
   let historyStack = ["home"];
   function initBack(){
-    historyStack = [location.hash.replace(/^#/, '') || 'home'];
+    const initialPath = location.hash.replace(/^#/, '') || 'home';
+    const initialRoute = parseHashRoute();
+    const initialParent = initialRoute.kind === "detail" ? initialRoute.definition?.parent : null;
+    historyStack = initialParent && initialParent !== initialPath
+      ? [initialParent, initialPath]
+      : [initialPath];
     $$('[data-back]').forEach(b=> b.addEventListener('click', ()=>{
       const prev = historyStack[historyStack.length-2] || 'home';
       location.hash = `#${prev}`;
@@ -3150,6 +3268,7 @@
         if(D.demoConfig?.calendar) D.demoConfig.calendar.isInRecess = false;
         D.voiceIssues[0].supporters = 124;
         notificationTestMode = null;
+        opportunityTestScenario = "normal";
         const state = participationState();
         state.membership = { ...defaultMembership() };
         state.participation = { ...defaultParticipation(), demoScenario:"normal", returnTo:null, returnAction:null };
@@ -3232,6 +3351,19 @@
         }
         notificationTestMode = normalized;
         renderNotifications();
+      },
+      setOpportunityScenario(name){
+        if(!Object.prototype.hasOwnProperty.call(OPPORTUNITY_SCENARIO_DAYS, name)){
+          throw new TypeError(`Unknown Opportunity test scenario: ${name}`);
+        }
+        opportunityTestScenario = name;
+        const state = participationState();
+        hydrateTenant(state);
+        renderDiscover();
+        if(location.hash.toLowerCase() === "#opportunities/ra-climate") renderOpportunityEntity(D.opportunity);
+      },
+      getOpportunityLifecycle(){
+        return { ...opportunityLifecycle(D.opportunity) };
       }
     };
     if(debugEnabled){
