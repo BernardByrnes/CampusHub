@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-const STATE_KEY = 'campushub:state:v2:tenant-makerere:membership-demo-001';
-const DRAFT_KEY = 'campushub:voice-draft:v2:tenant-makerere:membership-demo-001';
+const STATE_KEY = 'campushub:state:v3:tenant-makerere:membership-demo-001';
+const DRAFT_KEY = 'campushub:voice-draft:v3:tenant-makerere:membership-demo-001';
 const CATEGORIES = [
   'Wi-Fi',
   'Water & Sanitation',
@@ -159,10 +159,9 @@ test.describe('Phase 8D frozen Student Voice composer contract', () => {
         description:'D'.repeat(1000),
         step:9
       };
-      state.xp = 412;
       state.pollDone = true;
       localStorage.setItem(key, JSON.stringify(state));
-      sessionStorage.removeItem('campushub:voice-draft:v2:tenant-makerere:membership-demo-001');
+      sessionStorage.removeItem('campushub:voice-draft:v3:tenant-makerere:membership-demo-001');
     }, STATE_KEY);
     await page.reload();
     const draft = await readSessionDraft(page);
@@ -172,7 +171,8 @@ test.describe('Phase 8D frozen Student Voice composer contract', () => {
     expect(draft.step).toBe(1);
     const state = await readDurableState(page);
     expect(state.voiceDraft).toBeUndefined();
-    expect(state.xp).toBe(412);
+    expect(state.xpEvents).toHaveLength(1);
+    expect(state.xpEvents[0].amount).toBe(340);
     expect(state.pollDone).toBe(true);
   });
 

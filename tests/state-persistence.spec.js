@@ -2,8 +2,10 @@ import { expect, test } from '@playwright/test';
 
 const LEGACY_STATE_KEY = 'campushub:state';
 const LEGACY_DRAFT_KEY = 'campushub:voice-draft';
-const FOREIGN_STATE_KEY = 'campushub:state:v2:tenant-other:membership-other-001';
-const FOREIGN_DRAFT_KEY = 'campushub:voice-draft:v2:tenant-other:membership-other-001';
+const STATE_V3_KEY = 'campushub:state:v3:tenant-makerere:membership-demo-001';
+const STATE_V2_KEY = 'campushub:state:v2:tenant-makerere:membership-demo-001';
+const FOREIGN_STATE_KEY = 'campushub:state:v3:tenant-other:membership-other-001';
+const FOREIGN_DRAFT_KEY = 'campushub:voice-draft:v3:tenant-other:membership-other-001';
 const PERSISTENCE_SCENARIO_KEY = 'campushub:debug:persistence-scenario';
 const GENERIC_FAILURE = 'We couldn’t save that change. Try again.';
 
@@ -142,19 +144,21 @@ test.describe('Phase 8T state ownership, persistence truth, and navigation histo
   test('uses one versioned opaque namespace and a flat ownership envelope', async ({ page }) => {
     const key = await stateKey(page);
     const draft = await draftKey(page);
-    expect(key).toBe('campushub:state:v2:tenant-makerere:membership-demo-001');
-    expect(draft).toBe('campushub:voice-draft:v2:tenant-makerere:membership-demo-001');
+    expect(key).toBe(STATE_V3_KEY);
+    expect(draft).toBe('campushub:voice-draft:v3:tenant-makerere:membership-demo-001');
     expect(key).not.toMatch(/21\/U\/04218|Nakato Grace|email|phone/i);
     expect(draft).not.toMatch(/21\/U\/04218|Nakato Grace|email|phone/i);
 
     const state = await readState(page);
     expect(state).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       tenantId: 'tenant-makerere',
       membershipId: 'membership-demo-001'
     });
     expect(state).not.toHaveProperty('metadata');
-    expect(state).toHaveProperty('xp', 340);
+    expect(state).not.toHaveProperty('xp');
+    expect(state.xpEvents).toHaveLength(1);
+    expect(state.xpEvents[0]).toMatchObject({ ruleRef:'prototype-opening-balance', amount:340, studentVisible:false });
   });
 
   test('migrates legacy durable state and removes it only after the namespaced write succeeds', async ({ page }) => {
@@ -174,14 +178,16 @@ test.describe('Phase 8T state ownership, persistence truth, and navigation histo
     await page.reload();
     const migrated = await readState(page);
     expect(migrated).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       tenantId: 'tenant-makerere',
       membershipId: 'membership-demo-001',
-      xp: 500,
       level: 5,
       rsvp: 'going',
       saveEvent: true
     });
+    expect(migrated).not.toHaveProperty('xp');
+    expect(migrated.xpEvents).toHaveLength(1);
+    expect(migrated.xpEvents[0]).toMatchObject({ ruleRef:'prototype-opening-balance', amount:500, studentVisible:false });
     expect(migrated.notificationReadIds).toContain('notification-priority-rescheduled');
     expect(await page.evaluate(() => localStorage.getItem('campushub:state'))).toBeNull();
     expect(await page.evaluate(stateKey => Boolean(localStorage.getItem(stateKey)), key)).toBe(true);
@@ -203,14 +209,15 @@ test.describe('Phase 8T state ownership, persistence truth, and navigation histo
 
     await setPersistence(page, 'normal');
     await page.reload();
-    expect((await readState(page)).xp).toBe(501);
+    expect((await page.evaluate(() => window.CampusHubDebug.getXpTotal()))).toBe(501);
+    expect((await readState(page))).not.toHaveProperty('xp');
     expect(await page.evaluate(() => localStorage.getItem('campushub:state'))).toBeNull();
   });
 
   test('recovers safely from malformed, primitive, and foreign current records', async ({ page }) => {
     const key = await stateKey(page);
     const records = ['not-json', JSON.stringify(42), JSON.stringify({
-      schemaVersion: 2,
+      schemaVersion: 3,
       tenantId: 'tenant-other',
       membershipId: 'membership-other-001',
       xp: 999999
@@ -221,7 +228,7 @@ test.describe('Phase 8T state ownership, persistence truth, and navigation histo
         localStorage.setItem(stateKey, value);
       }, { stateKey: key, value: raw });
       await page.reload();
-      expect((await readState(page)).xp).toBe(340);
+      expect(await page.evaluate(() => window.CampusHubDebug.getXpTotal())).toBe(340);
       expect((await page.evaluate(() => window.CampusHubDebug.getCurrentState())).tenantId).toBe('tenant-makerere');
     }
   });
@@ -239,7 +246,7 @@ test.describe('Phase 8T state ownership, persistence truth, and navigation histo
     await page.evaluate(({ stateKey, raw }) => localStorage.setItem(stateKey, raw), { stateKey: key, raw: rawFuture });
     await page.reload();
 
-    expect((await page.evaluate(() => window.CampusHubDebug.getCurrentState())).xp).toBe(340);
+    expect(await page.evaluate(() => window.CampusHubDebug.getXpTotal())).toBe(340);
     expect(await page.evaluate(stateKey => localStorage.getItem(stateKey), key)).toBe(rawFuture);
     await goTo(page, '#play');
     await expect(page.locator('[data-field="xpCount"]')).toHaveText('340');
@@ -250,10 +257,9 @@ test.describe('Phase 8T state ownership, persistence truth, and navigation histo
     const unrelated = 'campushub:unrelated-fixture';
     await page.evaluate(({ stateKey, foreignKey, unrelatedKey }) => {
       const state = JSON.parse(localStorage.getItem(stateKey));
-      state.xp = 777;
       localStorage.setItem(stateKey, JSON.stringify(state));
       localStorage.setItem(foreignKey, JSON.stringify({
-        schemaVersion: 2,
+        schemaVersion: 3,
         tenantId: 'tenant-other',
         membershipId: 'membership-other-001',
         xp: 999999
@@ -262,13 +268,13 @@ test.describe('Phase 8T state ownership, persistence truth, and navigation histo
     }, { stateKey: key, foreignKey: FOREIGN_STATE_KEY, unrelatedKey: unrelated });
 
     await page.evaluate(() => window.CampusHubDebug.resetDemo());
-    expect((await readState(page)).xp).toBe(340);
+    expect(await page.evaluate(() => window.CampusHubDebug.getXpTotal())).toBe(340);
     expect(await page.evaluate(foreignKey => JSON.parse(localStorage.getItem(foreignKey)).xp, FOREIGN_STATE_KEY)).toBe(999999);
     expect(await page.evaluate(unrelatedKey => localStorage.getItem(unrelatedKey), unrelated)).toBe('leave me alone');
 
     await page.evaluate(stateKey => localStorage.removeItem(stateKey), key);
     await page.reload();
-    expect((await readState(page)).xp).toBe(340);
+    expect(await page.evaluate(() => window.CampusHubDebug.getXpTotal())).toBe(340);
     expect(await page.evaluate(foreignKey => Boolean(localStorage.getItem(foreignKey)), FOREIGN_STATE_KEY)).toBe(true);
   });
 
@@ -310,7 +316,8 @@ test.describe('Phase 8T state ownership, persistence truth, and navigation histo
     await page.waitForTimeout(700);
     await expect(page.locator('#pollSuccess')).toBeHidden();
     await expectFailureToast(page);
-    expect(await readState(page)).toMatchObject({ pollDone: false, xp: 340, streakState: { count: 3 } });
+    expect(await readState(page)).toMatchObject({ pollDone: false, streakState: { count: 3 } });
+    expect(await page.evaluate(() => window.CampusHubDebug.getXpTotal())).toBe(340);
 
     await goTo(page, '#play');
     await page.locator('#quizOptions input[value="0"]').check();
@@ -318,11 +325,13 @@ test.describe('Phase 8T state ownership, persistence truth, and navigation histo
     await page.waitForTimeout(250);
     await expect(page.locator('#quizCompleteNote')).toBeHidden();
     await expectFailureToast(page);
-    expect(await readState(page)).toMatchObject({ quizDone: false, xp: 340, streakState: { count: 3 } });
+    expect(await readState(page)).toMatchObject({ quizDone: false, streakState: { count: 3 } });
+    expect(await page.evaluate(() => window.CampusHubDebug.getXpTotal())).toBe(340);
     expect(await page.evaluate(() => window.CampusHubDemo.student.xp)).toBe(340);
 
     await page.reload();
-    expect(await readState(page)).toMatchObject({ pollDone: false, quizDone: false, xp: 340, streakState: { count: 3 } });
+    expect(await readState(page)).toMatchObject({ pollDone: false, quizDone: false, streakState: { count: 3 } });
+    expect(await page.evaluate(() => window.CampusHubDebug.getXpTotal())).toBe(340);
   });
 
   test('fails Save, RSVP, Voice support, and Opportunity report without success state', async ({ page }) => {
@@ -354,7 +363,8 @@ test.describe('Phase 8T state ownership, persistence truth, and navigation histo
     await page.waitForTimeout(250);
     await expect(page.locator('#voiceStepConfirmation')).toBeHidden();
     await expect(page.locator('#voiceSubmitError')).toHaveText(GENERIC_FAILURE);
-    expect(await readState(page)).toMatchObject({ voiceSubmissions: [], xp: 340, streakState: { count: 3 } });
+    expect(await readState(page)).toMatchObject({ voiceSubmissions: [], streakState: { count: 3 } });
+    expect(await page.evaluate(() => window.CampusHubDebug.getXpTotal())).toBe(340);
     expect((await readSessionDraft(page)).title).toBe('Water disruption');
   });
 

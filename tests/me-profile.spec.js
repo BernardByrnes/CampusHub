@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-const STATE_KEY = 'campushub:state:v2:tenant-makerere:membership-demo-001';
+const STATE_KEY = 'campushub:state:v3:tenant-makerere:membership-demo-001';
 
 async function resetDemo(page) {
   await page.goto('/#home');
@@ -17,7 +17,16 @@ async function readState(page) {
 async function applyStudentProgressState(page, xp, level) {
   await page.evaluate(({ key, xp: nextXp, level: nextLevel }) => {
     const state = JSON.parse(localStorage.getItem(key) || '{}');
-    state.xp = nextXp;
+    const opening = state.xpEvents?.find(event => event.ruleRef === 'prototype-opening-balance') || {
+      id: 'xp-opening-balance-tenant-makerere-membership-demo-001',
+      tenantId: 'tenant-makerere', membershipId: 'membership-demo-001',
+      ruleRef: 'prototype-opening-balance', timestamp: '2026-05-20T00:00:00.000Z',
+      idempotencyKey: 'xp:correction:prototype-opening-balance', type: 'correction',
+      sourceType: 'prototype-migration', sourceId: 'pre-ledger-balance', sourceAction: 'opening-balance',
+      reason: 'Migrated from the pre-ledger prototype balance.', studentLabel: 'Starting XP balance', studentVisible: false
+    };
+    state.xpEvents = [{ ...opening, amount: nextXp }];
+    delete state.xp;
     if (nextLevel === null) delete state.level;
     else state.level = nextLevel;
     localStorage.setItem(key, JSON.stringify(state));
@@ -189,17 +198,20 @@ test.describe('Phase 8M canonical Me profile and activity coherence', () => {
     await expect(page.locator('[data-field="levelDisplay"]')).toHaveText('Level 4');
     await page.goto('/#home');
     await expect(page.locator('#homePlaySummary [data-field="homeLevel"]')).toHaveText('Level 4');
-    expect(await readState(page)).toMatchObject({ xp:340, level:4 });
+    expect(await page.evaluate(() => window.CampusHubDebug.getXpTotal())).toBe(340);
+    expect(await readState(page)).toMatchObject({ level:4 });
   });
 
   test('migrates an XP-only legacy state to the threshold-derived level without a reset', async ({ page }) => {
     await applyStudentProgressState(page, 340, null);
     await expect(page.locator('[data-field="meLevelXp"]')).toHaveText('Level 4 • 340 XP');
-    expect(await readState(page)).toMatchObject({ xp:340, level:4 });
+    expect(await page.evaluate(() => window.CampusHubDebug.getXpTotal())).toBe(340);
+    expect(await readState(page)).toMatchObject({ level:4 });
 
     await applyStudentProgressState(page, 500, null);
     await expect(page.locator('[data-field="meLevelXp"]')).toHaveText('Level 5 • 500 XP');
-    expect(await readState(page)).toMatchObject({ xp:500, level:5 });
+    expect(await page.evaluate(() => window.CampusHubDebug.getXpTotal())).toBe(500);
+    expect(await readState(page)).toMatchObject({ level:5 });
 
     await page.goto('/#play');
     await expect(page.locator('[data-field="levelDisplay"]')).toHaveText('Level 5');

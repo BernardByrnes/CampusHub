@@ -166,26 +166,26 @@ test.describe('Phase 8J canonical Event detail', () => {
     await resetDemo(page);
     await goTo(page, '#events/guild-debate');
     const startingXp = await page.evaluate(() => window.CampusHubDemo.student.xp);
-    const startingStreak = await page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state:v2:tenant-makerere:membership-demo-001')).streakState.count);
+    const startingStreak = await page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state:v3:tenant-makerere:membership-demo-001')).streakState.count);
 
     await page.locator('#rsvpGoing').click();
     await expect(page.locator('#rsvpGoing')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('#rsvpGoing')).toHaveText('Going ✓');
-    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state:v2:tenant-makerere:membership-demo-001')).rsvp)).toBe('going');
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state:v3:tenant-makerere:membership-demo-001')).rsvp)).toBe('going');
     expect(await page.evaluate(() => window.CampusHubDemo.student.xp)).toBe(startingXp);
-    const afterGoingStreak = await page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state:v2:tenant-makerere:membership-demo-001')).streakState.count);
+    const afterGoingStreak = await page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state:v3:tenant-makerere:membership-demo-001')).streakState.count);
     expect(afterGoingStreak).toBeGreaterThanOrEqual(startingStreak);
 
     await page.locator('#rsvpGoing').click();
     await expect(page.locator('#rsvpGoing')).toHaveAttribute('aria-pressed', 'false');
-    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state:v2:tenant-makerere:membership-demo-001')).rsvp)).toBe(null);
-    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state:v2:tenant-makerere:membership-demo-001')).streakState.count)).toBe(afterGoingStreak);
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state:v3:tenant-makerere:membership-demo-001')).rsvp)).toBe(null);
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state:v3:tenant-makerere:membership-demo-001')).streakState.count)).toBe(afterGoingStreak);
     expect(await page.evaluate(() => window.CampusHubDemo.student.xp)).toBe(startingXp);
 
     await page.locator('#rsvpInterested').click();
     await expect(page.locator('#rsvpInterested')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('#rsvpInterested')).toHaveText('Interested ✓');
-    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state:v2:tenant-makerere:membership-demo-001')).rsvp)).toBe('interested');
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state:v3:tenant-makerere:membership-demo-001')).rsvp)).toBe('interested');
     expect(await page.evaluate(() => window.CampusHubDemo.student.xp)).toBe(startingXp);
   });
 
@@ -193,7 +193,7 @@ test.describe('Phase 8J canonical Event detail', () => {
     await resetDemo(page);
     await goTo(page, '#events/guild-debate');
     const before = await page.evaluate(() => {
-      const state = JSON.parse(localStorage.getItem('campushub:state:v2:tenant-makerere:membership-demo-001'));
+      const state = JSON.parse(localStorage.getItem('campushub:state:v3:tenant-makerere:membership-demo-001'));
       return { xp: window.CampusHubDemo.student.xp, rsvp: state.rsvp, streak: state.streakState.count };
     });
 
@@ -201,7 +201,7 @@ test.describe('Phase 8J canonical Event detail', () => {
     await expect(page.locator('#eventSave')).toHaveText('Saved ✓');
     await expect(page.locator('#eventSave')).toHaveAttribute('aria-pressed', 'true');
     const after = await page.evaluate(() => {
-      const state = JSON.parse(localStorage.getItem('campushub:state:v2:tenant-makerere:membership-demo-001'));
+      const state = JSON.parse(localStorage.getItem('campushub:state:v3:tenant-makerere:membership-demo-001'));
       return { xp: window.CampusHubDemo.student.xp, rsvp: state.rsvp, streak: state.streakState.count };
     });
     expect(after).toEqual(before);

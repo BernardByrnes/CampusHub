@@ -19,7 +19,7 @@ window.CampusHubDemo = {
     // membership boundary without exposing PII or claiming browser storage
     // is a security boundary.
     stateNamespace: {
-      schemaVersion: 2,
+      schemaVersion: 3,
       tenantId: "tenant-makerere",
       membershipId: "membership-demo-001"
     },

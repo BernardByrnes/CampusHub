@@ -369,9 +369,9 @@ test.describe('Canonical Publication detail', () => {
   test('Notifications opens CoCIS, marks it read, and persists the read state', async ({ page }) => {
     await goTo(page, '#notifications');
     await page.evaluate(notificationId => {
-      const state = JSON.parse(localStorage.getItem('campushub:state:v2:tenant-makerere:membership-demo-001'));
+      const state = JSON.parse(localStorage.getItem('campushub:state:v3:tenant-makerere:membership-demo-001'));
       state.notificationReadIds = (state.notificationReadIds || []).filter(id => id !== notificationId);
-      localStorage.setItem('campushub:state:v2:tenant-makerere:membership-demo-001', JSON.stringify(state));
+      localStorage.setItem('campushub:state:v3:tenant-makerere:membership-demo-001', JSON.stringify(state));
     }, cocisNotificationId);
     await page.reload();
 
@@ -383,7 +383,7 @@ test.describe('Canonical Publication detail', () => {
     await expect(page.locator('#newsDetailTitle')).toHaveText(cocisTitle);
     await expectDiscoverNav(page);
     await expect.poll(() => page.evaluate(notificationId => {
-      const state = JSON.parse(localStorage.getItem('campushub:state:v2:tenant-makerere:membership-demo-001'));
+      const state = JSON.parse(localStorage.getItem('campushub:state:v3:tenant-makerere:membership-demo-001'));
       return state.notificationReadIds?.includes(notificationId) || false;
     }, cocisNotificationId)).toBe(true);
 

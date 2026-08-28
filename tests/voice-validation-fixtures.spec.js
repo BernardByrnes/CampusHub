@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-const STATE_KEY = 'campushub:state:v2:tenant-makerere:membership-demo-001';
+const STATE_KEY = 'campushub:state:v3:tenant-makerere:membership-demo-001';
 const ACTION_PLANNED_UPDATE = 'A lighting survey of the Mary Stuart–Library path is complete. Replacement fittings are scheduled this week.';
 const RESOLVED_UPDATE = 'Sunday opening hours have been extended through the assessment period. Students who still cannot access a space can raise a new issue.';
 

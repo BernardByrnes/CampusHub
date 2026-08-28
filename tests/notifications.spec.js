@@ -102,7 +102,7 @@ test.describe('Phase 8O canonical Notifications centre', () => {
     await expect(page.locator('#newsDetailTitle')).toHaveText('Wednesday Classes Rescheduled');
     await expect(page.locator('#tab-discover')).toHaveAttribute('aria-current', 'page');
 
-    const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state:v2:tenant-makerere:membership-demo-001') || '{}'));
+    const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state:v3:tenant-makerere:membership-demo-001') || '{}'));
     expect(persisted.notificationReadIds).toContain('notification-priority-rescheduled');
     expect(persisted.notificationReadIds).not.toContain('notification-poll-opened');
 
@@ -124,7 +124,7 @@ test.describe('Phase 8O canonical Notifications centre', () => {
 
     await expect(page.locator('.notification-row--unread')).toHaveCount(1);
     await expect(page.locator('#notifBtn')).toHaveAttribute('aria-label', 'Notifications, 1 unread');
-    const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state:v2:tenant-makerere:membership-demo-001') || '{}'));
+    const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state:v3:tenant-makerere:membership-demo-001') || '{}'));
     expect(persisted.notificationReadIds).toEqual(expect.arrayContaining(['notification-poll-opened', 'notification-cocis-story', 'notification-verification-updated']));
     expect(persisted.notificationReadIds).not.toContain('notification-priority-rescheduled');
   });

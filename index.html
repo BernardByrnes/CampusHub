@@ -401,6 +401,13 @@
           <div class="divider"></div>
           <p class="meta" style="font-size:11px;">Your XP comes from completed CampusHub activities and cannot be spent.</p>
         </article>
+
+        <!-- Explainable, student-visible ledger history. Technical migration
+             events remain hidden while legitimate recent activity is shown. -->
+        <article class="card card-pad" style="margin-top:10px;" id="xpHistoryCard">
+          <h3 class="section-title" style="font-size:12px;">Recent XP</h3>
+          <div id="xpHistory" aria-live="polite" style="margin-top:4px;"></div>
+        </article>
       </section>
 
       <!-- ME / PROFILE -->

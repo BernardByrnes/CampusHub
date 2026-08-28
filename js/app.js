@@ -6,7 +6,8 @@
   const LEGACY_STATE_KEY = "campushub:state";
   const LEGACY_VOICE_DRAFT_SESSION_KEY = "campushub:voice-draft";
   const PERSISTENCE_SCENARIO_SESSION_KEY = "campushub:debug:persistence-scenario";
-  const CURRENT_STATE_SCHEMA_VERSION = 2;
+  const CURRENT_STATE_SCHEMA_VERSION = 3;
+  const PREVIOUS_STATE_SCHEMA_VERSION = 2;
   const DEFAULT_STATE_NAMESPACE = Object.freeze({
     schemaVersion: CURRENT_STATE_SCHEMA_VERSION,
     tenantId: "tenant-makerere",
@@ -76,9 +77,22 @@
     return `campushub:state:v${namespace.schemaVersion}:${namespace.tenantId}:${namespace.membershipId}`;
   }
 
+  function stateStorageKeyForSchema(schemaVersion){
+    const namespace = currentStateNamespace();
+    return `campushub:state:v${schemaVersion}:${namespace.tenantId}:${namespace.membershipId}`;
+  }
+
+  function previousStateStorageKey(){
+    return stateStorageKeyForSchema(PREVIOUS_STATE_SCHEMA_VERSION);
+  }
+
   function voiceDraftStorageKey(){
     const namespace = currentStateNamespace();
     return `campushub:voice-draft:v${namespace.schemaVersion}:${namespace.tenantId}:${namespace.membershipId}`;
+  }
+
+  function previousVoiceDraftStorageKey(){
+    return `campushub:voice-draft:v${PREVIOUS_STATE_SCHEMA_VERSION}:${currentStateNamespace().tenantId}:${currentStateNamespace().membershipId}`;
   }
 
   function stateOwnershipFields(){
@@ -585,6 +599,7 @@
     renderEventEntity(D.featuredEvent);
     // me
     renderMe(normalizedState, progress);
+    renderRecentXpHistory(normalizedState);
     // play header
     const levelInfo = progress.levelInfo;
     const next = D.levels.find(l=> Number(l.level)===progress.level+1);
@@ -1321,7 +1336,35 @@
         optionIndex:choice,
         xpAwarded:earned
       };
-      state.xp = Number(state.xp) + earned;
+      const participationEvent = appendXpEvent(state, {
+        type:"award",
+        ruleRef:"daily-quiz-participation",
+        amount:xpPart,
+        idempotencyKey:`xp:award:daily-quiz-participation:${D.quiz.id}`,
+        sourceType:"daily-quiz",
+        sourceId:D.quiz.id,
+        sourceAction:"participate",
+        tenantDay:D.quiz.tenantDay,
+        studentLabel:"Daily Quiz participation"
+      });
+      const accuracyEvent = correct ? appendXpEvent(state, {
+        type:"award",
+        ruleRef:"daily-quiz-accuracy",
+        amount:xpBonus,
+        idempotencyKey:`xp:award:daily-quiz-accuracy:${D.quiz.id}`,
+        sourceType:"daily-quiz",
+        sourceId:D.quiz.id,
+        sourceAction:"accuracy",
+        tenantDay:D.quiz.tenantDay,
+        studentLabel:"Daily Quiz accuracy bonus"
+      }) : { added:false, reason:"not-applicable" };
+      const appendFailures = [participationEvent, accuracyEvent]
+        .filter(result => !result.added && !["idempotent", "source-duplicate", "not-applicable"].includes(result.reason));
+      if(appendFailures.length){
+        pendingQuizChoice = choice;
+        renderQuiz();
+        return;
+      }
       applyStreakQualification("daily-quiz", state);
       pendingQuizChoice = null;
       if(!saveState(state)){
@@ -1352,6 +1395,33 @@
     `).join("");
   }
 
+  function formatXpHistoryAmount(amount){
+    const numeric = Number(amount);
+    if(!Number.isFinite(numeric)) return "";
+    if(numeric > 0) return `+${numeric} XP`;
+    if(numeric < 0) return `−${Math.abs(numeric)} XP`;
+    return "0 XP";
+  }
+
+  function renderRecentXpHistory(state=participationState()){
+    const wrap = $('#xpHistory');
+    if(!wrap) return;
+    const events = balanceXpEventsForState(state)
+      .filter(event => event.studentVisible !== false)
+      .slice()
+      .sort((a, b) => String(b.timestamp).localeCompare(String(a.timestamp)));
+    if(!events.length){
+      wrap.innerHTML = '<p class="meta" data-xp-history-empty>No recent XP activity yet.</p>';
+      return;
+    }
+    wrap.innerHTML = events.map(event => `
+      <div class="xp-history-row" style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:9px 0; border-bottom:1px solid var(--border);">
+        <span style="font-size:13px; font-weight:600; min-width:0;">${escapeHtml(xpEventLabel(event))}</span>
+        <span style="font-size:13px; font-weight:800; color:${event.amount < 0 ? 'var(--danger)' : 'var(--brand)'}; white-space:nowrap;">${escapeHtml(formatXpHistoryAmount(event.amount))}</span>
+      </div>
+    `).join("");
+  }
+
   function configuredStudentLevels(){
     return (Array.isArray(D.levels) ? D.levels : [])
       .filter(level => level && Number.isFinite(Number(level.level)))
@@ -1374,16 +1444,14 @@
     return levels.find(record => Number(record.level) === Number(level)) || studentLevelForXp(0);
   }
 
-  // XP is the threshold input; the persisted level is only the highest level
-  // already reached, preserving the frozen non-decrease/grandfathering rule.
+  // XP is derived solely from the append-only ledger; the persisted level is
+  // only the highest level already reached, preserving the frozen
+  // non-decrease/grandfathering rule.
   function studentProgressForState(state){
-    const parsedXp = Number(state?.xp);
-    const fallbackXp = Number(D.student.xp);
-    const xp = Number.isFinite(parsedXp) && parsedXp >= 0
-      ? parsedXp
-      : Number.isFinite(fallbackXp) && fallbackXp >= 0
-        ? fallbackXp
-        : 0;
+    const ledgerTotal = xpTotalForState(state);
+    // Never show a negative balance even if a malformed hand-edited ledger is
+    // present; reconciliation still reports that impossible state.
+    const xp = Number.isFinite(ledgerTotal) && ledgerTotal >= 0 ? ledgerTotal : 0;
     const thresholdRecord = studentLevelForXp(xp);
     const thresholdLevel = Number(thresholdRecord.level) || 1;
     const levels = configuredStudentLevels();
@@ -1398,8 +1466,8 @@
 
   function ensureStudentProgress(state){
     const progress = studentProgressForState(state);
-    state.xp = progress.xp;
     state.level = progress.level;
+    delete state.xp;
     return progress;
   }
 
@@ -1590,10 +1658,12 @@
 
   function readVoiceDraftSession(){
     let currentRaw = null;
+    let previousRaw = null;
     let legacyRaw = null;
     try{
       currentRaw = sessionStorage.getItem(voiceDraftStorageKey());
-      if(!currentRaw) legacyRaw = sessionStorage.getItem(LEGACY_VOICE_DRAFT_SESSION_KEY);
+      if(!currentRaw) previousRaw = sessionStorage.getItem(previousVoiceDraftStorageKey());
+      if(!currentRaw && !previousRaw) legacyRaw = sessionStorage.getItem(LEGACY_VOICE_DRAFT_SESSION_KEY);
     }catch(e){
       return null;
     }
@@ -1609,6 +1679,16 @@
 
     const current = parseDraft(currentRaw);
     if(current) return current;
+
+    const previous = parseDraft(previousRaw);
+    if(previous){
+      // Preserve a v2 draft through the schema bump only after the v3 session
+      // write succeeds; the old copy remains recoverable on failure.
+      if(writeVoiceDraftSession(previous)){
+        try{ sessionStorage.removeItem(previousVoiceDraftStorageKey()); }catch(error){}
+      }
+      return previous;
+    }
 
     const legacy = parseDraft(legacyRaw);
     if(!legacy) return null;
@@ -1631,6 +1711,7 @@
   function clearVoiceDraftSession(){
     try{
       sessionStorage.removeItem(voiceDraftStorageKey());
+      sessionStorage.removeItem(previousVoiceDraftStorageKey());
       sessionStorage.removeItem(LEGACY_VOICE_DRAFT_SESSION_KEY);
     }catch(e){}
   }
@@ -1659,6 +1740,60 @@
     return state;
   }
 
+  function safeLegacyXpSeed(value){
+    const fallback = Number(D.student?.xp);
+    if(typeof value === "number" && Number.isFinite(value) && value >= 0) return value;
+    return Number.isFinite(fallback) && fallback >= 0 ? fallback : 0;
+  }
+
+  // This prototype-only event stands in for the pre-ledger scalar. Production
+  // data migration must use a controlled migration process; this is not a
+  // normal XP rule or a fabricated activity history.
+  function prototypeOpeningBalanceEvent(amount){
+    const ownership = stateOwnershipFields();
+    return {
+      id: `xp-opening-balance-${ownership.tenantId}-${ownership.membershipId}`,
+      tenantId: ownership.tenantId,
+      membershipId: ownership.membershipId,
+      ruleRef: "prototype-opening-balance",
+      amount,
+      timestamp: new Date().toISOString(),
+      idempotencyKey: "xp:correction:prototype-opening-balance",
+      type: "correction",
+      sourceType: "prototype-migration",
+      sourceId: "pre-ledger-balance",
+      sourceAction: "opening-balance",
+      reason: "Migrated from the pre-ledger prototype balance.",
+      studentLabel: "Starting XP balance",
+      studentVisible: false
+    };
+  }
+
+  function hasPrototypeOpeningBalance(events){
+    return Array.isArray(events) && events.some(event => event
+      && event.ruleRef === "prototype-opening-balance"
+      && event.sourceType === "prototype-migration"
+      && event.sourceId === "pre-ledger-balance"
+      && event.sourceAction === "opening-balance");
+  }
+
+  function ensureXpLedgerState(state, options={}){
+    if(!state || typeof state !== "object" || Array.isArray(state)) return state;
+    const currentEvents = Array.isArray(state.xpEvents) ? state.xpEvents.slice() : [];
+    const hasScalar = Object.prototype.hasOwnProperty.call(state, "xp");
+    const scalarValue = hasScalar ? safeLegacyXpSeed(state.xp) : null;
+    const shouldCreateOpening = options.createOpening === true
+      || (hasScalar && currentEvents.length === 0);
+    if(shouldCreateOpening && !hasPrototypeOpeningBalance(currentEvents)){
+      currentEvents.unshift(prototypeOpeningBalanceEvent(scalarValue));
+    }
+    state.xpEvents = currentEvents;
+    // A scalar may be read only while migrating an older record; it is never
+    // retained in the v3 durable shape or used as current XP authority.
+    delete state.xp;
+    return state;
+  }
+
   function ensureParticipationState(state){
     if(!state || typeof state!=="object") state = {};
     const ownership = stateOwnershipFields();
@@ -1671,6 +1806,7 @@
     if(!state.membership || typeof state.membership!=="object") state.membership = {};
     if(!state.participation || typeof state.participation!=="object") state.participation = {};
 
+    ensureXpLedgerState(state);
     ensureStudentProgress(state);
     if(!Array.isArray(state.saves)) state.saves = D.saves.slice();
     // Keep the canonical saved Opportunity addressable by entity ID while
@@ -2196,7 +2332,25 @@
         state.pollDone = true;
         state.pollChoice = idx;
         const pollXp = Number(D.demoConfig?.xp?.pollParticipation) || 0;
-        state.xp = Number(state.xp) + pollXp;
+        const pollEvent = appendXpEvent(state, {
+          type:"award",
+          ruleRef:"poll-participation",
+          amount:pollXp,
+          idempotencyKey:`xp:award:poll-participation:${D.poll?.id || "poll"}`,
+          sourceType:"poll-participation",
+          sourceId:D.poll?.id || "poll-restroom-cleanliness",
+          sourceAction:"participate",
+          tenantDay:D.demoConfig?.calendar?.currentTenantDay,
+          studentLabel:"Poll participation"
+        });
+        if(!pollEvent.added && !["idempotent", "source-duplicate"].includes(pollEvent.reason)){
+          persistenceFailure(restored=>{
+            hydrateTenant(restored);
+            renderXPRules();
+            renderPollState();
+          });
+          return;
+        }
         applyStreakQualification("poll-response", state);
         if(!saveState(state)){
           persistenceFailure(restored=>{
@@ -3382,6 +3536,229 @@
     return Number(choice)===Number(quiz?.correctIndex) ? participationXp + accuracyXp : participationXp;
   }
 
+  const XP_EVENT_TYPES = Object.freeze(["award", "reversal", "correction", "capped_award"]);
+
+  function xpEventTimestampIsUtc(value){
+    if(typeof value !== "string" || !value.endsWith("Z")) return false;
+    const parsed = new Date(value);
+    return !Number.isNaN(parsed.getTime());
+  }
+
+  function xpEventSourceIdentity(event){
+    if(!event || typeof event !== "object") return "";
+    return [event.tenantId, event.membershipId, event.ruleRef, event.sourceType, event.sourceId, event.sourceAction].join("\u001f");
+  }
+
+  function xpEventIsBalanceAffecting(event){
+    return Boolean(event && typeof event === "object"
+      && (event.type === "award" || event.type === "correction" || event.type === "reversal")
+      && Number.isFinite(event.amount)
+      && event.amount !== 0);
+  }
+
+  function validateXpEvent(event, options={}){
+    const requireOwnership = options.requireOwnership !== false;
+    if(!event || typeof event !== "object" || Array.isArray(event)) return { valid:false, code:"INVALID_EVENT" };
+    const requiredStrings = ["id", "ruleRef", "timestamp", "idempotencyKey", "type", "sourceType", "sourceId", "sourceAction"];
+    if(requiredStrings.some(key => typeof event[key] !== "string" || !event[key].trim())) return { valid:false, code:"INVALID_EVENT_FIELDS" };
+    if(!Number.isFinite(event.amount)) return { valid:false, code:"INVALID_AMOUNT" };
+    if(!XP_EVENT_TYPES.includes(event.type)) return { valid:false, code:"INVALID_TYPE" };
+    if(!xpEventTimestampIsUtc(event.timestamp)) return { valid:false, code:"INVALID_TIMESTAMP" };
+    if(requireOwnership){
+      const ownership = stateOwnershipFields();
+      if(event.tenantId !== ownership.tenantId || event.membershipId !== ownership.membershipId){
+        return { valid:false, code:"OWNERSHIP_MISMATCH" };
+      }
+    } else if(typeof event.tenantId !== "string" || !event.tenantId.trim()
+      || typeof event.membershipId !== "string" || !event.membershipId.trim()){
+      return { valid:false, code:"INVALID_OWNERSHIP" };
+    }
+    if(event.type === "award" && !(event.amount > 0)) return { valid:false, code:"INVALID_AWARD_AMOUNT" };
+    if(event.type === "correction" && !(event.amount > 0)) return { valid:false, code:"INVALID_CORRECTION_AMOUNT" };
+    if(event.type === "reversal" && !(event.amount < 0)) return { valid:false, code:"INVALID_REVERSAL_AMOUNT" };
+    if(event.type === "capped_award" && event.amount !== 0) return { valid:false, code:"INVALID_CAPPED_AMOUNT" };
+    if((event.type === "correction" || event.type === "reversal")
+      && (typeof event.reason !== "string" || !event.reason.trim())){
+      return { valid:false, code:"REASON_REQUIRED" };
+    }
+    if(event.type === "reversal"
+      && (typeof event.referencesEventId !== "string" || !event.referencesEventId.trim())){
+      return { valid:false, code:"REFERENCED_EVENT_REQUIRED" };
+    }
+    if(event.studentVisible !== undefined && typeof event.studentVisible !== "boolean"){
+      return { valid:false, code:"INVALID_VISIBILITY" };
+    }
+    if(event.tenantDay !== undefined && event.tenantDay !== null && !isCanonicalTenantDay(event.tenantDay)){
+      return { valid:false, code:"INVALID_TENANT_DAY" };
+    }
+    return { valid:true };
+  }
+
+  function createXpEventId(){
+    try{
+      if(window.crypto && typeof window.crypto.randomUUID === "function") return window.crypto.randomUUID();
+    }catch(error){}
+    return `xp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+
+  function xpEventLabel(event){
+    if(event?.type === "reversal") return "XP reversal";
+    if(event?.type === "correction") return "XP correction";
+    if(event?.ruleRef === "poll-participation") return "Poll participation";
+    if(event?.ruleRef === "daily-quiz-participation") return "Daily Quiz participation";
+    if(event?.ruleRef === "daily-quiz-accuracy") return "Daily Quiz accuracy bonus";
+    if(typeof event?.studentLabel === "string" && event.studentLabel.trim()) return event.studentLabel.trim();
+    return "XP activity";
+  }
+
+  function buildXpEvent(eventInput={}){
+    const ownership = stateOwnershipFields();
+    const type = eventInput.type;
+    const event = {
+      id: typeof eventInput.id === "string" && eventInput.id.trim() ? eventInput.id.trim() : createXpEventId(),
+      tenantId: ownership.tenantId,
+      membershipId: ownership.membershipId,
+      ruleRef: eventInput.ruleRef,
+      amount: eventInput.amount,
+      timestamp: eventInput.timestamp || new Date().toISOString(),
+      idempotencyKey: eventInput.idempotencyKey,
+      type,
+      sourceType: eventInput.sourceType,
+      sourceId: eventInput.sourceId,
+      sourceAction: eventInput.sourceAction,
+      studentLabel: eventInput.studentLabel || xpEventLabel({ ...eventInput, type }),
+      studentVisible: eventInput.studentVisible === undefined ? type !== "capped_award" : eventInput.studentVisible
+    };
+    ["reason", "referencesEventId", "tenantDay"].forEach(key=>{
+      if(eventInput[key] !== undefined) event[key] = eventInput[key];
+    });
+    return event;
+  }
+
+  // Canonical append-only boundary. Existing events are never edited or
+  // removed; corrections and reversals are represented by new events.
+  function appendXpEvent(state, eventInput={}){
+    if(!state || typeof state !== "object" || Array.isArray(state)) return { added:false, reason:"INVALID_STATE" };
+    const existingEvents = Array.isArray(state.xpEvents) ? state.xpEvents : [];
+    if(!Array.isArray(state.xpEvents)) state.xpEvents = existingEvents;
+    const event = buildXpEvent(eventInput);
+    const validation = validateXpEvent(event);
+    if(!validation.valid) return { added:false, reason:validation.code };
+    if(existingEvents.some(existing => existing && existing.id === event.id)){
+      return { added:false, reason:"duplicate-event-id" };
+    }
+    const sameIdempotency = existingEvents.find(existing => existing
+      && existing.tenantId === event.tenantId
+      && existing.membershipId === event.membershipId
+      && existing.idempotencyKey === event.idempotencyKey);
+    if(sameIdempotency) return { added:false, reason:"idempotent", event:sameIdempotency };
+
+    // Automatic positive awards are unique by conceptual source as well as
+    // by the exact idempotency key. Prototype opening balance is a migration
+    // correction, so it is intentionally outside this automatic-award rule.
+    if(event.type === "award"){
+      const duplicateSource = existingEvents.find(existing => existing
+        && existing.type === "award"
+        && xpEventSourceIdentity(existing) === xpEventSourceIdentity(event));
+      if(duplicateSource) return { added:false, reason:"source-duplicate", event:duplicateSource };
+    }
+
+    if(event.type === "reversal"){
+      const referenced = existingEvents.find(existing => existing
+        && existing.id === event.referencesEventId
+        && existing.tenantId === event.tenantId
+        && existing.membershipId === event.membershipId
+        && xpEventIsBalanceAffecting(existing)
+        && existing.amount > 0);
+      if(!referenced) return { added:false, reason:"PREREQUISITE_MISSING" };
+      const priorReversalAmount = existingEvents
+        .filter(existing => existing && existing.type === "reversal" && existing.referencesEventId === referenced.id)
+        .reduce((sum, existing) => sum + (Number.isFinite(existing.amount) ? existing.amount : 0), 0);
+      if(Math.abs(priorReversalAmount + event.amount) > referenced.amount){
+        return { added:false, reason:"EXCESS_REVERSAL" };
+      }
+    }
+
+    const nextEvents = existingEvents.concat(event);
+    state.xpEvents = nextEvents;
+    return { added:true, event };
+  }
+
+  function balanceXpEventsForState(state){
+    if(!Array.isArray(state?.xpEvents)) return [];
+    const ownership = stateOwnershipFields();
+    const seenIds = new Set();
+    const seenIdempotencyKeys = new Set();
+    const seenAutomaticSources = new Set();
+    return state.xpEvents.filter(event => {
+      if(!xpEventIsBalanceAffecting(event) || !validateXpEvent(event).valid
+        || event.tenantId !== ownership.tenantId || event.membershipId !== ownership.membershipId) return false;
+      if(seenIds.has(event.id) || seenIdempotencyKeys.has(event.idempotencyKey)) return false;
+      if(event.type === "award"){
+        const source = xpEventSourceIdentity(event);
+        if(seenAutomaticSources.has(source)) return false;
+        seenAutomaticSources.add(source);
+      }
+      seenIds.add(event.id);
+      seenIdempotencyKeys.add(event.idempotencyKey);
+      return true;
+    });
+  }
+
+  function xpTotalForState(state){
+    return balanceXpEventsForState(state).reduce((sum, event) => sum + event.amount, 0);
+  }
+
+  function reconcileXpLedger(state){
+    const events = Array.isArray(state?.xpEvents) ? state.xpEvents : [];
+    const problems = [];
+    const ids = new Set();
+    const idempotencyKeys = new Set();
+    const sourceIdentities = new Set();
+    events.forEach((event, index)=>{
+      const validation = validateXpEvent(event, { requireOwnership:false });
+      if(!validation.valid) problems.push(`${validation.code}:${index}`);
+      const id = event?.id;
+      if(typeof id === "string" && id){
+        if(ids.has(id)) problems.push(`DUPLICATE_EVENT_ID:${id}`);
+        ids.add(id);
+      }
+      const idempotencyKey = event?.idempotencyKey;
+      if(typeof idempotencyKey === "string" && idempotencyKey){
+        if(idempotencyKeys.has(idempotencyKey)) problems.push(`DUPLICATE_IDEMPOTENCY_KEY:${idempotencyKey}`);
+        idempotencyKeys.add(idempotencyKey);
+      }
+      if(validation.valid && event.type === "award"){
+        const source = xpEventSourceIdentity(event);
+        if(sourceIdentities.has(source)) problems.push(`DUPLICATE_SOURCE:${source}`);
+        sourceIdentities.add(source);
+      }
+    });
+    const ownership = stateOwnershipFields();
+    events.forEach((event, index)=>{
+      if(event && (event.tenantId !== ownership.tenantId || event.membershipId !== ownership.membershipId)){
+        problems.push(`OWNERSHIP_MISMATCH:${index}`);
+      }
+      if(event?.type === "reversal"){
+        const referenced = events.find(candidate => candidate?.id === event.referencesEventId
+          && candidate.tenantId === ownership.tenantId
+          && candidate.membershipId === ownership.membershipId
+          && xpEventIsBalanceAffecting(candidate)
+          && candidate.amount > 0);
+        if(!referenced) problems.push(`PREREQUISITE_MISSING:${index}`);
+        else {
+          const reversalAmount = events.filter(candidate => candidate?.type === "reversal"
+            && candidate.referencesEventId === referenced.id)
+            .reduce((sum, candidate) => sum + (Number.isFinite(candidate.amount) ? candidate.amount : 0), 0);
+          if(Math.abs(reversalAmount) > referenced.amount) problems.push(`EXCESS_REVERSAL:${index}`);
+        }
+      }
+    });
+    const total = xpTotalForState(state);
+    if(total < 0) problems.push("NEGATIVE_TOTAL");
+    return { valid:problems.length === 0, total, eventCount:events.length, problems };
+  }
+
   function canonicalDemoStreakState(){
     const fixture = D.streakState || {};
     return {
@@ -3544,6 +3921,7 @@
     const ownership = stateOwnershipFields();
     const seedXp = Number(D.student?.xp);
     const seedLevel = Number(D.student?.level);
+    const openingBalance = Number.isFinite(seedXp) && seedXp >= 0 ? seedXp : 340;
     return {
       ...ownership,
       pollDone:false,
@@ -3551,8 +3929,8 @@
       quizDone:false,
       quizChoice:null,
       quizParticipation:null,
-      xp:Number.isFinite(seedXp) && seedXp >= 0 ? seedXp : 340,
       level:Number.isInteger(seedLevel) && seedLevel >= 1 ? seedLevel : 1,
+      xpEvents:[prototypeOpeningBalanceEvent(openingBalance)],
       rsvp:null,
       saveEvent:false,
       saveOpp:false,
@@ -3591,6 +3969,7 @@
     const normalized = ensureParticipationState(state);
     const durable = { ...normalized };
     delete durable.voiceDraft;
+    delete durable.xp;
     try{
       localStorage.setItem(stateStorageKey(), JSON.stringify(durable));
       return true;
@@ -3609,8 +3988,40 @@
   }
 
   function hasFutureStateRecord(){
-    const record = readStorageRecord(stateStorageKey());
-    return record.exists && isFutureStateVersion(record.value);
+    const currentRecord = readStorageRecord(stateStorageKey());
+    if(currentRecord.exists && isFutureStateVersion(currentRecord.value)) return true;
+    const previousRecord = readStorageRecord(previousStateStorageKey());
+    return previousRecord.exists && isFutureStateVersion(previousRecord.value);
+  }
+
+  function stateOwnsMembershipAtSchema(state, schemaVersion){
+    const namespace = currentStateNamespace();
+    return Boolean(state && typeof state === "object" && !Array.isArray(state)
+      && Number(state.schemaVersion) === Number(schemaVersion)
+      && state.tenantId === namespace.tenantId
+      && state.membershipId === namespace.membershipId);
+  }
+
+  function normalizeCurrentStateRecord(value){
+    const state = { ...value };
+    state.xpEvents = Array.isArray(value?.xpEvents) ? value.xpEvents.slice() : [];
+    if(!state.xpEvents.length && Object.prototype.hasOwnProperty.call(value || {}, "xp")){
+      state.xp = safeLegacyXpSeed(value.xp);
+    }
+    return ensureParticipationState(state);
+  }
+
+  function migrateOlderStateRecord(value){
+    const state = { ...value };
+    const sourceEvents = Array.isArray(value?.xpEvents) ? value.xpEvents.slice() : [];
+    state.xpEvents = sourceEvents;
+    state.schemaVersion = CURRENT_STATE_SCHEMA_VERSION;
+    const ownership = stateOwnershipFields();
+    state.tenantId = ownership.tenantId;
+    state.membershipId = ownership.membershipId;
+    if(!sourceEvents.length) state.xp = safeLegacyXpSeed(value?.xp);
+    ensureXpLedgerState(state, { createOpening: !sourceEvents.length });
+    return ensureParticipationState(state);
   }
 
   function loadState(){
@@ -3623,32 +4034,51 @@
       // understand. A separate in-memory default keeps the UI usable.
       state = defaultState();
     } else if(currentRecord.exists && !currentRecord.parseError && stateOwnsCurrentMembership(currentRecord.value)){
-      state = currentRecord.value;
-      if(Object.prototype.hasOwnProperty.call(state, "voiceDraft")){
-        durableVoiceDraft = normalizeVoiceDraft(state.voiceDraft);
-      }
-    } else if(!currentRecord.exists){
-      const legacyRecord = readStorageRecord(LEGACY_STATE_KEY);
-      if(legacyRecord.exists){
-        const legacyState = !legacyRecord.parseError && legacyRecord.value && typeof legacyRecord.value === "object" && !Array.isArray(legacyRecord.value)
-          ? legacyRecord.value
-          : defaultState();
-        const hasLegacyDraft = Object.prototype.hasOwnProperty.call(legacyState, "voiceDraft");
-        state = ensureParticipationState(legacyState);
-        const legacyDraft = state.voiceDraft;
-        const stateWritten = writeStateRecord(state);
-        const draftWritten = !hasLegacyDraft || writeVoiceDraftSession(legacyDraft);
-        if(stateWritten && draftWritten) removeLegacyStateAfterMigration();
-      } else {
-        state = defaultState();
-        writeStateRecord(state);
+      state = normalizeCurrentStateRecord(currentRecord.value);
+      // ensureVoiceState supplies an in-memory default, so inspect the raw
+      // record when deciding whether a durable draft really existed.
+      if(Object.prototype.hasOwnProperty.call(currentRecord.value || {}, "voiceDraft")){
+        durableVoiceDraft = normalizeVoiceDraft(currentRecord.value.voiceDraft);
       }
     } else {
-      // A malformed, primitive, or mismatched current record is not allowed to
-      // contribute behaviour to the active membership. Replace it with safe
-      // canonical defaults when possible.
-      state = defaultState();
-      writeStateRecord(state);
+      const previousRecord = readStorageRecord(previousStateStorageKey());
+      const previousFuture = previousRecord.exists && isFutureStateVersion(previousRecord.value);
+      if(previousRecord.exists && !previousRecord.parseError && !previousFuture
+        && stateOwnsMembershipAtSchema(previousRecord.value, PREVIOUS_STATE_SCHEMA_VERSION)){
+        const hasPreviousDraft = Object.prototype.hasOwnProperty.call(previousRecord.value || {}, "voiceDraft");
+        const previousDraft = hasPreviousDraft ? normalizeVoiceDraft(previousRecord.value.voiceDraft) : null;
+        const previousState = migrateOlderStateRecord(previousRecord.value);
+        state = previousState;
+        const stateWritten = writeStateRecord(state);
+        const draftWritten = !hasPreviousDraft || writeVoiceDraftSession(previousDraft);
+        if(stateWritten && draftWritten){
+          try{ localStorage.removeItem(previousStateStorageKey()); }catch(error){}
+        }
+      } else if(!previousFuture){
+        // A malformed or foreign v2 record is not a usable source for this
+        // membership, so continue the precedence chain without deleting it.
+        const legacyRecord = readStorageRecord(LEGACY_STATE_KEY);
+        if(legacyRecord.exists){
+          const legacyState = !legacyRecord.parseError && legacyRecord.value && typeof legacyRecord.value === "object" && !Array.isArray(legacyRecord.value)
+            ? legacyRecord.value
+            : defaultState();
+          const hasLegacyDraft = Object.prototype.hasOwnProperty.call(legacyState, "voiceDraft");
+          const legacyDraft = hasLegacyDraft ? normalizeVoiceDraft(legacyState.voiceDraft) : null;
+          state = migrateOlderStateRecord(legacyState);
+          const stateWritten = writeStateRecord(state);
+          const draftWritten = !hasLegacyDraft || writeVoiceDraftSession(legacyDraft);
+          if(stateWritten && draftWritten) removeLegacyStateAfterMigration();
+        } else {
+          state = defaultState();
+          writeStateRecord(state);
+        }
+      } else {
+        // A malformed, primitive, mismatched, or future record is not allowed
+        // to contribute behaviour to the active membership. Replace it with
+        // safe in-memory defaults while preserving unsupported records.
+        state = defaultState();
+        if(!currentRecord.exists && !previousFuture) writeStateRecord(state);
+      }
     }
 
     const sessionDraft = readVoiceDraftSession();
@@ -3725,6 +4155,9 @@
         }
         voiceSubmitInFlight = false;
         setPersistenceScenarioValue("normal");
+        // An explicit reset must not overwrite a state schema this runtime
+        // does not understand; the unsupported record remains recoverable.
+        if(hasFutureStateRecord()) return false;
         const resetState = defaultState();
         const persisted = writeStateRecord(resetState);
         if(!persisted) return false;
@@ -3749,8 +4182,8 @@
         state.supportedVoiceIssues = [];
         state.notificationReadIds = notificationDefaultReadIds();
         state.streakState = { count:3, lastQualifiedTenantDay:"2026-05-19" };
-        state.xp = 340;
-        state.level = studentLevelForXp(state.xp).level;
+        state.xpEvents = [prototypeOpeningBalanceEvent(340)];
+        state.level = studentLevelForXp(xpTotalForState(state)).level;
         meSavesOpen = false;
         meRsvpsOpen = false;
         lastParticipationDecision = null;
@@ -3806,6 +4239,42 @@
       },
       getCurrentState(){
         return JSON.parse(JSON.stringify(participationState()));
+      },
+      getXpEvents(){
+        return JSON.parse(JSON.stringify(participationState().xpEvents || []));
+      },
+      getXpTotal(){
+        return xpTotalForState(participationState());
+      },
+      reconcileXpLedger(){
+        return reconcileXpLedger(participationState());
+      },
+      appendXpEvent(eventInput={}){
+        const state = participationState();
+        const result = appendXpEvent(state, eventInput);
+        if(!result.added) return result;
+        if(!saveState(state)) return { added:false, reason:"PERSISTENCE_FAILURE" };
+        hydrateTenant(state);
+        renderXPRules();
+        return { added:true, event:JSON.parse(JSON.stringify(result.event)) };
+      },
+      appendXpCorrection(eventInput={}){
+        const state = participationState();
+        const result = appendXpEvent(state, { ...eventInput, type:"correction" });
+        if(!result.added) return result;
+        if(!saveState(state)) return { added:false, reason:"PERSISTENCE_FAILURE" };
+        hydrateTenant(state);
+        renderXPRules();
+        return { added:true, event:JSON.parse(JSON.stringify(result.event)) };
+      },
+      appendXpReversal(referencesEventId, eventInput={}){
+        const state = participationState();
+        const result = appendXpEvent(state, { ...eventInput, type:"reversal", referencesEventId });
+        if(!result.added) return result;
+        if(!saveState(state)) return { added:false, reason:"PERSISTENCE_FAILURE" };
+        hydrateTenant(state);
+        renderXPRules();
+        return { added:true, event:JSON.parse(JSON.stringify(result.event)) };
       },
       getRouteStack(){
         return historyStack.slice();

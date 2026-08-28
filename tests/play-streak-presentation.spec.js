@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-const STATE_KEY = 'campushub:state:v2:tenant-makerere:membership-demo-001';
+const STATE_KEY = 'campushub:state:v3:tenant-makerere:membership-demo-001';
 
 async function goTo(page, hash) {
   await page.goto(`/${hash}`);

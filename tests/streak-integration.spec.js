@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-const STATE_KEY = 'campushub:state:v2:tenant-makerere:membership-demo-001';
+const STATE_KEY = 'campushub:state:v3:tenant-makerere:membership-demo-001';
 
 async function goTo(page, hash) {
   await page.goto(`/${hash}`);
@@ -15,6 +15,10 @@ async function resetDemo(page, scenario = null) {
 
 async function readState(page) {
   return page.evaluate(key => JSON.parse(localStorage.getItem(key) || 'null'), STATE_KEY);
+}
+
+async function readXp(page) {
+  return page.evaluate(() => window.CampusHubDebug.getXpTotal());
 }
 
 async function setStoredState(page, patch) {
@@ -85,12 +89,12 @@ test.describe('Phase 8C canonical tenant-day streak integration', () => {
 
   test('qualifies a successful Poll once and persists four across UI and reload', async ({ page }) => {
     await resetDemo(page);
-    const startingXp = (await readState(page)).xp;
+    const startingXp = await readXp(page);
     const pollXp = await page.evaluate(() => Number(window.CampusHubDemo.demoConfig.xp.pollParticipation));
     await submitPoll(page);
 
     expect((await readState(page)).streakState).toEqual({ count:4, lastQualifiedTenantDay:'2026-05-20' });
-    expect((await readState(page)).xp).toBe(startingXp + pollXp);
+    expect(await readXp(page)).toBe(startingXp + pollXp);
     await goTo(page, '#play');
     await expect(page.locator('[data-field="streakDuration"]')).toHaveText('4 days');
     await goTo(page, '#home');
@@ -126,26 +130,26 @@ test.describe('Phase 8C canonical tenant-day streak integration', () => {
   test('qualifies both correct and incorrect Quiz answers independently of XP correctness', async ({ page }) => {
     await resetDemo(page);
     await goTo(page, '#play');
-    const correctStartingXp = (await readState(page)).xp;
+    const correctStartingXp = await readXp(page);
     await page.locator('#quizOptions input[value="0"]').check();
     await page.locator('#quizSubmit').click();
     await expect(page.locator('#quizFeedback')).toContainText('Correct!');
     expect((await readState(page)).streakState.count).toBe(4);
-    expect((await readState(page)).xp).toBe(correctStartingXp + 10);
+    expect(await readXp(page)).toBe(correctStartingXp + 10);
 
     await resetDemo(page);
     await goTo(page, '#play');
-    const incorrectStartingXp = (await readState(page)).xp;
+    const incorrectStartingXp = await readXp(page);
     await page.locator('#quizOptions input[value="1"]').check();
     await page.locator('#quizSubmit').click();
     await expect(page.locator('#quizFeedback')).toContainText('Not quite.');
     expect((await readState(page)).streakState.count).toBe(4);
-    expect((await readState(page)).xp).toBe(incorrectStartingXp + 5);
+    expect(await readXp(page)).toBe(incorrectStartingXp + 5);
   });
 
   test('qualifies final Voice submission silently without publishing or XP', async ({ page }) => {
     await resetDemo(page);
-    const startingXp = (await readState(page)).xp;
+    const startingXp = await readXp(page);
     await completeVoiceSubmission(page);
     const state = await readState(page);
     expect(state.streakState).toEqual({ count:4, lastQualifiedTenantDay:'2026-05-20' });
@@ -247,12 +251,12 @@ test.describe('Phase 8C canonical tenant-day streak integration', () => {
     await page.evaluate(() => { window.CampusHubDemo.demoConfig.calendar.isInRecess = true; });
     await page.evaluate(() => { window.location.hash = '#play'; });
     await expect(page.locator('[data-field="streakPauseNote"]')).toHaveText('Your streak is paused for the recess.');
-    const startingXp = (await readState(page)).xp;
+    const startingXp = await readXp(page);
     await page.evaluate(() => { window.location.hash = '#participate'; });
     await submitPollOnCurrentPage(page);
     const state = await readState(page);
     expect(state.streakState).toEqual({ count:3, lastQualifiedTenantDay:'2026-05-19' });
-    expect((await readState(page)).xp).toBe(startingXp + 5);
+    expect(await readXp(page)).toBe(startingXp + 5);
 
     await page.evaluate(() => { window.CampusHubDemo.demoConfig.calendar.isInRecess = false; });
     await goTo(page, '#play');
@@ -286,13 +290,13 @@ test.describe('Phase 8C canonical tenant-day streak integration', () => {
     await resetDemo(page);
     await setStoredState(page, {
       removeStreakState:true,
-      state:{ xp:412, pollDone:true, pollChoice:1 },
+      state:{ pollDone:true, pollChoice:1 },
       membership:{ assuranceLevel:2, status:'active' }
     });
     await page.reload();
     const state = await readState(page);
     expect(state.streakState).toEqual({ count:3, lastQualifiedTenantDay:'2026-05-19' });
-    expect(state.xp).toBe(412);
+    expect(await readXp(page)).toBe(340);
     expect(state.membership).toEqual({ assuranceLevel:2, status:'active' });
     expect(state.pollDone).toBe(true);
     expect(state.pollChoice).toBe(1);

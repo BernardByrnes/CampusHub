@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-const PARTICIPATION_STATE_KEY = 'campushub:state:v2:tenant-makerere:membership-demo-001';
+const PARTICIPATION_STATE_KEY = 'campushub:state:v3:tenant-makerere:membership-demo-001';
 
 async function goTo(page, hash) {
   await page.goto(`/${hash}`);
@@ -15,6 +15,10 @@ async function resetDemo(page, scenario = null) {
 
 async function readState(page) {
   return page.evaluate(key => JSON.parse(localStorage.getItem(key) || 'null'), PARTICIPATION_STATE_KEY);
+}
+
+async function readXp(page) {
+  return page.evaluate(() => window.CampusHubDebug.getXpTotal());
 }
 
 async function expectGateDecision(page, expected) {
@@ -50,7 +54,7 @@ test.describe('Phase 6C RSVP and Daily Quiz GSC-14 integration', () => {
   test('allows mutually exclusive RSVP changes with zero XP', async ({ page }) => {
     await resetDemo(page);
     await goTo(page, '#events/guild-debate');
-    const startingXp = (await readState(page)).xp;
+    const startingXp = await readXp(page);
 
     await page.locator('#rsvpGoing').click();
     await expect(page.locator('#rsvpGoing')).toHaveAttribute('aria-pressed', 'true');
@@ -171,7 +175,7 @@ test.describe('Phase 6C RSVP and Daily Quiz GSC-14 integration', () => {
     await expect(page.locator('#quizFeedback')).toContainText('Correct!');
     await expect(page.locator('#quizCompleteNote')).toContainText('quiz is complete');
     await expect(page.locator('#quizSubmit')).toBeHidden();
-    expect((await readState(page)).xp).toBe(startingXp + 10);
+    expect(await readXp(page)).toBe(startingXp + 10);
     expect(await readState(page)).toMatchObject({
       quizDone:true,
       quizChoice:0,
@@ -187,13 +191,13 @@ test.describe('Phase 6C RSVP and Daily Quiz GSC-14 integration', () => {
     await expect(page.locator('#quizFeedback')).toContainText('Correct!');
     await expect(page.locator('#quizCompleteNote')).toContainText('quiz is complete');
     await expect(page.locator('#quizSubmit')).toBeHidden();
-    expect((await readState(page)).xp).toBe(startingXp + 10);
+    expect(await readXp(page)).toBe(startingXp + 10);
   });
 
   test('awards only participation XP for an incorrect Quiz answer and reveals the answer after submit', async ({ page }) => {
     await resetDemo(page);
     await goTo(page, '#play');
-    const startingXp = (await readState(page)).xp;
+    const startingXp = await readXp(page);
 
     await page.locator('#quizOptions input[value="1"]').check();
     await page.locator('#quizSubmit').click();
@@ -201,7 +205,7 @@ test.describe('Phase 6C RSVP and Daily Quiz GSC-14 integration', () => {
     await expect(page.locator('#quizFeedback')).toContainText('Correct answer: Lake Victoria.');
     await expect(page.locator('#quizCompleteNote')).toContainText('quiz is complete');
     await expect(page.locator('#quizSubmit')).toBeHidden();
-    expect((await readState(page)).xp).toBe(startingXp + 5);
+    expect(await readXp(page)).toBe(startingXp + 5);
     expect((await readState(page)).quizParticipation.xpAwarded).toBe(5);
   });
 
@@ -263,7 +267,7 @@ test.describe('Phase 6C RSVP and Daily Quiz GSC-14 integration', () => {
     await page.locator('#quizOptions input[value="0"]').check();
     await page.locator('#quizSubmit').click();
     await expect(page.locator('#quizFeedback')).toContainText('Correct!');
-    const completedXp = (await readState(page)).xp;
+    const completedXp = await readXp(page);
     const completedState = await readState(page);
 
     await goTo(page, '#home');
@@ -274,10 +278,9 @@ test.describe('Phase 6C RSVP and Daily Quiz GSC-14 integration', () => {
       variant:'prerequisites-unmet',
       resourceContext:'daily-quiz'
     });
-    expect((await readState(page)).xp).toBe(completedXp);
+    expect(await readXp(page)).toBe(completedXp);
     expect(await readState(page)).toMatchObject({
-      quizParticipation:completedState.quizParticipation,
-      xp:completedState.xp
+      quizParticipation:completedState.quizParticipation
     });
   });
 

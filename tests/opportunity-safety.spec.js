@@ -25,7 +25,7 @@ async function resetAndGo(page) {
 }
 
 async function storedState(page) {
-  return page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state:v2:tenant-makerere:membership-demo-001')));
+  return page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state:v3:tenant-makerere:membership-demo-001')));
 }
 
 test.describe('Opportunity external destination safety', () => {
@@ -156,7 +156,7 @@ test.describe('Opportunity external destination safety', () => {
     await expect(report).toBeDisabled();
     const after = await storedState(page);
     expect(after.reportedOpportunityIds).toEqual(['ra-climate']);
-    expect(after.xp).toBe(before.xp);
+    expect(after.xpEvents).toEqual(before.xpEvents);
     expect(after.streakState).toEqual(before.streakState);
 
     await page.reload();
@@ -169,11 +169,11 @@ test.describe('Opportunity external destination safety', () => {
   test('normalizes old state without reportedOpportunityIds and preserves Save behavior', async ({ page }) => {
     await resetAndGo(page);
     await page.evaluate(() => {
-      const current = JSON.parse(localStorage.getItem('campushub:state:v2:tenant-makerere:membership-demo-001'));
-      localStorage.setItem('campushub:state:v2:tenant-makerere:membership-demo-001', JSON.stringify({
+    const current = JSON.parse(localStorage.getItem('campushub:state:v3:tenant-makerere:membership-demo-001'));
+    localStorage.setItem('campushub:state:v3:tenant-makerere:membership-demo-001', JSON.stringify({
         ...current,
         saveOpp: true,
-        xp: 321,
+        xpEvents: [{ ...current.xpEvents[0], amount: 321 }],
         legacyMarker: 'preserved'
       }));
     });
@@ -182,7 +182,8 @@ test.describe('Opportunity external destination safety', () => {
     const migrated = await storedState(page);
     expect(migrated.reportedOpportunityIds).toEqual([]);
     expect(migrated.legacyMarker).toBe('preserved');
-    expect(migrated.xp).toBe(321);
+    expect(migrated).not.toHaveProperty('xp');
+    expect(migrated.xpEvents[0].amount).toBe(321);
   });
 
   test('keeps detail and dialog usable across the required responsive matrix', async ({ page }) => {
