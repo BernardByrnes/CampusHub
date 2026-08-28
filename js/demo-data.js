@@ -54,16 +54,21 @@ window.CampusHubDemo = {
     lastQualifiedTenantDay: "2026-05-19"
   },
 
-  priorityNotice: {
-    id: "notice-classes-rescheduled",
-    kicker: "Priority Notice",
-    title: "Wednesday Classes Rescheduled",
-    body: "Due to the Guild General Assembly, all teaching on Wednesday, 20 May 2026 will start at 2:00 PM.",
-    meta: "19 May 2026  •  Office of the Academic Registrar",
-    href: "#notifications"
-  },
-
   publications: [
+    {
+      id: "notice-classes-rescheduled",
+      type: "notice",
+      priority: "priority",
+      kicker: "Priority Notice",
+      title: "Wednesday Classes Rescheduled",
+      excerpt: "Due to the Guild General Assembly, all teaching on Wednesday, 20 May 2026 will start at 2:00 PM.",
+      body: "Due to the Guild General Assembly, all teaching on Wednesday, 20 May 2026 will start at 2:00 PM.",
+      date: "19 May 2026",
+      source: "Office of the Academic Registrar",
+      visibility: "MEMBERS",
+      image: null,
+      href: "#news/notice-classes-rescheduled"
+    },
     {
       id: "innovation-week",
       kicker: "Innovation Week",
@@ -165,17 +170,10 @@ window.CampusHubDemo = {
     requiredAssurance: "L2",
     privacyNote: "Your individual response is private.",
     trustNote: "CampusHub does not provide Guild or university users with a way to see how a named student responded to a poll.",
+    href: "#participate",
+    cta: "Respond",
     hasVoted: false,
     selected: null
-  },
-
-  quickPollForHome: {
-    id: "poll-campus-improvements",
-    kicker: "Quick Poll",
-    title: "What should be improved most around Main Campus?",
-    meta: "Non-binding sentiment poll • Closes 25 May 2026",
-    cta: "Respond",
-    href: "#participate"
   },
 
   voiceIssues: [
@@ -310,7 +308,7 @@ window.CampusHubDemo = {
       time: "09:30",
       unread: true,
       type: "priority",
-      href: "#home"
+      href: "#news/notice-classes-rescheduled"
     },
     {
       id: "notification-poll-opened",

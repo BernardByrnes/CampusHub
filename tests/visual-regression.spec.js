@@ -281,6 +281,11 @@ test.describe('Phase 7D canonical visual regression baselines', () => {
       await captureMobileViewport(page, 'news-innovation-week-390.png');
     });
 
+    test('news-notice-390', async ({ page }) => {
+      await resetAndGo(page, '#news/notice-classes-rescheduled');
+      await captureMobileViewport(page, 'news-notice-390.png');
+    });
+
     test('voice-water-halls-390', async ({ page }) => {
       await resetAndGo(page, '#voice-detail/voice-water-halls');
       await captureMobileViewport(page, 'voice-water-halls-390.png');

@@ -2,6 +2,10 @@ import { expect, test } from '@playwright/test';
 
 const innovationTitle = 'Makerere Innovation Week opens Monday';
 const cocisTitle = 'New Innovation Lab Opens at CoCIS';
+const noticeTitle = 'Wednesday Classes Rescheduled';
+const noticeBody = [
+  'Due to the Guild General Assembly, all teaching on Wednesday, 20 May 2026 will start at 2:00 PM.'
+];
 const innovationImageSrc = /assets\/images\/hero-innovation\.webp$/;
 const innovationImageAlt = 'A group collaborating around a project planning board';
 const cocisImageSrc = /assets\/images\/campus-cocis\.webp$/;
@@ -41,6 +45,14 @@ const COCIS = Object.freeze({
   body: cocisBody,
   imageSrc: cocisImageSrc,
   imageAlt: cocisImageAlt
+});
+const NOTICE = Object.freeze({
+  id: 'notice-classes-rescheduled',
+  kicker: 'Priority Notice',
+  title: noticeTitle,
+  date: '19 May 2026',
+  source: 'Office of the Academic Registrar',
+  body: noticeBody
 });
 
 function expectAtLeastWithSubpixelTolerance(actual, minimum, epsilon = 0.01) {
@@ -106,6 +118,23 @@ async function expectPublicationDetail(page, publication) {
   await expectDiscoverNav(page);
 }
 
+async function expectNoticeDetail(page) {
+  const view = page.locator('#view-news');
+  await expect(view).toBeVisible();
+  await expect(view.locator('h1')).toHaveCount(1);
+  await expect(view.locator('h1#newsDetailTitle')).toHaveText(NOTICE.title);
+  await expect(page.locator('#newsDetailKicker')).toHaveText(NOTICE.kicker);
+  await expect(page.locator('#newsDetailDate')).toHaveText(NOTICE.date);
+  await expect(page.locator('#newsDetailSource')).toHaveText(NOTICE.source);
+  await expect(page.locator('#newsDetailBody p')).toHaveCount(NOTICE.body.length);
+  await expect(page.locator('#newsDetailBody')).toHaveText(NOTICE.body[0]);
+  await expect(page.locator('#newsDetailMedia')).toBeHidden();
+  await expect(page.locator('#newsDetailImage')).toBeHidden();
+  await expect(page.locator('#newsDetailImage')).not.toHaveAttribute('src', /.+/);
+  await expect(page.locator('#newsDetailImage')).toHaveAttribute('alt', '');
+  await expectDiscoverNav(page);
+}
+
 function captureRuntimeErrors(page) {
   const runtime = { pageErrors: [], consoleErrors: [] };
   page.on('pageerror', error => runtime.pageErrors.push(error.message));
@@ -154,6 +183,19 @@ test.describe('Canonical Publication detail', () => {
     expect(new URL(page.url()).hash).toBe('#news/cocis-innovation-lab');
   });
 
+  test('Priority Notice direct route resolves as the canonical text-only Publication', async ({ page }) => {
+    await goTo(page, '#news/notice-classes-rescheduled');
+
+    await expectNoticeDetail(page);
+    expect(new URL(page.url()).hash).toBe('#news/notice-classes-rescheduled');
+    await expect.poll(() => page.evaluate(() => document.activeElement?.id)).toBe('newsDetailTitle');
+
+    const back = page.locator('#view-news [data-back]');
+    const box = await back.boundingBox();
+    expectAtLeastWithSubpixelTolerance(box?.width || 0, 44);
+    expectAtLeastWithSubpixelTolerance(box?.height || 0, 44);
+  });
+
   test('uses the canonical News SubHeader and one entity-title H1', async ({ page }) => {
     await goTo(page, '#news/innovation-week');
 
@@ -196,6 +238,23 @@ test.describe('Canonical Publication detail', () => {
     await expect.poll(() => new URL(page.url()).hash).toBe('#news/innovation-week');
     await expectPublicationDetail(page, INNOVATION);
     await expect(page.locator('#newsDetailBody')).not.toContainText(cocisBody[0]);
+  });
+
+  test('switches between the text-only Notice and image-bearing Publications without stale media', async ({ page }) => {
+    await goTo(page, '#news/notice-classes-rescheduled');
+    await expectNoticeDetail(page);
+
+    await page.evaluate(() => { location.hash = '#news/innovation-week'; });
+    await expect.poll(() => new URL(page.url()).hash).toBe('#news/innovation-week');
+    await expectPublicationDetail(page, INNOVATION);
+
+    await page.evaluate(() => { location.hash = '#news/cocis-innovation-lab'; });
+    await expect.poll(() => new URL(page.url()).hash).toBe('#news/cocis-innovation-lab');
+    await expectPublicationDetail(page, COCIS);
+
+    await page.evaluate(() => { location.hash = '#news/notice-classes-rescheduled'; });
+    await expect.poll(() => new URL(page.url()).hash).toBe('#news/notice-classes-rescheduled');
+    await expectNoticeDetail(page);
   });
 
   test('hides missing Publication media without breaking the detail', async ({ page }) => {
@@ -272,6 +331,18 @@ test.describe('Canonical Publication detail', () => {
     await expect(page.locator('#newsDetailTitle')).toHaveText(innovationTitle);
     expect(new URL(page.url()).hash).toBe('#news/innovation-week');
     await expectDiscoverNav(page);
+
+    await page.locator('#view-news [data-back]').click();
+    await expect(page.locator('#view-home')).toBeVisible();
+    expect(new URL(page.url()).hash).toBe('#home');
+  });
+
+  test('Home Priority Notice opens the Publication detail and Back returns Home', async ({ page }) => {
+    await goTo(page, '#home');
+    await page.locator('[data-testid="home-priority-link"]').click();
+
+    await expectNoticeDetail(page);
+    expect(new URL(page.url()).hash).toBe('#news/notice-classes-rescheduled');
 
     await page.locator('#view-news [data-back]').click();
     await expect(page.locator('#view-home')).toBeVisible();
@@ -371,6 +442,47 @@ test.describe('Canonical Publication detail', () => {
         expect(metrics.shellWidth).toBeLessThanOrEqual(431);
         if (metrics.navHeight) expect(metrics.mainPaddingBottom + 1).toBeGreaterThanOrEqual(metrics.navHeight);
       }
+    }
+  });
+
+  test('keeps the text-only Notice detail contained across the frozen responsive matrix', async ({ page }) => {
+    for (const viewport of responsiveViewports) {
+      await page.setViewportSize(viewport);
+      await goTo(page, '#news/notice-classes-rescheduled');
+      await expectNoticeDetail(page);
+      const metrics = await page.evaluate(() => {
+        const view = document.querySelector('#view-news')?.getBoundingClientRect();
+        const shell = document.querySelector('#shell')?.getBoundingClientRect();
+        const title = document.querySelector('#newsDetailTitle');
+        const back = document.querySelector('#view-news [data-back]')?.getBoundingClientRect();
+        const nav = document.querySelector('.bottom-nav')?.getBoundingClientRect();
+        const mainStyle = getComputedStyle(document.querySelector('#main'));
+        return {
+          viewportWidth: window.innerWidth,
+          documentWidth: document.documentElement.scrollWidth,
+          bodyWidth: document.body.scrollWidth,
+          viewLeft: view?.left ?? 0,
+          viewRight: view?.right ?? 0,
+          shellLeft: shell?.left ?? 0,
+          shellRight: shell?.right ?? 0,
+          shellWidth: shell?.width ?? 0,
+          titleFits: title ? title.scrollWidth <= title.clientWidth : false,
+          backWidth: back?.width ?? 0,
+          backHeight: back?.height ?? 0,
+          navHeight: nav?.height ?? 0,
+          mainPaddingBottom: Number.parseFloat(mainStyle.paddingBottom) || 0
+        };
+      });
+
+      expect(metrics.documentWidth).toBeLessThanOrEqual(metrics.viewportWidth + 1);
+      expect(metrics.bodyWidth).toBeLessThanOrEqual(metrics.viewportWidth + 1);
+      expect(metrics.viewLeft).toBeGreaterThanOrEqual(metrics.shellLeft - 1);
+      expect(metrics.viewRight).toBeLessThanOrEqual(metrics.shellRight + 1);
+      expect(metrics.titleFits).toBe(true);
+      expectAtLeastWithSubpixelTolerance(metrics.backWidth, 44);
+      expectAtLeastWithSubpixelTolerance(metrics.backHeight, 44);
+      expect(metrics.shellWidth).toBeLessThanOrEqual(431);
+      if (metrics.navHeight) expect(metrics.mainPaddingBottom + 1).toBeGreaterThanOrEqual(metrics.navHeight);
     }
   });
 });

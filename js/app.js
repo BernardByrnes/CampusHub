@@ -415,6 +415,19 @@
     }
   }
 
+  function hydratePollContent(){
+    const poll = D.poll;
+    if(!poll) return;
+    setEntityField('#pollQuestion', poll.question);
+    setEntityField('#pollCard [data-field="pollKicker"]', poll.kicker);
+    setEntityField('#pollCard [data-field="pollHelp"]', poll.help);
+    setEntityField('#pollCard [data-field="pollPrivacy"]', poll.privacyNote);
+    setEntityField('#pollCard [data-field="pollTrust"]', poll.trustNote);
+    $$('#pollForm [data-field="pollOptionLabel"]').forEach((label, index)=>{
+      label.textContent = poll.options?.[index] || '';
+    });
+  }
+
   // Populate tenant header
   function hydrateTenant(state=participationState()){
     const normalizedState = ensureParticipationState(state || {});
@@ -423,11 +436,15 @@
     $('[data-field="tenantCampus"]').textContent = D.tenant.campusLabel;
     $('[data-field="tenantYear"]').textContent = `Academic Year ${D.tenant.academicYear}`;
     // priority
-    $('[data-field="priorityTitle"]').textContent = D.priorityNotice.title;
-    $('[data-field="priorityBody"]').textContent = D.priorityNotice.body;
-    $('[data-field="priorityMeta"]').textContent = D.priorityNotice.meta;
+    const priorityPublication = findPublication("notice-classes-rescheduled");
+    if(priorityPublication){
+      setEntityField('[data-field="priorityKicker"]', priorityPublication.kicker);
+      setEntityField('[data-field="priorityTitle"]', priorityPublication.title);
+      setEntityField('[data-field="priorityBody"]', priorityPublication.body);
+      setEntityField('[data-field="priorityMeta"]', [priorityPublication.date, priorityPublication.source].filter(Boolean).join(" • "));
+    }
     const priorityLink = $('#homePriority [data-testid="home-priority-link"]');
-    if(priorityLink) priorityLink.href = D.priorityNotice.href || "#notifications";
+    if(priorityLink) priorityLink.href = priorityPublication?.href || "#news/notice-classes-rescheduled";
     // hero
     $('[data-field="heroKicker"]').textContent = D.heroStory.kicker.toUpperCase();
     $('[data-field="heroTitle"]').textContent = D.heroStory.title;
@@ -437,17 +454,20 @@
     const heroLink = $('[data-testid="hero-read"]');
     if(heroLink) heroLink.href = D.heroStory.href;
     // Home composition uses the same canonical records as the destination views.
-    const homePoll = D.quickPollForHome;
+    const homePoll = D.poll;
     if(homePoll){
+      const homePollCard = $('#homePoll');
+      if(homePollCard) homePollCard.dataset.pollId = homePoll.id || '';
       setEntityField('[data-field="homePollKicker"]', homePoll.kicker);
-      setEntityField('[data-field="homePollTitle"]', homePoll.title);
-      setEntityField('[data-field="homePollMeta"]', homePoll.meta || "Non-binding student sentiment poll");
+      setEntityField('[data-field="homePollTitle"]', homePoll.question);
+      setEntityField('[data-field="homePollMeta"]', homePoll.closes);
       const pollLink = $('#homePoll [data-testid="home-poll-respond"]');
       if(pollLink){
-        pollLink.href = homePoll.href;
-        pollLink.textContent = homePoll.cta;
+        pollLink.href = homePoll.href || "#participate";
+        pollLink.textContent = homePoll.cta || "Respond";
       }
     }
+    hydratePollContent();
     const homeEvent = D.featuredEvent;
     if(homeEvent){
       setEntityField('[data-field="homeEventKicker"]', homeEvent.kicker);
@@ -1996,6 +2016,7 @@
     const btn = $('#submitPoll');
     const success = $('#pollSuccess');
     if(!form || !btn || !success) return;
+    hydratePollContent();
     const state = participationState();
     if(state.pollDone){
       form.querySelectorAll('input').forEach(i=> i.disabled=true);

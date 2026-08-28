@@ -23,6 +23,13 @@ function notificationRow(page, id) {
   return page.locator(`li.notification-item:has([data-notification-id="${id}"])`);
 }
 
+// CSS specifies the 44px Back target exactly; Chromium/Windows can expose a
+// tiny floating-point bounding-box error, so this epsilon is measurement
+// precision only, not a design tolerance.
+function expectAtLeastWithSubpixelTolerance(actual, minimum, epsilon = 0.01) {
+  expect(actual + epsilon).toBeGreaterThanOrEqual(minimum);
+}
+
 test.describe('Phase 8O canonical Notifications centre', () => {
   test.beforeEach(async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'canonical-mobile', 'Notifications contract coverage runs once in canonical-mobile.');
@@ -84,6 +91,30 @@ test.describe('Phase 8O canonical Notifications centre', () => {
     await expect(page.locator('#notifBtn')).toHaveAttribute('aria-label', 'Notifications, 1 unread');
   });
 
+  test('opens the Priority notification source Publication and marks only that row read', async ({ page }) => {
+    await openNotifications(page);
+    const priority = notification(page, 'notification-priority-rescheduled');
+    await expect(priority).toHaveAttribute('href', '#news/notice-classes-rescheduled');
+
+    await priority.click();
+    await expect(page).toHaveURL(/#news\/notice-classes-rescheduled$/);
+    await expect(page.locator('#view-news')).toBeVisible();
+    await expect(page.locator('#newsDetailTitle')).toHaveText('Wednesday Classes Rescheduled');
+    await expect(page.locator('#tab-discover')).toHaveAttribute('aria-current', 'page');
+
+    const persisted = await page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state') || '{}'));
+    expect(persisted.notificationReadIds).toContain('notification-priority-rescheduled');
+    expect(persisted.notificationReadIds).not.toContain('notification-poll-opened');
+
+    await page.locator('#view-news [data-back]').click();
+    await expect(page).toHaveURL(/#notifications$/);
+    await expect(page.locator('#view-notifications')).toBeVisible();
+    await expect(page.locator('.notification-row--unread')).toHaveCount(1);
+    await expect(notificationRow(page, 'notification-priority-rescheduled')).not.toHaveClass(/notification-row--unread/);
+    await expect(notificationRow(page, 'notification-poll-opened')).toHaveClass(/notification-row--unread/);
+    await expect(page.locator('#notifBtn')).toHaveAttribute('aria-label', 'Notifications, 1 unread');
+  });
+
   test('persists one read receipt across reload without mutating fixture content', async ({ page }) => {
     await openNotifications(page);
     await notification(page, 'notification-poll-opened').click();
@@ -133,7 +164,7 @@ test.describe('Phase 8O canonical Notifications centre', () => {
 
   test('resolves every canonical source route', async ({ page }) => {
     const routes = [
-      ['notification-priority-rescheduled', /#home$/],
+      ['notification-priority-rescheduled', /#news\/notice-classes-rescheduled$/],
       ['notification-poll-opened', /#participate$/],
       ['notification-cocis-story', /#news\/cocis-innovation-lab$/],
       ['notification-verification-updated', /#verification$/]
@@ -234,7 +265,7 @@ test.describe('Phase 8O Notifications responsive matrix', () => {
     expect(measurements.bodyScrollWidth).toBeLessThanOrEqual(measurements.viewportWidth + 1);
     expect(measurements.listWidth).toBeLessThanOrEqual(measurements.viewportWidth + 1);
     expect(measurements.backWidth).toBeGreaterThanOrEqual(44);
-    expect(measurements.backHeight).toBeGreaterThanOrEqual(44);
+    expectAtLeastWithSubpixelTolerance(measurements.backHeight, 44);
     expect(measurements.rowHeights.every(height => height >= 44)).toBe(true);
     expect(measurements.markAllVisible).toBe(true);
   });

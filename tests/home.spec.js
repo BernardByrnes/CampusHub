@@ -87,22 +87,29 @@ test.describe('Canonical Home', () => {
     await expect(home.locator('#homePlaySummary h2')).toHaveCount(0);
   });
 
-  test('makes the Priority Notice a full-row Notifications link', async ({ page }) => {
+  test('makes the Priority Notice a full-row Publication link', async ({ page }) => {
     await goTo(page);
 
     const priority = page.locator('#homePriority');
     const link = priority.locator('[data-testid="home-priority-link"]');
     await expect(priority).toHaveAttribute('role', 'note');
     await expect(link).toHaveCount(1);
-    await expect(link).toHaveAttribute('href', '#notifications');
+    await expect(link).toHaveAttribute('href', '#news/notice-classes-rescheduled');
     await expect(link).toContainText('Wednesday Classes Rescheduled');
     await expect(priority.locator('a[href]')).toHaveCount(1);
     const box = await link.boundingBox();
     expect(box).not.toBeNull();
     expectAtLeastWithSubpixelTolerance(box?.height || 0, 44);
+    const before = await page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state') || '{}').notificationReadIds);
     await link.click();
-    await expect(page.locator('#view-notifications')).toBeVisible();
-    await expect(page.locator('.nav-item[data-nav="home"]')).toHaveAttribute('aria-current', 'page');
+    await expect(page.locator('#view-news')).toBeVisible();
+    await expect(page.locator('#newsDetailTitle')).toHaveText('Wednesday Classes Rescheduled');
+    await expect(page.locator('.nav-item[data-nav="discover"]')).toHaveAttribute('aria-current', 'page');
+    const after = await page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state') || '{}').notificationReadIds);
+    expect(after).toEqual(before);
+    await page.locator('#view-news [data-back]').click();
+    await expect(page.locator('#view-home')).toBeVisible();
+    expect(new URL(page.url()).hash).toBe('#home');
   });
 
   test('keeps every Home affordance at a practical touch target', async ({ page }, testInfo) => {
@@ -156,7 +163,7 @@ test.describe('Canonical Home', () => {
     }
   });
 
-  test('renders the canonical hero and Quick Poll immediately after it', async ({ page }) => {
+  test('renders the canonical hero and Poll immediately after it', async ({ page }) => {
     await goTo(page);
 
     await expect(page.locator('#globalSearch')).toHaveAttribute(
@@ -171,8 +178,9 @@ test.describe('Canonical Home', () => {
       '#news/innovation-week'
     );
 
-    await expect(page.locator('#homePoll')).toContainText('What should be improved most around Main Campus?');
-    await expect(page.locator('#homePoll')).toContainText('Non-binding sentiment poll');
+    await expect(page.locator('#homePoll')).toContainText('How would you rate the cleanliness of public restrooms on campus?');
+    await expect(page.locator('#homePoll')).toContainText('Non-binding student sentiment poll');
+    await expect(page.locator('#homePoll')).toContainText('Closes 25 May 2026');
     await expect(page.locator('#homePoll [data-testid="home-poll-respond"]')).toHaveText('Respond');
     await expect(page.locator('#homePoll [data-testid="home-poll-respond"]')).toHaveAttribute(
       'href',
@@ -180,6 +188,37 @@ test.describe('Canonical Home', () => {
     );
     await expect(page.locator('#homePoll')).not.toContainText('Submit Vote');
     await expect(page.locator('#homePoll')).not.toContainText('Take Poll');
+  });
+
+  test('keeps Home Poll content on the canonical D.poll and continues to Participate', async ({ page }) => {
+    await goTo(page);
+
+    const canonical = await page.evaluate(() => ({
+      poll: {
+        id: window.CampusHubDemo.poll?.id,
+        question: window.CampusHubDemo.poll?.question,
+        closes: window.CampusHubDemo.poll?.closes,
+        href: window.CampusHubDemo.poll?.href
+      },
+      hasQuickPollForHome: Object.prototype.hasOwnProperty.call(window.CampusHubDemo, 'quickPollForHome'),
+      publicationIds: window.CampusHubDemo.publications.map(publication => publication.id),
+      hasPriorityNoticeEntity: Object.prototype.hasOwnProperty.call(window.CampusHubDemo, 'priorityNotice')
+    }));
+    expect(canonical.poll).toEqual({
+      id: 'poll-restroom-cleanliness',
+      question: 'How would you rate the cleanliness of public restrooms on campus?',
+      closes: 'Closes 25 May 2026',
+      href: '#participate'
+    });
+    expect(canonical.hasQuickPollForHome).toBe(false);
+    expect(canonical.hasPriorityNoticeEntity).toBe(false);
+    expect(canonical.publicationIds.filter(id => id === 'notice-classes-rescheduled')).toHaveLength(1);
+
+    await expect(page.locator('#homePoll [data-field="homePollTitle"]')).toHaveText(canonical.poll.question);
+    await page.locator('#homePoll [data-testid="home-poll-respond"]').click();
+    await expect(page.locator('#view-participate')).toBeVisible();
+    await expect(page.locator('#seg-polls')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.locator('#pollQuestion')).toHaveText(canonical.poll.question);
   });
 
   test('routes Home search to Discover with the bounded query', async ({ page }) => {
