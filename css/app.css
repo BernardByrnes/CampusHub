@@ -48,6 +48,22 @@
 .detail-hero img { width:100%; height:auto; aspect-ratio:16/9; object-fit:cover; }
 .detail-hero--text { padding:0; border:0; background: transparent; }
 
+/* Canonical Home affordances */
+.priority-link { display:block; color:inherit; text-decoration:none; }
+.home-action { min-height:var(--control-min-h); }
+.home-icon-link {
+  width:var(--control-min-h);
+  height:var(--control-min-h);
+  flex:0 0 var(--control-min-h);
+  display:inline-grid;
+  place-items:center;
+  border-radius:var(--inner-radius);
+  color:var(--text-muted);
+  text-decoration:none;
+}
+.home-icon-link:hover { background:var(--surface-muted); }
+.app-header #notifBtn.home-bell-target { width:var(--control-min-h); height:var(--control-min-h); flex:0 0 var(--control-min-h); }
+
 /* Publication detail */
 .news-subheader { display:flex; align-items:center; gap:10px; padding:2px 0 10px; }
 .news-back { width:var(--control-min-h); height:var(--control-min-h); flex:0 0 var(--control-min-h); }

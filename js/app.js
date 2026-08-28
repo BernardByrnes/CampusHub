@@ -128,6 +128,63 @@
     return D.voiceIssues.find(issue => issue.id.toLowerCase() === normalizedId) || null;
   }
 
+  const VOICE_MONTHS = Object.freeze([
+    "january", "february", "march", "april", "may", "june",
+    "july", "august", "september", "october", "november", "december"
+  ]);
+
+  function voiceHistoryDateRank(value){
+    if(typeof value !== "string") return Number.NEGATIVE_INFINITY;
+    const normalized = value.trim().toLowerCase();
+    if(isCanonicalTenantDay(normalized)){
+      const [year, month, day] = normalized.split("-").map(Number);
+      return Date.UTC(year, month - 1, day);
+    }
+    const match = normalized.match(/^(\d{1,2})\s+([a-z]+)\s+(\d{4})$/);
+    if(!match) return Number.NEGATIVE_INFINITY;
+    const day = Number(match[1]);
+    const month = VOICE_MONTHS.findIndex(name => name === match[2] || name.startsWith(match[2]));
+    const year = Number(match[3]);
+    if(month < 0 || !Number.isInteger(day) || day < 1 || day > 31 || !Number.isInteger(year)){
+      return Number.NEGATIVE_INFINITY;
+    }
+    const timestamp = Date.UTC(year, month, day);
+    const date = new Date(timestamp);
+    return date.getUTCFullYear() === year && date.getUTCMonth() === month && date.getUTCDate() === day
+      ? timestamp
+      : Number.NEGATIVE_INFINITY;
+  }
+
+  function latestVoiceOperationalUpdateRank(issue){
+    const updates = [
+      ...(Array.isArray(issue?.history) ? issue.history : []),
+      ...(Array.isArray(issue?.officialUpdates) ? issue.officialUpdates : [])
+    ];
+    return updates.reduce((latest, update) => {
+      const value = update?.tenantDay || update?.date || update?.updatedAt;
+      return Math.max(latest, voiceHistoryDateRank(value));
+    }, Number.NEGATIVE_INFINITY);
+  }
+
+  function featuredVoiceForHome(issues=D.voiceIssues){
+    const candidates = Array.isArray(issues)
+      ? issues.filter(issue => issue && typeof issue.id === "string")
+      : [];
+    const configured = candidates.find(issue => issue.featured === true);
+    if(configured) return configured;
+
+    let selected = null;
+    let selectedRank = Number.NEGATIVE_INFINITY;
+    candidates.forEach(issue => {
+      const rank = latestVoiceOperationalUpdateRank(issue);
+      if(!selected || rank > selectedRank){
+        selected = issue;
+        selectedRank = rank;
+      }
+    });
+    return selected;
+  }
+
   function resolveVoiceDetailEntity(issueId){
     const publicIssue = findVoiceIssue(issueId);
     if(publicIssue) return publicIssue;
@@ -369,6 +426,8 @@
     $('[data-field="priorityTitle"]').textContent = D.priorityNotice.title;
     $('[data-field="priorityBody"]').textContent = D.priorityNotice.body;
     $('[data-field="priorityMeta"]').textContent = D.priorityNotice.meta;
+    const priorityLink = $('#homePriority [data-testid="home-priority-link"]');
+    if(priorityLink) priorityLink.href = D.priorityNotice.href || "#notifications";
     // hero
     $('[data-field="heroKicker"]').textContent = D.heroStory.kicker.toUpperCase();
     $('[data-field="heroTitle"]').textContent = D.heroStory.title;
@@ -412,7 +471,7 @@
       const homeOpportunityLink = $('#homeOpp [data-testid="home-opportunity-link"]');
       if(homeOpportunityLink) homeOpportunityLink.href = homeOpportunity.href;
     }
-    const homeVoice = D.voiceIssues.find(issue => issue.id === "voice-water-halls") || D.voiceIssues[0];
+    const homeVoice = featuredVoiceForHome();
     if(homeVoice){
       setEntityField('[data-field="homeVoiceCategory"]', homeVoice.category);
       setEntityField('[data-field="homeVoiceTitle"]', homeVoice.title);
@@ -448,6 +507,7 @@
     setEntityField('[data-field="homeQuizQuestion"]', D.quiz.question);
     setEntityField('[data-field="homeQuizXpParticipation"]', `+${D.quiz.xpParticipation || 5} XP`);
     setEntityField('[data-field="homeQuizXpBonus"]', `+${D.quiz.xpBonus || 5} XP`);
+    setEntityField('[data-field="homeQuizCta"]', quizParticipationForCurrentDay(normalizedState, D.quiz) ? "Review" : "Play");
     setEntityField('[data-field="homeLevel"]', `Level ${progress.level}`);
     setEntityField('[data-field="homeXp"]', `${progress.xp} XP`);
   }
@@ -2518,7 +2578,8 @@
 
   function showView(name){
     const target = views.includes(name) ? name : "home";
-    syncStreakPresentation(participationState());
+    if(target === "home") hydrateTenant(participationState());
+    else syncStreakPresentation(participationState());
     // hide all
     views.forEach(v=>{
       const el = document.getElementById(`view-${v}`);
@@ -2546,6 +2607,7 @@
         a.removeAttribute('aria-current');
       }
     });
+    $('#notifBtn')?.classList.toggle('home-bell-target', target === "home");
     // search visibility
     const searchWrap = $('#searchWrap');
     if(["home","discover"].includes(target)){
@@ -3308,6 +3370,10 @@
         D.student.xp = 340;
         if(D.demoConfig?.calendar) D.demoConfig.calendar.isInRecess = false;
         D.voiceIssues[0].supporters = 124;
+        D.voiceIssues.forEach(issue => {
+          if(issue.id === "voice-water-halls") issue.featured = true;
+          else delete issue.featured;
+        });
         notificationTestMode = null;
         opportunityTestScenario = "normal";
         const state = participationState();

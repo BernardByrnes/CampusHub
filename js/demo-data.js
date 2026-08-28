@@ -181,6 +181,7 @@ window.CampusHubDemo = {
   voiceIssues: [
     {
       id: "voice-water-halls",
+      featured: true,
       category: "Water & Sanitation",
       title: "Irregular water supply in Halls",
       body: "Frequent disruptions are affecting daily routines and hygiene.",
