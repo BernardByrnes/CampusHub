@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-const PARTICIPATION_STATE_KEY = 'campushub:state';
+const PARTICIPATION_STATE_KEY = 'campushub:state:v2:tenant-makerere:membership-demo-001';
 
 async function goTo(page, hash) {
   await page.goto(`/${hash}`);
@@ -18,7 +18,7 @@ async function readState(page) {
 }
 
 async function readVoiceDraft(page) {
-  return page.evaluate(() => JSON.parse(sessionStorage.getItem('campushub:voice-draft') || 'null'));
+  return page.evaluate(() => JSON.parse(sessionStorage.getItem('campushub:voice-draft:v2:tenant-makerere:membership-demo-001') || 'null'));
 }
 
 async function readDecision(page) {
@@ -59,7 +59,7 @@ test.describe('Phase 6B Poll and Student Voice GSC-14 integration', () => {
     await resetDemo(page);
     await goTo(page, '#participate');
 
-    const startingXp = await page.evaluate(() => window.CampusHubDemo.student.xp);
+    const startingXp = (await readState(page)).xp;
     const pollXp = await page.evaluate(() => Number(window.CampusHubDemo.demoConfig.xp.pollParticipation));
     const option = page.locator('#pollForm input[type="radio"]').first();
     await option.check();
@@ -71,7 +71,7 @@ test.describe('Phase 6B Poll and Student Voice GSC-14 integration', () => {
     await expect(page.locator('#submitPoll')).toBeDisabled();
     await expect(page.locator('#view-participate')).not.toContainText('%');
 
-    const afterXp = await page.evaluate(() => window.CampusHubDemo.student.xp);
+    const afterXp = (await readState(page)).xp;
     expect(afterXp).toBe(startingXp + pollXp);
     const completedState = await readState(page);
     expect(completedState.pollDone).toBe(true);
@@ -80,10 +80,10 @@ test.describe('Phase 6B Poll and Student Voice GSC-14 integration', () => {
     await page.reload();
     await expect(page.locator('#pollSuccess')).toBeVisible();
     await expect(page.locator('#submitPoll')).toBeDisabled();
-    const xpAtReload = await page.evaluate(() => window.CampusHubDemo.student.xp);
+    const xpAtReload = (await readState(page)).xp;
     await page.locator('#submitPoll').click({ force:true });
     await page.waitForTimeout(100);
-    expect(await page.evaluate(() => window.CampusHubDemo.student.xp)).toBe(xpAtReload);
+    expect((await readState(page)).xp).toBe(xpAtReload);
     expect((await readState(page)).pollDone).toBe(true);
   });
 

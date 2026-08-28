@@ -145,4 +145,75 @@ test.describe('Phase 3 entity-aware detail routing', () => {
     expect(new URL(page.url()).hash).toBe('#voice-detail/voice-evening-buses');
     await expectOnlyPrimaryTab(page, 'participate');
   });
+
+  test('pops the in-app route stack without resurrecting a prior detail', async ({ page }) => {
+    await goTo(page, '#home');
+    await page.locator('#tab-discover').click();
+    await expect(page.locator('#view-discover')).toBeVisible();
+    await page.locator('#discoverList [data-discover-id="cocis-innovation-lab"] a').click();
+    await expect(page.locator('#view-news')).toBeVisible();
+
+    await page.locator('#view-news [data-back]').click();
+    await expect(page.locator('#view-discover')).toBeVisible();
+    expect(new URL(page.url()).hash).toBe('#discover');
+    await page.locator('#view-discover').getByRole('heading', { name: 'Discover' }).waitFor();
+
+    await page.locator('#tab-home').click();
+    await expect(page.locator('#view-home')).toBeVisible();
+    expect(new URL(page.url()).hash).toBe('#home');
+    const stack = await page.evaluate(() => window.CampusHubDebug.getRouteStack());
+    expect(stack.at(-1)).toBe('home');
+    expect(stack).not.toContain('news/cocis-innovation-lab');
+  });
+
+  test('preserves Home and Notifications origins for Priority Notice Back', async ({ page }) => {
+    await goTo(page, '#home');
+    await page.locator('#homePriority a').click();
+    await expect(page.locator('#view-news')).toBeVisible();
+    await page.locator('#view-news [data-back]').click();
+    await expect(page.locator('#view-home')).toBeVisible();
+    expect(new URL(page.url()).hash).toBe('#home');
+
+    await goTo(page, '#notifications');
+    await page.locator('[data-notification-id="notification-priority-rescheduled"]').click();
+    await expect(page.locator('#view-news')).toBeVisible();
+    await page.locator('#view-news [data-back]').click();
+    await expect(page.locator('#view-notifications')).toBeVisible();
+    expect(new URL(page.url()).hash).toBe('#notifications');
+  });
+
+  test('gives direct News and Opportunity detail links their Discover Back parent', async ({ page }) => {
+    await goTo(page, '#news/innovation-week');
+    await page.locator('#view-news [data-back]').click();
+    await expect(page.locator('#view-discover')).toBeVisible();
+    expect(new URL(page.url()).hash).toBe('#discover');
+
+    await goTo(page, '#opportunities/ra-climate');
+    await page.locator('#view-opportunity [data-back]').click();
+    await expect(page.locator('#view-discover')).toBeVisible();
+    expect(new URL(page.url()).hash).toBe('#discover');
+  });
+
+  test('keeps browser Back and Forward valid without duplicating the route stack', async ({ page }) => {
+    await goTo(page, '#home');
+    await page.locator('#tab-discover').click();
+    await page.locator('#discoverList [data-discover-id="cocis-innovation-lab"] a').click();
+    await expect(page.locator('#view-news')).toBeVisible();
+
+    await page.goBack();
+    await expect(page.locator('#view-discover')).toBeVisible();
+    expect(await page.evaluate(() => window.CampusHubDebug.getRouteStack())).toEqual(['home', 'discover']);
+    await page.goForward();
+    await expect(page.locator('#view-news')).toBeVisible();
+    expect(await page.evaluate(() => window.CampusHubDebug.getRouteStack())).toEqual(['home', 'discover', 'news/cocis-innovation-lab']);
+  });
+
+  test('keeps Student Voice list and detail Back behavior coherent', async ({ page }) => {
+    await goTo(page, '#voice');
+    await page.locator('#voiceAllList [data-voice-issue-id="voice-water-halls"]').click();
+    await expect(page.locator('#view-voice-detail')).toBeVisible();
+    await page.locator('#voiceDetailBack').click();
+    await expect(page.locator('#view-voice')).toBeVisible();
+    expect(new URL(page.url()).hash).toBe('#voice');
+  });
 });

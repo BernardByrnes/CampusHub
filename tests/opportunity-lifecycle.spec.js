@@ -53,7 +53,7 @@ async function setOpportunityScenario(page, name) {
 }
 
 async function storedState(page) {
-  return page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state')));
+  return page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state:v2:tenant-makerere:membership-demo-001')));
 }
 
 async function expectDiscoverNav(page) {
@@ -264,10 +264,10 @@ test.describe('Phase 8P canonical Opportunity lifecycle', () => {
   test('migrates a legacy canonical save to sourceId without losing unrelated saves', async ({ page }) => {
     await resetDemo(page);
     await page.evaluate(() => {
-      const state = JSON.parse(localStorage.getItem('campushub:state'));
+      const state = JSON.parse(localStorage.getItem('campushub:state:v2:tenant-makerere:membership-demo-001'));
       state.saves = state.saves.map(item => item.id === 's2' ? { ...item, sourceId: undefined } : item);
       state.saves.push({ id: 'legacy-save', type: 'Campus Story', title: 'A legitimate saved item', meta: '18 May' });
-      localStorage.setItem('campushub:state', JSON.stringify(state));
+      localStorage.setItem('campushub:state:v2:tenant-makerere:membership-demo-001', JSON.stringify(state));
     });
     await page.reload();
     await goTo(page, '#me');

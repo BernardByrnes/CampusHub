@@ -3,6 +3,15 @@
   const D = window.CampusHubDemo;
   const $ = (s, r=document) => r.querySelector(s);
   const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
+  const LEGACY_STATE_KEY = "campushub:state";
+  const LEGACY_VOICE_DRAFT_SESSION_KEY = "campushub:voice-draft";
+  const PERSISTENCE_SCENARIO_SESSION_KEY = "campushub:debug:persistence-scenario";
+  const CURRENT_STATE_SCHEMA_VERSION = 2;
+  const DEFAULT_STATE_NAMESPACE = Object.freeze({
+    schemaVersion: CURRENT_STATE_SCHEMA_VERSION,
+    tenantId: "tenant-makerere",
+    membershipId: "membership-demo-001"
+  });
   const POLL_RETURN_ROUTE = "participate/poll/restroom-cleanliness";
   const RSVP_RETURN_ROUTE = "events/guild-debate";
   const QUIZ_RETURN_ROUTE = "play";
@@ -31,7 +40,8 @@
     "Academic Facilities",
     "Campus Services"
   ]);
-  const VOICE_DRAFT_SESSION_KEY = "campushub:voice-draft";
+  let persistenceScenario = "normal";
+  const PERSISTENCE_FAILURE_MESSAGE = "We couldn’t save that change. Try again.";
   const VOICE_TITLE_MAX = 80;
   const VOICE_DESCRIPTION_MAX = 500;
   const DISCOVER_FILTERS = Object.freeze(["All", "Events", "Opportunities", "Sports", "News"]);
@@ -44,6 +54,75 @@
   let opportunityTestScenario = "normal";
   let meSavesOpen = false;
   let meRsvpsOpen = false;
+
+  function currentStateNamespace(){
+    const configured = D.demoConfig?.stateNamespace || {};
+    const schemaVersion = Number(configured.schemaVersion);
+    const tenantId = typeof configured.tenantId === "string" && configured.tenantId.trim()
+      ? configured.tenantId.trim()
+      : DEFAULT_STATE_NAMESPACE.tenantId;
+    const membershipId = typeof configured.membershipId === "string" && configured.membershipId.trim()
+      ? configured.membershipId.trim()
+      : DEFAULT_STATE_NAMESPACE.membershipId;
+    return {
+      schemaVersion: Number.isInteger(schemaVersion) && schemaVersion > 0 ? schemaVersion : CURRENT_STATE_SCHEMA_VERSION,
+      tenantId,
+      membershipId
+    };
+  }
+
+  function stateStorageKey(){
+    const namespace = currentStateNamespace();
+    return `campushub:state:v${namespace.schemaVersion}:${namespace.tenantId}:${namespace.membershipId}`;
+  }
+
+  function voiceDraftStorageKey(){
+    const namespace = currentStateNamespace();
+    return `campushub:voice-draft:v${namespace.schemaVersion}:${namespace.tenantId}:${namespace.membershipId}`;
+  }
+
+  function stateOwnershipFields(){
+    const namespace = currentStateNamespace();
+    return {
+      schemaVersion: namespace.schemaVersion,
+      tenantId: namespace.tenantId,
+      membershipId: namespace.membershipId
+    };
+  }
+
+  function stateOwnsCurrentMembership(state){
+    const ownership = stateOwnershipFields();
+    return Boolean(state && typeof state === "object" && !Array.isArray(state)
+      && state.schemaVersion === ownership.schemaVersion
+      && state.tenantId === ownership.tenantId
+      && state.membershipId === ownership.membershipId);
+  }
+
+  function isFutureStateVersion(state){
+    return Boolean(state && typeof state === "object" && !Array.isArray(state)
+      && Number.isInteger(Number(state.schemaVersion))
+      && Number(state.schemaVersion) > CURRENT_STATE_SCHEMA_VERSION);
+  }
+
+  function persistenceScenarioFromSession(){
+    try{
+      const stored = sessionStorage.getItem(PERSISTENCE_SCENARIO_SESSION_KEY);
+      return stored === "fail" ? "fail" : "normal";
+    }catch(error){
+      return "normal";
+    }
+  }
+
+  persistenceScenario = persistenceScenarioFromSession();
+
+  function setPersistenceScenarioValue(value){
+    persistenceScenario = value === "fail" ? "fail" : "normal";
+    try{
+      if(persistenceScenario === "fail") sessionStorage.setItem(PERSISTENCE_SCENARIO_SESSION_KEY, "fail");
+      else sessionStorage.removeItem(PERSISTENCE_SCENARIO_SESSION_KEY);
+    }catch(error){}
+    return persistenceScenario;
+  }
 
   const CANONICAL_PARTICIPATION_SCENARIOS = Object.freeze({
     "assurance-required": {
@@ -834,9 +913,12 @@
     }
     if(state.selectedVoiceIssueId!==issue.id){
       state.selectedVoiceIssueId = issue.id;
-      saveState(state);
+      if(!saveState(state)) persistenceFailure(nextState=>{
+        renderVoiceLists();
+        renderVoiceDetail(nextState.selectedVoiceIssueId || issue.id);
+      });
     } else if(!state.voiceStatusScenario && scenarioFixtureId){
-      saveState(state);
+      if(!saveState(state)) persistenceFailure();
     }
     return issue;
   }
@@ -974,7 +1056,14 @@
     }
     state.supportedVoiceIssues.push(issue.id);
     state.supportedVoiceIssues = [...new Set(state.supportedVoiceIssues)];
-    saveState(state);
+    if(!saveState(state)){
+      const restored = persistenceFailure(nextState=>{
+        renderVoiceLists();
+        renderVoiceDetail(nextState.selectedVoiceIssueId || issue.id);
+      });
+      renderVoiceDetail(restored.selectedVoiceIssueId || issue.id);
+      return;
+    }
     renderVoiceLists();
     renderVoiceDetail(issue.id);
     const feedback = $('#voiceSupportFeedback');
@@ -988,23 +1077,21 @@
     const fixtureId = scenario?.fixtureId || "voice-water-halls";
     state.voiceStatusScenario = scenario ? name : null;
     state.selectedVoiceIssueId = fixtureId;
-    saveState(state);
+    if(!saveState(state)) return false;
     renderVoiceLists();
     if(!$('#view-voice-detail')?.hidden){
       const nextRoute = voiceDetailRoute(fixtureId);
       if(location.hash.toLowerCase()===nextRoute.toLowerCase()) renderVoiceDetail(fixtureId);
-      else location.hash = nextRoute;
+      else navigateToHash(nextRoute);
     }
     if(announce) toast(scenario ? `${scenario.label} selected for this prototype.` : 'Student Voice — Acknowledged selected for this prototype.');
+    return true;
   }
 
   function returnFromVoiceDetail(){
     const previous = historyStack[historyStack.length-2] || '';
-    if(previous==='voice' || previous==='participate'){
-      location.hash = `#${previous}`;
-      return;
-    }
-    location.hash = '#voice';
+    if(previous==='voice' || previous==='participate') navigateInAppBack();
+    else navigateToHash('#voice');
   }
 
   function initVoiceDetail(){
@@ -1093,7 +1180,10 @@
     if(!Array.isArray(state.notificationReadIds)) state.notificationReadIds = notificationDefaultReadIds();
     if(state.notificationReadIds.includes(notificationId)) return false;
     state.notificationReadIds = [...state.notificationReadIds, notificationId];
-    saveState(state);
+    if(!saveState(state)){
+      persistenceFailure(rendered=> renderNotifications(rendered));
+      return false;
+    }
     renderNotifications();
     return true;
   }
@@ -1106,7 +1196,10 @@
     if(!changed) return false;
     ids.forEach(id => current.add(id));
     state.notificationReadIds = [...current];
-    saveState(state);
+    if(!saveState(state)){
+      persistenceFailure(rendered=> renderNotifications(rendered));
+      return false;
+    }
     renderNotifications();
     return true;
   }
@@ -1152,7 +1245,7 @@
       const notificationId = link.getAttribute('data-notification-id');
       event.preventDefault();
       markNotificationRead(notificationId);
-      if(destination) location.hash = destination;
+      if(destination) navigateToHash(destination);
     }));
   }
 
@@ -1228,11 +1321,18 @@
         optionIndex:choice,
         xpAwarded:earned
       };
-      D.student.xp += earned;
-      state.xp = D.student.xp;
+      state.xp = Number(state.xp) + earned;
       applyStreakQualification("daily-quiz", state);
       pendingQuizChoice = null;
-      saveState(state);
+      if(!saveState(state)){
+        pendingQuizChoice = choice;
+        persistenceFailure(restored=>{
+          hydrateTenant(restored);
+          renderXPRules();
+          renderQuiz();
+        });
+        return;
+      }
       hydrateTenant(state);
       renderXPRules();
       toast(correct ? `Correct — +${earned} XP (+${xpPart} +${xpBonus} bonus). A new quiz will be available tomorrow.` : `Answer recorded — +${earned} XP for taking part. A new quiz will be available tomorrow.`);
@@ -1300,8 +1400,6 @@
     const progress = studentProgressForState(state);
     state.xp = progress.xp;
     state.level = progress.level;
-    D.student.xp = progress.xp;
-    D.student.level = progress.level;
     return progress;
   }
 
@@ -1351,7 +1449,10 @@
       nextState.saves = savedItems(nextState).filter(item => String(item.id) !== String(id));
       if(nextState.saves.some(item => saveRecordMatches(item, "event")) === false) nextState.saveEvent = false;
       if(nextState.saves.some(item => saveRecordMatches(item, "opportunity")) === false) nextState.saveOpp = false;
-      saveState(nextState);
+      if(!saveState(nextState)){
+        persistenceFailure(rendered=> renderMe(rendered));
+        return;
+      }
       renderMe(nextState);
       toast("Removed from saves.");
     }));
@@ -1382,8 +1483,7 @@
     const normalizedState = ensureParticipationState(state || {});
     const currentProgress = progress || studentProgressForState(normalizedState);
     const membershipStatus = normalizedState.membership.status === "refresh" ? "Needs refreshing" : "Current";
-    D.student.assuranceLevel = normalizedState.membership.assuranceLevel;
-    D.student.assurance = assuranceLabel(normalizedState.membership.assuranceLevel);
+    const currentAssurance = assuranceLabel(normalizedState.membership.assuranceLevel);
     const level = currentProgress.level;
     const xp = currentProgress.xp;
     const items = savedItems(normalizedState);
@@ -1400,12 +1500,12 @@
     setEntityField('[data-field="studentFaculty"]', D.student.faculty);
     setEntityField('[data-field="studentEnrolment"]', membershipStatus);
     setEntityField('[data-field="studentDisplayName"]', D.student.displayName);
-    setEntityField('[data-field="assuranceBadge"]', D.student.assurance);
+    setEntityField('[data-field="assuranceBadge"]', currentAssurance);
     setEntityField('[data-field="meLevelXp"]', `Level ${level} • ${xp} XP`);
     setEntityField('[data-field="savesMeta"]', items.length ? `${items.length} saved` : "Nothing saved yet.");
     setEntityField('[data-field="meRsvpMeta"]', rsvpSummary);
     setEntityField('[data-field="mePlayLevel"]', `Level ${level}`);
-    setEntityField('[data-field="meVerificationMeta"]', `${D.student.assurance} • ${membershipStatus}`);
+    setEntityField('[data-field="meVerificationMeta"]', `${currentAssurance} • ${membershipStatus}`);
 
     const savesPanel = $('#meSaves');
     if(savesPanel) savesPanel.hidden = !meSavesOpen;
@@ -1489,24 +1589,50 @@
   }
 
   function readVoiceDraftSession(){
+    let currentRaw = null;
+    let legacyRaw = null;
     try{
-      const raw = sessionStorage.getItem(VOICE_DRAFT_SESSION_KEY);
-      return raw ? JSON.parse(raw) : null;
+      currentRaw = sessionStorage.getItem(voiceDraftStorageKey());
+      if(!currentRaw) legacyRaw = sessionStorage.getItem(LEGACY_VOICE_DRAFT_SESSION_KEY);
     }catch(e){
       return null;
     }
+
+    const parseDraft = raw => {
+      if(!raw) return null;
+      try{
+        return normalizeVoiceDraft(JSON.parse(raw));
+      }catch(error){
+        return null;
+      }
+    };
+
+    const current = parseDraft(currentRaw);
+    if(current) return current;
+
+    const legacy = parseDraft(legacyRaw);
+    if(!legacy) return null;
+
+    // Legacy session drafts are migrated only after the scoped write succeeds.
+    if(writeVoiceDraftSession(legacy)){
+      try{ sessionStorage.removeItem(LEGACY_VOICE_DRAFT_SESSION_KEY); }catch(error){}
+    }
+    return legacy;
   }
 
   function writeVoiceDraftSession(draft){
     try{
-      sessionStorage.setItem(VOICE_DRAFT_SESSION_KEY, JSON.stringify(normalizeVoiceDraft(draft)));
+      sessionStorage.setItem(voiceDraftStorageKey(), JSON.stringify(normalizeVoiceDraft(draft)));
       return true;
     }catch(e){}
     return false;
   }
 
   function clearVoiceDraftSession(){
-    try{ sessionStorage.removeItem(VOICE_DRAFT_SESSION_KEY); }catch(e){}
+    try{
+      sessionStorage.removeItem(voiceDraftStorageKey());
+      sessionStorage.removeItem(LEGACY_VOICE_DRAFT_SESSION_KEY);
+    }catch(e){}
   }
 
   function ensureVoiceState(state){
@@ -1535,6 +1661,10 @@
 
   function ensureParticipationState(state){
     if(!state || typeof state!=="object") state = {};
+    const ownership = stateOwnershipFields();
+    state.schemaVersion = ownership.schemaVersion;
+    state.tenantId = ownership.tenantId;
+    state.membershipId = ownership.membershipId;
     ensureStreakState(state);
     const membershipDefaults = defaultMembership();
     const participationDefaults = defaultParticipation();
@@ -1615,8 +1745,7 @@
   }
 
   function syncStudentTrustState(state=participationState()){
-    D.student.assuranceLevel = state.membership.assuranceLevel;
-    D.student.assurance = assuranceLabel(state.membership.assuranceLevel);
+    return assuranceLabel(state?.membership?.assuranceLevel);
   }
 
   const ASSURANCE_CODES = Object.freeze(["L0", "L1", "L2", "L3"]);
@@ -2067,10 +2196,16 @@
         state.pollDone = true;
         state.pollChoice = idx;
         const pollXp = Number(D.demoConfig?.xp?.pollParticipation) || 0;
-        D.student.xp += pollXp;
-        state.xp = D.student.xp;
+        state.xp = Number(state.xp) + pollXp;
         applyStreakQualification("poll-response", state);
-        saveState(state);
+        if(!saveState(state)){
+          persistenceFailure(restored=>{
+            hydrateTenant(restored);
+            renderXPRules();
+            renderPollState();
+          });
+          return;
+        }
         hydrateTenant(state);
         renderXPRules();
         renderPollState();
@@ -2087,7 +2222,7 @@
     state.participation = { ...defaultParticipation(), ...scenario.participation, demoScenario:name, returnTo:null, returnAction:null };
     state.pollDone = false;
     state.pollChoice = null;
-    saveState(state);
+    if(!saveState(state)) return false;
     syncStudentTrustState(state);
     hydrateTenant(state);
     renderPollState();
@@ -2096,6 +2231,7 @@
     const success = $('#verificationSuccess');
     if(success) success.hidden = true;
     if(announce) toast(`${name} selected for this prototype.`);
+    return true;
   }
 
   function restoreOriginalParticipationIntent(){
@@ -2104,27 +2240,30 @@
     const returnAction = state.participation.returnAction;
     state.participation.returnTo = null;
     state.participation.returnAction = null;
-    saveState(state);
+    if(!saveState(state)){
+      persistenceFailure();
+      return;
+    }
     if(returnTo===POLL_RETURN_ROUTE){
       pendingReturnFocus = true;
-      location.hash = "#participate";
+      navigateToHash("#participate");
       return;
     }
     if(returnTo===VOICE_NEW_RETURN_ROUTE){
       pendingVoiceComposerFocus = true;
       pendingVoiceComposerAction = returnAction || "voice-composer-entry";
-      location.hash = "#voice-new";
+      navigateToHash("#voice-new");
       return;
     }
     if(returnTo===RSVP_RETURN_ROUTE){
       pendingRsvpFocus = true;
       pendingRsvpAction = returnAction || "rsvp";
-      location.hash = `#${RSVP_RETURN_ROUTE}`;
+      navigateToHash(`#${RSVP_RETURN_ROUTE}`);
       return;
     }
     if(returnTo===QUIZ_RETURN_ROUTE){
       pendingQuizFocus = true;
-      location.hash = `#${QUIZ_RETURN_ROUTE}`;
+      navigateToHash(`#${QUIZ_RETURN_ROUTE}`);
       return;
     }
     if(isVoiceDetailReturnIntent(returnTo)){
@@ -2132,7 +2271,7 @@
       if(getVoiceIssue(issueId)){
         pendingVoiceDetailFocus = true;
         pendingVoiceDetailAction = returnAction || "voice-support";
-        location.hash = voiceDetailRoute(issueId);
+        navigateToHash(voiceDetailRoute(issueId));
       }
     }
   }
@@ -2153,7 +2292,19 @@
       updated.participation.demoScenario = "normal";
       const returnTo = updated.participation.returnTo;
       const returning = [POLL_RETURN_ROUTE, VOICE_NEW_RETURN_ROUTE, RSVP_RETURN_ROUTE, QUIZ_RETURN_ROUTE].includes(returnTo) || isVoiceDetailReturnIntent(returnTo);
-      saveState(updated);
+      if(!saveState(updated)){
+        const restored = persistenceFailure(state=>{
+          hydrateTenant(state);
+          syncVerificationUi();
+          renderPollState();
+          renderQuiz();
+        });
+        if(button){ button.disabled = false; button.textContent = restored.membership.status === "refresh" ? "Refresh membership" : "Match my student record"; }
+        if(help){ help.hidden = false; help.textContent = restored.membership.status === "refresh"
+          ? "We will refresh your current membership against the university roster."
+          : "We will check your current enrolment against the university roster."; }
+        return;
+      }
       syncStudentTrustState(updated);
       hydrateTenant(updated);
       renderPollState();
@@ -2206,13 +2357,16 @@
         const state = participationState();
         state.participation.returnTo = gateContinuation?.returnTo || POLL_RETURN_ROUTE;
         state.participation.returnAction = gateContinuation?.returnAction || null;
-        saveState(state);
+        if(!saveState(state)){
+          persistenceFailure();
+          return;
+        }
         dismissGateForNavigation();
-        location.hash = "#verification";
+        navigateToHash("#verification");
       } else if(action==="navigate"){
         const hash = gateNavigationHash || "#participate";
         dismissGateForNavigation();
-        location.hash = hash;
+        navigateToHash(hash);
       } else {
         closeParticipationGate();
       }
@@ -2278,7 +2432,7 @@
     if(nextStep<=3 && persist){
       const state = participationState();
       state.voiceDraft.step = nextStep;
-      saveState(state);
+      writeVoiceDraftSession(state.voiceDraft);
     }
     if(nextStep===3) renderVoiceReview();
     if(nextStep===4) renderVoiceConfirmation();
@@ -2338,7 +2492,7 @@
     state.voiceDraft.title = title?.value || '';
     state.voiceDraft.description = description?.value || '';
     if([1,2,3].includes(voiceComposerStep)) state.voiceDraft.step = voiceComposerStep;
-    saveState(state);
+    writeVoiceDraftSession(state.voiceDraft);
     return state.voiceDraft;
   }
 
@@ -2377,10 +2531,10 @@
     }
     saveVoiceDraft();
     if(valid){
-      const state = participationState();
-      state.voiceDraft.title = titleValue;
-      state.voiceDraft.description = descriptionValue;
-      saveState(state);
+      const draft = readVoiceDraftSession() || defaultVoiceDraft();
+      draft.title = titleValue;
+      draft.description = descriptionValue;
+      writeVoiceDraftSession(draft);
     }
     return valid;
   }
@@ -2430,9 +2584,6 @@
       voiceSubmitTimer = null;
     }
     voiceSubmitInFlight = false;
-    const state = participationState();
-    state.voiceDraft = defaultVoiceDraft();
-    saveState(state);
     clearVoiceDraftSession();
     voiceComposerStep = 1;
     clearVoiceValidation();
@@ -2441,7 +2592,7 @@
 
   function cancelVoiceComposer(){
     resetVoiceDraft();
-    location.hash = '#voice';
+    navigateToHash('#voice');
   }
 
   function submitVoiceIssue(){
@@ -2504,7 +2655,7 @@
           button.disabled = false;
           button.textContent = 'Submit issue';
         }
-        showVoiceError('#voiceSubmitError', null, 'We couldn’t submit your issue. Please try again.');
+        showVoiceError('#voiceSubmitError', null, PERSISTENCE_FAILURE_MESSAGE);
         setVoiceStatus('Submission failed. Please try again.');
       }
     }, 120);
@@ -2517,7 +2668,7 @@
     }
     pendingVoiceComposerFocus = true;
     if(location.hash==='#voice-new') showView('voice-new');
-    else location.hash = '#voice-new';
+    else navigateToHash('#voice-new');
   }
 
   function initVoiceComposer(){
@@ -2561,7 +2712,11 @@
     $('#voiceReviewCancel')?.addEventListener('click', cancelVoiceComposer);
     $('#voiceSubmitIssue')?.addEventListener('click', submitVoiceIssue);
     $('#voiceCategoryCancel')?.addEventListener('click', cancelVoiceComposer);
-    $('#voiceConfirmationBack')?.addEventListener('click', ()=> location.hash = '#voice');
+    $('#voiceConfirmationBack')?.addEventListener('click', ()=>{
+      const previous = historyStack[historyStack.length - 2] || '';
+      if(previous === 'voice' || previous === 'participate') navigateInAppBack();
+      else navigateToHash('#voice');
+    });
   }
 
   // Navigation (hash routing)
@@ -2719,6 +2874,7 @@
     const legacyTarget = LEGACY_DETAIL_ALIASES[normalizedPath];
     if(legacyTarget){
       history.replaceState(null, "", `#${legacyTarget}`);
+      replaceCurrentHistoryRoute(legacyTarget);
       handleHash();
       return;
     }
@@ -2731,6 +2887,7 @@
         }
         const fallback = route.definition.parent === "participate" ? "#voice" : "#discover";
         history.replaceState(null, "", fallback);
+        replaceCurrentHistoryRoute(fallback);
         showView(route.definition.parent === "participate" ? "voice" : "discover");
         return;
       }
@@ -2755,6 +2912,7 @@
       if(route.definition.view === "voice-detail"){
         if(!selectVoiceIssue(route.entity.id)){
           history.replaceState(null, "", "#voice");
+          replaceCurrentHistoryRoute("voice");
           showView("voice");
           return;
         }
@@ -2772,6 +2930,7 @@
           returnAction:'voice-composer-entry'
         })){
         history.replaceState(null, '', '#participate');
+        replaceCurrentHistoryRoute('participate');
         showView('participate');
         return;
       }
@@ -2808,7 +2967,10 @@
       } else {
         state.saves = state.saves.filter(item => !saveRecordMatches(item, "event"));
       }
-      saveState(state);
+      if(!saveState(state)){
+        persistenceFailure(restored=> reflect(s1,'saveEvent', restored));
+        return;
+      }
       reflect(s1,'saveEvent', state);
       renderMe(state);
       toast(state.saveEvent ? "Saved." : "Removed from saves.");
@@ -2824,7 +2986,10 @@
       } else {
         state.saves = state.saves.filter(item => !saveRecordMatches(item, "opportunity"));
       }
-      saveState(state);
+      if(!saveState(state)){
+        persistenceFailure(restored=> reflect(s2,'saveOpp', restored));
+        return;
+      }
       reflect(s2,'saveOpp', state);
       renderMe(state);
       toast(state.saveOpp ? "Saved." : "Removed from saves.");
@@ -2902,7 +3067,10 @@
         return;
       }
       state.reportedOpportunityIds.push(opportunity.id);
-      saveState(state);
+      if(!saveState(state)){
+        persistenceFailure(restored=> syncOpportunityReportButton(opportunity));
+        return;
+      }
       syncOpportunityReportButton(opportunity);
       toast("Report received. The Guild office reviews every report.");
     });
@@ -2948,8 +3116,16 @@
       if(nextState === 'going' || nextState === 'interested'){
         applyStreakQualification("event-rsvp", currentState);
       }
+      if(!saveState(currentState)){
+        persistenceFailure(restored=>{
+          state = restored;
+          syncStreakPresentation(restored);
+          renderMe(restored);
+          reflect();
+        });
+        return;
+      }
       state = currentState;
-      saveState(currentState);
       syncStreakPresentation(currentState);
       reflect();
       renderMe(currentState);
@@ -2990,7 +3166,7 @@
           discoverSearchState.query = q;
           pendingDiscoverSearchFocus = true;
           pendingDiscoverFilterFocus = false;
-          location.hash = "#discover";
+          navigateToHash("#discover");
         } else {
           discoverSearchState.query = q;
         }
@@ -3033,7 +3209,7 @@
       discoverSearchState.filter = "All";
       pendingDiscoverSearchFocus = false;
       pendingDiscoverFilterFocus = true;
-      location.hash = "#discover";
+      navigateToHash("#discover");
     });
   }
 
@@ -3079,24 +3255,102 @@
     }
   }
 
-  // Back buttons
+  // Back buttons. The stack is the app's compact in-memory route history;
+  // browser Back/Forward remains authoritative when no in-app intent is set.
   let historyStack = ["home"];
+  let pendingHistoryIntent = null;
+  function routeHistoryPath(){
+    return String(location.hash || "").replace(/^#/, "").trim() || "home";
+  }
+
+  function sameHistoryRoute(left, right){
+    return String(left || "").toLowerCase() === String(right || "").toLowerCase();
+  }
+
+  function setRouteHash(hash, intent="forward"){
+    const next = String(hash || "#home").startsWith("#") ? String(hash || "#home") : `#${hash}`;
+    const nextPath = next.replace(/^#/, "").trim() || "home";
+    if(sameHistoryRoute(routeHistoryPath(), nextPath)){
+      pendingHistoryIntent = null;
+      return false;
+    }
+    pendingHistoryIntent = intent;
+    location.hash = next;
+    return true;
+  }
+
+  function navigateToHash(hash){
+    return setRouteHash(hash, "forward");
+  }
+
+  function replaceCurrentHistoryRoute(path){
+    const next = String(path || "home").replace(/^#/, "") || "home";
+    if(!historyStack.length) historyStack = [next];
+    else historyStack[historyStack.length - 1] = next;
+    for(let index=historyStack.length-2; index>=0; index--){
+      if(sameHistoryRoute(historyStack[index], next)){
+        historyStack = historyStack.slice(0, index + 1);
+        break;
+      }
+    }
+  }
+
+  function navigateInAppBack(){
+    const current = routeHistoryPath();
+    const currentIndex = historyStack.length - 1;
+    if(currentIndex > 0 && sameHistoryRoute(historyStack[currentIndex], current)){
+      setRouteHash(`#${historyStack[currentIndex - 1]}`, "back");
+      return;
+    }
+    const existingIndex = historyStack.findIndex(path => sameHistoryRoute(path, current));
+    if(existingIndex > 0){
+      setRouteHash(`#${historyStack[existingIndex - 1]}`, "back");
+      return;
+    }
+    setRouteHash("#home", "back");
+  }
+
   function initBack(){
-    const initialPath = location.hash.replace(/^#/, '') || 'home';
+    const initialPath = routeHistoryPath();
     const initialRoute = parseHashRoute();
     const initialParent = initialRoute.kind === "detail" ? initialRoute.definition?.parent : null;
     historyStack = initialParent && initialParent !== initialPath
       ? [initialParent, initialPath]
       : [initialPath];
-    $$('[data-back]').forEach(b=> b.addEventListener('click', ()=>{
-      const prev = historyStack[historyStack.length-2] || 'home';
-      location.hash = `#${prev}`;
-    }));
+    $$('[data-back]').forEach(b=> b.addEventListener('click', navigateInAppBack));
+    // Mark normal in-app anchor navigation as forward intent. Browser
+    // Back/Forward and direct hash entry arrive without this marker.
+    document.addEventListener('click', event=>{
+      const link = event.target.closest?.('a[href^="#"]');
+      if(link && link.getAttribute('href') !== '#') pendingHistoryIntent = 'forward';
+    }, true);
     window.addEventListener('hashchange', ()=>{
-      const h = location.hash.replace('#','')||'home';
-      if(historyStack[historyStack.length-1]!==h){
-        historyStack.push(h);
-        if(historyStack.length>10) historyStack.shift();
+      const h = routeHistoryPath();
+      const intent = pendingHistoryIntent;
+      pendingHistoryIntent = null;
+      const current = historyStack[historyStack.length - 1];
+      if(intent === 'back'){
+        if(historyStack.length > 1) historyStack.pop();
+        else {
+          const existingIndex = historyStack.findIndex(path => sameHistoryRoute(path, h));
+          if(existingIndex >= 0) historyStack = historyStack.slice(0, existingIndex + 1);
+        }
+      } else if(intent === 'forward'){
+        if(!sameHistoryRoute(current, h)){
+          historyStack.push(h);
+          if(historyStack.length>20) historyStack.shift();
+        }
+      } else {
+        // Browser Back/Forward (or a direct hash navigation) has no app
+        // intent. Returning to a known route truncates the stack; a new route
+        // is appended. This avoids duplicating the immediate browser Back.
+        const existingIndex = historyStack.findIndex(path => sameHistoryRoute(path, h));
+        if(existingIndex >= 0 && existingIndex < historyStack.length - 1){
+          historyStack = historyStack.slice(0, existingIndex + 1);
+        } else if(!sameHistoryRoute(current, h)) {
+          historyStack.push(h);
+          if(historyStack.length>20) historyStack.shift();
+        }
       }
       handleHash();
     });
@@ -3112,6 +3366,13 @@
     wrap.appendChild(t);
     setTimeout(()=> { t.style.opacity='0'; t.style.transform='translateY(4px)'; t.style.transition='all .25s'; }, 2600);
     setTimeout(()=> t.remove(), 3000);
+  }
+
+  function persistenceFailure(render){
+    const restored = participationState();
+    if(typeof render === "function") render(restored);
+    toast(PERSISTENCE_FAILURE_MESSAGE);
+    return restored;
   }
 
   // State
@@ -3232,7 +3493,6 @@
         ? "Active today"
         : `Last active ${lastQualifiedWeekday}`)
       : "No qualifying activity yet";
-    D.student.streak = streak;
     setEntityField('[data-field="streakDuration"]', streakCopy.duration);
     setEntityField('[data-field="streakActivitySummary"]', summary);
     setEntityField('[data-field="homeStreak"]', streakCopy.compact);
@@ -3280,58 +3540,137 @@
     return record;
   }
 
-  function loadState(){
-    let state = null;
-    let hadLegacyVoiceDraft = false;
-    try{
-      const raw = localStorage.getItem('campushub:state');
-      if(raw) state = JSON.parse(raw);
-    }catch(e){}
-    if(!state || typeof state!=="object" || Array.isArray(state)){
-      state = {
-        pollDone:false, pollChoice:null,
-        quizDone:false, quizChoice:null,
-        quizParticipation:null,
-        xp:D.student.xp,
-        rsvp:null,
-        saveEvent:false, saveOpp:false,
-        reportedOpportunityIds: [],
-        saves: D.saves.slice(),
-        notificationReadIds: notificationDefaultReadIds()
-      };
-    } else {
-      hadLegacyVoiceDraft = Object.prototype.hasOwnProperty.call(state, 'voiceDraft');
-    }
-    const sessionDraft = readVoiceDraftSession();
-    if(sessionDraft) state.voiceDraft = sessionDraft;
-    const normalized = ensureParticipationState(state);
-    if(!sessionDraft && hadLegacyVoiceDraft){
-      // One-time migration from the pre-8D durable draft into this browser session.
-      writeVoiceDraftSession(normalized.voiceDraft);
-    }
-    return normalized;
+  function defaultState(){
+    const ownership = stateOwnershipFields();
+    const seedXp = Number(D.student?.xp);
+    const seedLevel = Number(D.student?.level);
+    return {
+      ...ownership,
+      pollDone:false,
+      pollChoice:null,
+      quizDone:false,
+      quizChoice:null,
+      quizParticipation:null,
+      xp:Number.isFinite(seedXp) && seedXp >= 0 ? seedXp : 340,
+      level:Number.isInteger(seedLevel) && seedLevel >= 1 ? seedLevel : 1,
+      rsvp:null,
+      saveEvent:false,
+      saveOpp:false,
+      reportedOpportunityIds:[],
+      saves:Array.isArray(D.saves) ? D.saves.map(item => ({ ...item })) : [],
+      notificationReadIds:notificationDefaultReadIds(),
+      membership:defaultMembership(),
+      participation:defaultParticipation(),
+      streakState:canonicalDemoStreakState(),
+      voiceDraft:defaultVoiceDraft(),
+      voiceSubmissions:[],
+      voiceSubmissionCounter:0,
+      voiceLastSubmissionId:null,
+      supportedVoiceIssues:[],
+      voiceStatusScenario:null,
+      selectedVoiceIssueId:"voice-water-halls"
+    };
   }
-  function saveState(s){
-    const normalized = ensureParticipationState(s);
+
+  function readStorageRecord(key){
+    try{
+      const raw = localStorage.getItem(key);
+      if(raw === null) return { exists:false, raw:null, value:null, parseError:false };
+      try{
+        return { exists:true, raw, value:JSON.parse(raw), parseError:false };
+      }catch(error){
+        return { exists:true, raw, value:null, parseError:true };
+      }
+    }catch(error){
+      return { exists:false, raw:null, value:null, parseError:true, readError:true };
+    }
+  }
+
+  function writeStateRecord(state){
+    if(persistenceScenario === "fail") return false;
+    const normalized = ensureParticipationState(state);
     const durable = { ...normalized };
     delete durable.voiceDraft;
-    let previousSessionDraft = null;
     try{
-      previousSessionDraft = sessionStorage.getItem(VOICE_DRAFT_SESSION_KEY);
-    }catch(e){
-      return false;
-    }
-    if(!writeVoiceDraftSession(normalized.voiceDraft)) return false;
-    try{
-      localStorage.setItem('campushub:state', JSON.stringify(durable));
+      localStorage.setItem(stateStorageKey(), JSON.stringify(durable));
       return true;
-    }catch(e){
-      try{
-        if(previousSessionDraft===null) sessionStorage.removeItem(VOICE_DRAFT_SESSION_KEY);
-        else sessionStorage.setItem(VOICE_DRAFT_SESSION_KEY, previousSessionDraft);
-      }catch(rollbackError){}
+    }catch(error){
       return false;
     }
+  }
+
+  function removeLegacyStateAfterMigration(){
+    try{
+      localStorage.removeItem(LEGACY_STATE_KEY);
+      return true;
+    }catch(error){
+      return false;
+    }
+  }
+
+  function hasFutureStateRecord(){
+    const record = readStorageRecord(stateStorageKey());
+    return record.exists && isFutureStateVersion(record.value);
+  }
+
+  function loadState(){
+    const currentRecord = readStorageRecord(stateStorageKey());
+    let state;
+    let durableVoiceDraft = null;
+
+    if(currentRecord.exists && isFutureStateVersion(currentRecord.value)){
+      // Never reinterpret or overwrite a state schema this prototype does not
+      // understand. A separate in-memory default keeps the UI usable.
+      state = defaultState();
+    } else if(currentRecord.exists && !currentRecord.parseError && stateOwnsCurrentMembership(currentRecord.value)){
+      state = currentRecord.value;
+      if(Object.prototype.hasOwnProperty.call(state, "voiceDraft")){
+        durableVoiceDraft = normalizeVoiceDraft(state.voiceDraft);
+      }
+    } else if(!currentRecord.exists){
+      const legacyRecord = readStorageRecord(LEGACY_STATE_KEY);
+      if(legacyRecord.exists){
+        const legacyState = !legacyRecord.parseError && legacyRecord.value && typeof legacyRecord.value === "object" && !Array.isArray(legacyRecord.value)
+          ? legacyRecord.value
+          : defaultState();
+        const hasLegacyDraft = Object.prototype.hasOwnProperty.call(legacyState, "voiceDraft");
+        state = ensureParticipationState(legacyState);
+        const legacyDraft = state.voiceDraft;
+        const stateWritten = writeStateRecord(state);
+        const draftWritten = !hasLegacyDraft || writeVoiceDraftSession(legacyDraft);
+        if(stateWritten && draftWritten) removeLegacyStateAfterMigration();
+      } else {
+        state = defaultState();
+        writeStateRecord(state);
+      }
+    } else {
+      // A malformed, primitive, or mismatched current record is not allowed to
+      // contribute behaviour to the active membership. Replace it with safe
+      // canonical defaults when possible.
+      state = defaultState();
+      writeStateRecord(state);
+    }
+
+    const sessionDraft = readVoiceDraftSession();
+    const draftToUse = sessionDraft || durableVoiceDraft;
+    if(draftToUse){
+      state.voiceDraft = draftToUse;
+      // Pre-8T records kept the draft in durable state. Move it to the
+      // namespaced session key, then remove the durable copy when the write
+      // succeeds; a failure leaves the old record recoverable for retry.
+      const sessionWritten = Boolean(sessionDraft) || writeVoiceDraftSession(draftToUse);
+      if(sessionWritten && durableVoiceDraft && Object.prototype.hasOwnProperty.call(state, "voiceDraft")){
+        const cleaned = { ...state };
+        delete cleaned.voiceDraft;
+        writeStateRecord(cleaned);
+      }
+    }
+    return ensureParticipationState(state);
+  }
+
+  function saveState(s){
+    if(persistenceScenario === "fail" || hasFutureStateRecord()) return false;
+    return writeStateRecord(s);
   }
 
   function escapeHtml(s){
@@ -3385,16 +3724,13 @@
           voiceSubmitTimer = null;
         }
         voiceSubmitInFlight = false;
-        localStorage.removeItem('campushub:state');
+        setPersistenceScenarioValue("normal");
+        const resetState = defaultState();
+        const persisted = writeStateRecord(resetState);
+        if(!persisted) return false;
+        removeLegacyStateAfterMigration();
         clearVoiceDraftSession();
-        // reset in-memory demo state
-        D.student.xp = 340;
-        if(D.demoConfig?.calendar) D.demoConfig.calendar.isInRecess = false;
-        D.voiceIssues[0].supporters = 124;
-        D.voiceIssues.forEach(issue => {
-          if(issue.id === "voice-water-halls") issue.featured = true;
-          else delete issue.featured;
-        });
+        // Reset mutable demo controls without rewriting canonical fixture data.
         notificationTestMode = null;
         opportunityTestScenario = "normal";
         const state = participationState();
@@ -3418,7 +3754,7 @@
         meSavesOpen = false;
         meRsvpsOpen = false;
         lastParticipationDecision = null;
-        saveState(state);
+        if(!saveState(state)) return false;
         clearVoiceDraftSession();
         syncStudentTrustState(state);
         hydrateTenant(state);
@@ -3434,17 +3770,45 @@
         const success = $('#verificationSuccess');
         if(success) success.hidden = true;
         toast('Demo state reset.');
+        return true;
       },
       resetQuiz(){
-        const s = participationState(); s.quizDone=false; s.quizChoice=null; s.quizParticipation=null; pendingQuizChoice=null; saveState(s); renderQuiz(); toast('Quiz reset (debug).');
+        const s = participationState(); s.quizDone=false; s.quizChoice=null; s.quizParticipation=null; pendingQuizChoice=null;
+        if(!saveState(s)) return false;
+        renderQuiz(); toast('Quiz reset (debug).');
+        return true;
       },
       resetPoll(){
-        const s = participationState(); s.pollDone=false; s.pollChoice=null; saveState(s); location.reload();
+        const s = participationState(); s.pollDone=false; s.pollChoice=null;
+        if(!saveState(s)) return false;
+        location.reload();
+        return true;
       },
       resetVoiceDraft(){
         resetVoiceDraft();
         if(location.hash==='#voice-new') renderVoiceComposer();
         toast('Student Voice draft reset (debug).');
+      },
+      setPersistenceScenario(name){
+        if(name !== "normal" && name !== "fail"){
+          throw new TypeError(`Unknown CampusHub persistence scenario: ${name}`);
+        }
+        return setPersistenceScenarioValue(name);
+      },
+      getPersistenceScenario(){
+        return persistenceScenario;
+      },
+      getStateStorageKey(){
+        return stateStorageKey();
+      },
+      getVoiceDraftStorageKey(){
+        return voiceDraftStorageKey();
+      },
+      getCurrentState(){
+        return JSON.parse(JSON.stringify(participationState()));
+      },
+      getRouteStack(){
+        return historyStack.slice();
       },
       getLastGateDecision(){
         return cloneParticipationDecision(lastParticipationDecision);

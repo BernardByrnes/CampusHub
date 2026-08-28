@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-const STATE_KEY = 'campushub:state';
+const STATE_KEY = 'campushub:state:v2:tenant-makerere:membership-demo-001';
 const POLL_BODY = 'This poll is available to students whose university membership has been matched to the current student roster.';
 const VOICE_SUBMISSION_BODY = 'Raising an issue is available to students whose university membership has been matched to the current student roster.';
 const VOICE_SUPPORT_BODY = 'Supporting an issue is available to students whose university membership has been matched to the current student roster.';
@@ -343,15 +343,15 @@ test.describe('Phase 6D contextual gate presentation and continuation', () => {
       const snapshots = names.map(name => {
         window.CampusHubDebug.resetDemo();
         window.CampusHubDebug.setScenario(name);
-        const state = JSON.parse(localStorage.getItem('campushub:state'));
+        const state = JSON.parse(localStorage.getItem('campushub:state:v2:tenant-makerere:membership-demo-001'));
         return { name, level:state.membership.assuranceLevel, status:state.membership.status, module:state.participation.moduleEnabled, resource:state.participation.resourceStatus, audience:state.participation.audienceEligible };
       });
       window.CampusHubDebug.resetDemo();
       let error;
       try { window.CampusHubDebug.setScenario('not-a-canonical-scenario'); } catch(e) { error = { name:e.name, message:e.message }; }
-      const reset = JSON.parse(localStorage.getItem('campushub:state'));
+      const reset = JSON.parse(localStorage.getItem('campushub:state:v2:tenant-makerere:membership-demo-001'));
       window.CampusHubDebug.setScenario('voice-under-review');
-      return { snapshots, error, reset, voiceStatus:JSON.parse(localStorage.getItem('campushub:state')).voiceStatusScenario };
+      return { snapshots, error, reset, voiceStatus:JSON.parse(localStorage.getItem('campushub:state:v2:tenant-makerere:membership-demo-001')).voiceStatusScenario };
     });
     expect(result.snapshots).toEqual([
       { name:'assurance-required', level:1, status:'active', module:true, resource:'active', audience:true },

@@ -15,6 +15,14 @@ window.CampusHubDemo = {
 
   // Prototype-only arithmetic configuration; this is not student-facing XP policy.
   demoConfig: {
+    // Opaque prototype ownership identifiers. These model the tenant/
+    // membership boundary without exposing PII or claiming browser storage
+    // is a security boundary.
+    stateNamespace: {
+      schemaVersion: 2,
+      tenantId: "tenant-makerere",
+      membershipId: "membership-demo-001"
+    },
     calendar: {
       // Canonical prototype facts; the browser/device date is not authoritative.
       currentTenantDay: "2026-05-20",

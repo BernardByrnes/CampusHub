@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-const STATE_KEY = 'campushub:state';
-const DRAFT_KEY = 'campushub:voice-draft';
+const STATE_KEY = 'campushub:state:v2:tenant-makerere:membership-demo-001';
+const DRAFT_KEY = 'campushub:voice-draft:v2:tenant-makerere:membership-demo-001';
 const CATEGORIES = [
   'Wi-Fi',
   'Water & Sanitation',
@@ -162,7 +162,7 @@ test.describe('Phase 8D frozen Student Voice composer contract', () => {
       state.xp = 412;
       state.pollDone = true;
       localStorage.setItem(key, JSON.stringify(state));
-      sessionStorage.removeItem('campushub:voice-draft');
+      sessionStorage.removeItem('campushub:voice-draft:v2:tenant-makerere:membership-demo-001');
     }, STATE_KEY);
     await page.reload();
     const draft = await readSessionDraft(page);

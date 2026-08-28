@@ -100,12 +100,12 @@ test.describe('Canonical Home', () => {
     const box = await link.boundingBox();
     expect(box).not.toBeNull();
     expectAtLeastWithSubpixelTolerance(box?.height || 0, 44);
-    const before = await page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state') || '{}').notificationReadIds);
+    const before = await page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state:v2:tenant-makerere:membership-demo-001') || '{}').notificationReadIds);
     await link.click();
     await expect(page.locator('#view-news')).toBeVisible();
     await expect(page.locator('#newsDetailTitle')).toHaveText('Wednesday Classes Rescheduled');
     await expect(page.locator('.nav-item[data-nav="discover"]')).toHaveAttribute('aria-current', 'page');
-    const after = await page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state') || '{}').notificationReadIds);
+    const after = await page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state:v2:tenant-makerere:membership-demo-001') || '{}').notificationReadIds);
     expect(after).toEqual(before);
     await page.locator('#view-news [data-back]').click();
     await expect(page.locator('#view-home')).toBeVisible();
@@ -386,10 +386,10 @@ test.describe('Canonical Home', () => {
     await expect(page.locator('#homePoll [data-testid="home-poll-respond"]')).toHaveText('Respond');
 
     await page.evaluate(() => {
-      const state = JSON.parse(localStorage.getItem('campushub:state'));
+      const state = JSON.parse(localStorage.getItem('campushub:state:v2:tenant-makerere:membership-demo-001'));
       state.quizDone = true;
       state.quizChoice = 0;
-      localStorage.setItem('campushub:state', JSON.stringify(state));
+      localStorage.setItem('campushub:state:v2:tenant-makerere:membership-demo-001', JSON.stringify(state));
       location.hash = '#discover';
     });
     await expect(page.locator('#view-discover')).toBeVisible();

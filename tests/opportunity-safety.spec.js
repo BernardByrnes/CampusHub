@@ -25,7 +25,7 @@ async function resetAndGo(page) {
 }
 
 async function storedState(page) {
-  return page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state')));
+  return page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state:v2:tenant-makerere:membership-demo-001')));
 }
 
 test.describe('Opportunity external destination safety', () => {
@@ -169,8 +169,8 @@ test.describe('Opportunity external destination safety', () => {
   test('normalizes old state without reportedOpportunityIds and preserves Save behavior', async ({ page }) => {
     await resetAndGo(page);
     await page.evaluate(() => {
-      const current = JSON.parse(localStorage.getItem('campushub:state'));
-      localStorage.setItem('campushub:state', JSON.stringify({
+      const current = JSON.parse(localStorage.getItem('campushub:state:v2:tenant-makerere:membership-demo-001'));
+      localStorage.setItem('campushub:state:v2:tenant-makerere:membership-demo-001', JSON.stringify({
         ...current,
         saveOpp: true,
         xp: 321,
