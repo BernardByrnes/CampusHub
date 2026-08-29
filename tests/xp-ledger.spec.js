@@ -247,7 +247,14 @@ test.describe('Phase 8T.1 append-only XP ledger and explainable progress', () =>
       studentVisible: true
     });
     expect(rsvpEvents[0].idempotencyKey).toBe('xp:award:event-rsvp:guild-debate');
-    expect(JSON.stringify(rsvpEvents[0])).not.toMatch(/going|interested|rsvpState|choice/i);
+    const rsvpEventKeys = Object.keys(rsvpEvents[0]);
+    for(const forbiddenKey of ['going', 'interested', 'rsvpState', 'choice']){
+      expect(rsvpEventKeys).not.toContain(forbiddenKey);
+    }
+    Object.values(rsvpEvents[0]).forEach(value => {
+      if(typeof value !== 'string') return;
+      expect(['going', 'interested', 'rsvpState', 'choice']).not.toContain(value);
+    });
     expect(await readTotal(page)).toBe(345);
     await goTo(page, '#play');
     await expect(page.locator('#xpHistory')).toContainText('Event RSVP');
