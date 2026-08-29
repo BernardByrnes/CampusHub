@@ -5,6 +5,9 @@ import {
   assertMinimumTarget,
   assertNoHorizontalOverflow,
   assertVisibleFocusIndicator,
+  AXE_EXCLUDED_RULES,
+  AXE_WCAG_TAG_INVENTORY,
+  AXE_WCAG_TAGS,
   runAxe
 } from './helpers/accessibility.js';
 
@@ -47,6 +50,25 @@ const TARGET_ROUTES = [
   '#sports/mubs-mak'
 ];
 
+const SKIP_ROUTES = [
+  '#home',
+  '#discover',
+  '#participate',
+  '#play',
+  '#me',
+  '#news/innovation-week',
+  '#events/guild-debate',
+  '#opportunities/ra-climate',
+  '#sports/mubs-mak',
+  '#voice-detail/voice-water-halls'
+];
+
+// Non-Axe coverage map: 44x44 targets → practical target test; keyboard
+// journeys → core student journeys; focus visibility → focus-indicator test;
+// 320px reflow → route matrix; reduced motion → reduced-motion test; route
+// focus → direct-detail and skip tests; dialog focus → leave-campus dialog;
+// tab keyboard → Participate tab pattern test.
+
 async function resetDemo(page) {
   await page.evaluate(() => {
     window.CampusHubDebug.resetDemo();
@@ -81,11 +103,23 @@ test.describe('Phase 8U WCAG A/AA accessibility gate', () => {
     onlyProject(testInfo, 'canonical-mobile');
     test.setTimeout(180_000);
     const failures = [];
+    const exercisedRules = new Set();
     for (const route of AXE_ROUTES) {
       await openRoute(page, route);
       const results = await runAxe(page);
+      ['violations', 'incomplete', 'passes', 'inapplicable'].forEach(bucket => {
+        (results[bucket] || []).forEach(rule => exercisedRules.add(rule.id));
+      });
       if (results.violations.length) failures.push({ route, violations: results.violations });
     }
+    console.log(JSON.stringify({
+      axeRoutes: AXE_ROUTES.length,
+      axeTags: AXE_WCAG_TAGS,
+      axeRuleInventory: AXE_WCAG_TAG_INVENTORY,
+      exercisedRuleCount: exercisedRules.size,
+      excludedRules: AXE_EXCLUDED_RULES
+    }));
+    expect(AXE_EXCLUDED_RULES).toEqual([]);
     expect(failures, JSON.stringify(failures, null, 2)).toEqual([]);
   });
 
@@ -250,6 +284,98 @@ test.describe('Phase 8U WCAG A/AA accessibility gate', () => {
     await page.locator('#tab-home').focus();
     await page.keyboard.press('Tab');
     await expect(page.locator('#tab-discover')).toBeFocused();
+  });
+
+  test('skip navigation preserves route, view, primary nav, and custom history', async ({ page }, testInfo) => {
+    onlyProject(testInfo, 'canonical-mobile');
+    for (const route of SKIP_ROUTES) {
+      await openRoute(page, route);
+      const before = await page.evaluate(() => ({
+        hash: location.hash,
+        activeView: document.querySelector('.view.is-active')?.id,
+        currentNav: [...document.querySelectorAll('nav.bottom-nav [aria-current="page"]')]
+          .map(item => item.getAttribute('data-nav') || item.id),
+        routeStack: window.CampusHubDebug.getRouteStack()
+      }));
+      await page.locator('.skip-link').focus();
+      await page.keyboard.press('Enter');
+      await expect(page.locator('main#main')).toBeFocused();
+      const after = await page.evaluate(() => ({
+        hash: location.hash,
+        activeView: document.querySelector('.view.is-active')?.id,
+        currentNav: [...document.querySelectorAll('nav.bottom-nav [aria-current="page"]')]
+          .map(item => item.getAttribute('data-nav') || item.id),
+        routeStack: window.CampusHubDebug.getRouteStack()
+      }));
+      expect(after).toEqual(before);
+      expect(after.hash).not.toBe('#main');
+      expect(after.routeStack).not.toContain('main');
+    }
+  });
+
+  test('skip navigation does not create browser history entries', async ({ page }, testInfo) => {
+    onlyProject(testInfo, 'canonical-mobile');
+    await openRoute(page, '#home');
+    await page.locator('#tab-discover').click();
+    await expect(page.locator('#view-discover')).toBeVisible();
+    const before = await page.evaluate(() => ({ hash: location.hash, historyLength: history.length }));
+    await page.locator('.skip-link').focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('main#main')).toBeFocused();
+    expect(await page.evaluate(() => ({ hash: location.hash, historyLength: history.length }))).toEqual(before);
+    await page.goBack();
+    await expect(page.locator('#view-home')).toBeVisible();
+    await expect(page).toHaveURL(/#home$/);
+    await page.goForward();
+    await expect(page.locator('#view-discover')).toBeVisible();
+    await expect(page).toHaveURL(/#discover$/);
+  });
+
+  test('skip navigation leaves detail fallback and in-app Back intact', async ({ page }, testInfo) => {
+    onlyProject(testInfo, 'canonical-mobile');
+    await openRoute(page, '#news/innovation-week');
+    await expect(page.locator('#view-news')).toBeVisible();
+    const before = await page.evaluate(() => window.CampusHubDebug.getRouteStack());
+    await page.locator('.skip-link').focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('main#main')).toBeFocused();
+    expect(await page.evaluate(() => window.CampusHubDebug.getRouteStack())).toEqual(before);
+    await page.locator('#view-news [data-back]').click();
+    await expect(page.locator('#view-discover')).toBeVisible();
+    await expect(page).toHaveURL(/#discover$/);
+  });
+
+  test('Axe configuration covers every installed WCAG A/AA tag through 2.2', async ({}, testInfo) => {
+    onlyProject(testInfo, 'canonical-mobile');
+    const relevantTags = Object.keys(AXE_WCAG_TAG_INVENTORY);
+    expect(AXE_WCAG_TAGS).toEqual(relevantTags.sort());
+    expect(AXE_WCAG_TAGS).toContain('wcag2a');
+    expect(AXE_WCAG_TAGS).toContain('wcag2aa');
+    expect(AXE_WCAG_TAGS).toContain('wcag21a');
+    expect(AXE_WCAG_TAGS).toContain('wcag21aa');
+    expect(AXE_WCAG_TAGS).toContain('wcag22aa');
+    expect(AXE_EXCLUDED_RULES).toEqual([]);
+  });
+
+  test('internal fragments are canonical routes except the handled skip target', async ({ page }, testInfo) => {
+    onlyProject(testInfo, 'canonical-mobile');
+    await openRoute(page, '#home');
+    const fragments = await page.locator('a[href^="#"]').evaluateAll(links => links.map(link => ({
+      href: link.getAttribute('href'),
+      skip: link.classList.contains('skip-link')
+    })));
+    const nonSkipFragments = fragments.filter(link => !link.skip && link.href !== '#');
+    expect(nonSkipFragments.some(link => link.href === '#main')).toBe(false);
+    expect(fragments.filter(link => link.href === '#main').every(link => link.skip)).toBe(true);
+  });
+
+  test('skip link remains keyboard-native from a detail route', async ({ page }, testInfo) => {
+    onlyProject(testInfo, 'canonical-mobile');
+    await openRoute(page, '#news/innovation-week');
+    await page.locator('.skip-link').focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('main#main')).toBeFocused();
+    await expect(page).toHaveURL(/#news\/innovation-week$/);
   });
 
   test('primary navigation remains a normal navigation with one page-current item', async ({ page }, testInfo) => {

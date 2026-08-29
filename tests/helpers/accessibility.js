@@ -1,4 +1,24 @@
 import AxeBuilder from '@axe-core/playwright';
+import axeCore from 'axe-core';
+
+const WCAG_TAG_PATTERN = /^wcag(?:2|21|22)(?:a|aa)$/;
+
+/**
+ * Axe 4.13.0 publishes versioned WCAG tags independently. Build the scan
+ * configuration from the installed rule metadata so the gate cannot silently
+ * regress to the original WCAG 2.0-only pair or depend on guessed tags.
+ */
+export const AXE_WCAG_TAG_INVENTORY = Object.freeze(
+  axeCore.getRules().reduce((inventory, rule) => {
+    rule.tags.filter(tag => WCAG_TAG_PATTERN.test(tag)).forEach(tag => {
+      inventory[tag] = (inventory[tag] || 0) + 1;
+    });
+    return inventory;
+  }, {})
+);
+
+export const AXE_WCAG_TAGS = Object.freeze(Object.keys(AXE_WCAG_TAG_INVENTORY).sort());
+export const AXE_EXCLUDED_RULES = Object.freeze([]);
 
 /**
  * Run the WCAG A/AA rules that apply to the student prototype.  This helper is
@@ -6,7 +26,7 @@ import AxeBuilder from '@axe-core/playwright';
  */
 export function runAxe(page) {
   return new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa'])
+    .withTags(AXE_WCAG_TAGS)
     .analyze();
 }
 

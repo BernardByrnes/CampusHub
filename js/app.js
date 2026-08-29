@@ -3481,6 +3481,19 @@
     setRouteHash("#home", "back");
   }
 
+  // Skip navigation is document-local, not an application route. Keep the
+  // semantic anchor for keyboard/native link behaviour, but prevent its
+  // fragment from reaching the hash router and focus the real main landmark.
+  function initSkipNavigation(){
+    const skipLink = $('.skip-link');
+    const main = $('#main');
+    if(!skipLink || !main) return;
+    skipLink.addEventListener('click', event=>{
+      event.preventDefault();
+      main.focus({preventScroll:false});
+    });
+  }
+
   function initBack(){
     const initialPath = routeHistoryPath();
     const initialRoute = parseHashRoute();
@@ -3493,7 +3506,7 @@
     // Back/Forward and direct hash entry arrive without this marker.
     document.addEventListener('click', event=>{
       const link = event.target.closest?.('a[href^="#"]');
-      if(link && link.getAttribute('href') !== '#') pendingHistoryIntent = 'forward';
+      if(link && !link.matches('.skip-link') && link.getAttribute('href') !== '#') pendingHistoryIntent = 'forward';
     }, true);
     window.addEventListener('hashchange', ()=>{
       const h = routeHistoryPath();
@@ -4561,6 +4574,7 @@
     initMeActivity();
     initLeaveCampusHubFlow();
     initRSVP();
+    initSkipNavigation();
     initBack();
     initImageFallbacks();
     initParticipationGate();
