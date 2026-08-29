@@ -193,6 +193,64 @@ test.describe('Phase 8T state ownership, persistence truth, and navigation histo
     expect(await page.evaluate(stateKey => Boolean(localStorage.getItem(stateKey)), key)).toBe(true);
   });
 
+  test('keeps zero legacy XP as a valid empty ledger and rejects malformed scalar values', async ({ page }) => {
+    test.setTimeout(60000);
+    const key = await stateKey(page);
+    for (const xp of [0, -1, 'garbage']) {
+      await page.evaluate(({ stateKey, v2Key, value }) => {
+        localStorage.removeItem(stateKey);
+        localStorage.setItem(v2Key, JSON.stringify({
+          schemaVersion: 2,
+          tenantId: 'tenant-makerere',
+          membershipId: 'membership-demo-001',
+          xp: value
+        }));
+      }, { stateKey:key, v2Key:STATE_V2_KEY, value:xp });
+      await page.reload();
+      expect(await page.evaluate(() => window.CampusHubDebug.getXpTotal())).toBe(0);
+      expect(await page.evaluate(() => window.CampusHubDebug.getXpEvents())).toEqual([]);
+      expect(await page.evaluate(() => window.CampusHubDebug.reconcileXpLedger())).toMatchObject({ valid:true, total:0, eventCount:0 });
+    }
+  });
+
+  test('quarantines malformed legacy events while recovering a valid scalar, without double-counting mixed state', async ({ page }) => {
+    const key = await stateKey(page);
+    const malformed = {
+      id:'malformed-legacy', tenantId:'tenant-makerere', membershipId:'membership-demo-001',
+      ruleRef:'legacy', amount:0, timestamp:'2026-05-20T00:00:00.000Z', idempotencyKey:'legacy-malformed',
+      type:'award', sourceType:'legacy', sourceId:'legacy', sourceAction:'award'
+    };
+    await page.evaluate(({ stateKey, v2Key, event }) => {
+      localStorage.removeItem(stateKey);
+      localStorage.setItem(v2Key, JSON.stringify({
+        schemaVersion:2, tenantId:'tenant-makerere', membershipId:'membership-demo-001', xp:340, xpEvents:[event]
+      }));
+    }, { stateKey:key, v2Key:STATE_V2_KEY, event:malformed });
+    await page.reload();
+    expect(await page.evaluate(() => window.CampusHubDebug.getXpTotal())).toBe(340);
+    expect(await page.evaluate(() => window.CampusHubDebug.getXpEvents())).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id:'malformed-legacy', amount:0 }),
+      expect.objectContaining({ ruleRef:'prototype-opening-balance', amount:340, studentVisible:false })
+    ]));
+    expect(await page.evaluate(() => window.CampusHubDebug.reconcileXpLedger())).toMatchObject({ valid:false, total:340 });
+
+    const valid = {
+      id:'valid-legacy', tenantId:'tenant-makerere', membershipId:'membership-demo-001',
+      ruleRef:'legacy', amount:300, timestamp:'2026-05-20T00:00:00.000Z', idempotencyKey:'legacy-valid',
+      type:'award', sourceType:'legacy', sourceId:'legacy-valid', sourceAction:'award', studentLabel:'Legacy award', studentVisible:true
+    };
+    await page.evaluate(({ stateKey, v2Key, valid, malformed }) => {
+      localStorage.removeItem(stateKey);
+      localStorage.setItem(v2Key, JSON.stringify({
+        schemaVersion:2, tenantId:'tenant-makerere', membershipId:'membership-demo-001', xp:340, xpEvents:[valid, malformed]
+      }));
+    }, { stateKey:key, v2Key:STATE_V2_KEY, valid, malformed });
+    await page.reload();
+    expect(await page.evaluate(() => window.CampusHubDebug.getXpTotal())).toBe(300);
+    expect(await page.evaluate(() => window.CampusHubDebug.getXpEvents())).toHaveLength(2);
+    expect(await page.evaluate(() => window.CampusHubDebug.reconcileXpLedger())).toMatchObject({ valid:false, total:300 });
+  });
+
   test('preserves legacy state when migration write fails, then recovers normally', async ({ page }) => {
     const key = await stateKey(page);
     const legacy = { xp: 501, level: 5, rsvp: 'interested' };

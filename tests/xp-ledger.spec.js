@@ -55,6 +55,25 @@ async function appendCorrection(page, amount, extra = {}) {
   }), { amount, extra });
 }
 
+function importedXpEvent(overrides = {}) {
+  return {
+    id: 'imported-event',
+    tenantId: 'tenant-makerere',
+    membershipId: 'membership-demo-001',
+    ruleRef: 'imported-test',
+    amount: 1,
+    timestamp: '2026-05-20T00:00:00.000Z',
+    idempotencyKey: 'imported-key',
+    type: 'award',
+    sourceType: 'imported-test',
+    sourceId: 'imported-source',
+    sourceAction: 'complete',
+    studentLabel: 'Imported test',
+    studentVisible: true,
+    ...overrides
+  };
+}
+
 test.describe('Phase 8T.1 append-only XP ledger and explainable progress', () => {
   test.beforeEach(async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'canonical-mobile', 'XP ledger contracts run once in canonical-mobile.');
@@ -296,6 +315,89 @@ test.describe('Phase 8T.1 append-only XP ledger and explainable progress', () =>
     await goTo(page, '#play');
     await expect(page.locator('[data-field="xpCount"]')).toHaveText('340');
     await expect(page.locator('#xpHistory')).not.toContainText('9999');
+  });
+
+  test('uses one permutation-stable projection for corrupt evidence and accepted reversals', async ({ page }) => {
+    const baseline = await readState(page);
+    const opening = baseline.xpEvents[0];
+    const source = importedXpEvent({ id:'partial-source', ruleRef:'partial-source', amount:10, idempotencyKey:'partial-source-key', sourceId:'partial-source-id' });
+    const partialA = importedXpEvent({ id:'partial-a', type:'reversal', amount:-3, idempotencyKey:'partial-a-key', sourceId:'partial-a-id', sourceAction:'reverse', referencesEventId:'partial-source', reason:'Partial reversal' });
+    const partialB = importedXpEvent({ id:'partial-b', type:'reversal', amount:-2, idempotencyKey:'partial-b-key', sourceId:'partial-b-id', sourceAction:'reverse', referencesEventId:'partial-source', reason:'Partial reversal' });
+    const excessSource = importedXpEvent({ id:'excess-source', ruleRef:'excess-source', amount:5, idempotencyKey:'excess-source-key', sourceId:'excess-source-id' });
+    const excessA = importedXpEvent({ id:'excess-a', type:'reversal', amount:-4, idempotencyKey:'excess-a-key', sourceId:'excess-a-id', sourceAction:'reverse', referencesEventId:'excess-source', reason:'Excess reversal' });
+    const excessB = importedXpEvent({ id:'excess-b', type:'reversal', amount:-2, idempotencyKey:'excess-b-key', sourceId:'excess-b-id', sourceAction:'reverse', referencesEventId:'excess-source', reason:'Excess reversal' });
+    const duplicateA = importedXpEvent({ id:'duplicate-id', amount:1, idempotencyKey:'duplicate-a', sourceId:'duplicate-a' });
+    const duplicateB = importedXpEvent({ id:'duplicate-id', amount:99, idempotencyKey:'duplicate-b', sourceId:'duplicate-b' });
+    const idempotencyA = importedXpEvent({ id:'idempotency-a', amount:2, idempotencyKey:'conflicting-key', sourceId:'idempotency-a' });
+    const idempotencyB = importedXpEvent({ id:'idempotency-b', amount:9, idempotencyKey:'conflicting-key', sourceId:'idempotency-b' });
+    const sourceConflictA = importedXpEvent({ id:'source-conflict-a', ruleRef:'source-conflict', amount:3, idempotencyKey:'source-conflict-a-key', sourceId:'same-source', sourceAction:'award' });
+    const sourceConflictB = importedXpEvent({ id:'source-conflict-b', ruleRef:'source-conflict', amount:7, idempotencyKey:'source-conflict-b-key', sourceId:'same-source', sourceAction:'award' });
+    const missing = importedXpEvent({ id:'missing-source-reversal', type:'reversal', amount:-200, idempotencyKey:'missing-source-key', sourceId:'missing-source', sourceAction:'reverse', referencesEventId:'missing-id', reason:'Missing source' });
+    const invalidCorrection = importedXpEvent({ id:'invalid-correction', type:'correction', amount:-4, idempotencyKey:'invalid-correction-key', sourceId:'invalid-correction', sourceAction:'correction', reason:'Invalid correction' });
+    const invalidCorrectionReversal = importedXpEvent({ id:'invalid-correction-reversal', type:'reversal', amount:-1, idempotencyKey:'invalid-correction-reversal-key', sourceId:'invalid-correction-reversal', sourceAction:'reverse', referencesEventId:'invalid-correction', reason:'Invalid source' });
+    const unknown = importedXpEvent({ id:'unknown-field', idempotencyKey:'unknown-field-key', sourceId:'unknown-field', banana:'value' });
+    const importedPrivacy = importedXpEvent({ id:'imported-poll-sensitive', idempotencyKey:'imported-poll-sensitive-key', sourceId:'imported-poll-sensitive-source', selectedOption:'Poor' });
+    const invalidDate = importedXpEvent({ id:'invalid-date', idempotencyKey:'invalid-date-key', sourceId:'invalid-date', tenantDay:'2026-02-30' });
+    const rawEvents = [opening, source, partialA, partialB, excessSource, excessA, excessB, duplicateA, duplicateB, idempotencyA, idempotencyB, sourceConflictA, sourceConflictB, missing, invalidCorrection, invalidCorrectionReversal, unknown, importedPrivacy, invalidDate];
+    const rawState = { ...baseline, xpEvents:rawEvents };
+    await page.evaluate(({ key, state }) => localStorage.setItem(key, JSON.stringify(state)), { key: V3_STATE_KEY, state:rawState });
+    await page.reload();
+    const first = await page.evaluate(() => ({
+      projection:window.CampusHubDebug.projectXpLedger(),
+      reconciliation:window.CampusHubDebug.reconcileXpLedger(),
+      total:window.CampusHubDebug.getXpTotal()
+    }));
+    expect(first.total).toBe(350);
+    expect(first.reconciliation.total).toBe(first.total);
+    expect(first.reconciliation.valid).toBe(false);
+    expect(first.reconciliation.acceptedEventIds).toEqual(first.projection.acceptedEventIds);
+    expect(first.projection.acceptedEventIds).toEqual([
+      'partial-a', 'partial-b', 'partial-source', 'excess-source',
+      opening.id
+    ].sort());
+    expect(first.projection.quarantinedEventIds).toEqual([
+      'duplicate-id', 'excess-a', 'excess-b', 'idempotency-a', 'idempotency-b',
+      'invalid-correction', 'invalid-correction-reversal', 'invalid-date',
+      'imported-poll-sensitive', 'missing-source-reversal', 'source-conflict-a', 'source-conflict-b', 'unknown-field'
+    ].sort());
+    expect(first.projection.problems).toEqual([
+      'DUPLICATE_EVENT_ID', 'DUPLICATE_IDEMPOTENCY_KEY', 'DUPLICATE_SOURCE', 'DUPLICATE_SOURCE_CONFLICT',
+      'EXCESS_REVERSAL', 'IDEMPOTENCY_CONFLICT',
+      'INVALID_CORRECTION_AMOUNT', 'INVALID_TENANT_DAY', 'PREREQUISITE_MISSING',
+      'UNKNOWN_EVENT_FIELD'
+    ].sort());
+    await goTo(page, '#play');
+    await expect(page.locator('#xpHistory')).not.toContainText('Missing source');
+    await expect(page.locator('#xpHistory')).not.toContainText('Excess reversal');
+
+    const permutedState = { ...rawState, xpEvents:rawEvents.slice().reverse() };
+    await page.evaluate(({ key, state }) => localStorage.setItem(key, JSON.stringify(state)), { key: V3_STATE_KEY, state:permutedState });
+    await page.reload();
+    const second = await page.evaluate(() => window.CampusHubDebug.projectXpLedger());
+    expect({ total:second.total, accepted:second.acceptedEventIds, quarantined:second.quarantinedEventIds, problems:second.problems })
+      .toEqual({ total:first.projection.total, accepted:first.projection.acceptedEventIds, quarantined:first.projection.quarantinedEventIds, problems:first.projection.problems });
+  });
+
+  test('binds append idempotency to intent, rejects unknown fields, and validates real tenant days', async ({ page }) => {
+    const input = {
+      type:'award', ruleRef:'intent-test', amount:2, idempotencyKey:'intent-test-key',
+      sourceType:'intent-test', sourceId:'intent-source', sourceAction:'complete', studentLabel:'Intent test'
+    };
+    const first = await page.evaluate(value => window.CampusHubDebug.appendXpEvent(value), input);
+    const replay = await page.evaluate(value => window.CampusHubDebug.appendXpEvent({ ...value, id:'replay-id', timestamp:'2028-02-29T00:00:00Z', studentLabel:'Different presentation' }), input);
+    const conflict = await page.evaluate(value => window.CampusHubDebug.appendXpEvent({ ...value, id:'conflict-id', amount:3 }), input);
+    const unknown = await page.evaluate(value => window.CampusHubDebug.appendXpEvent({ ...value, id:'unknown-id', idempotencyKey:'unknown-key', banana:'value' }), input);
+    const pollSensitive = await page.evaluate(value => window.CampusHubDebug.appendXpEvent({ ...value, id:'poll-sensitive-id', idempotencyKey:'poll-sensitive-key', sourceId:'poll-sensitive-source', selectedOption:'Poor' }), input);
+    const impossibleDate = await page.evaluate(value => window.CampusHubDebug.appendXpEvent({ ...value, id:'date-id', idempotencyKey:'date-key', sourceId:'date-source', tenantDay:'2026-02-30' }), input);
+    const realLeapDay = await page.evaluate(value => window.CampusHubDebug.appendXpEvent({ ...value, id:'leap-id', idempotencyKey:'leap-key', sourceId:'leap-source', tenantDay:'2028-02-29' }), input);
+    expect(first.added).toBe(true);
+    expect(replay).toMatchObject({ added:false, reason:'idempotent' });
+    expect(conflict).toMatchObject({ added:false, reason:'IDEMPOTENCY_CONFLICT' });
+    expect(unknown).toMatchObject({ added:false, reason:'UNKNOWN_EVENT_FIELD' });
+    expect(pollSensitive).toMatchObject({ added:false, reason:'UNKNOWN_EVENT_FIELD' });
+    expect(impossibleDate).toMatchObject({ added:false, reason:'INVALID_TENANT_DAY' });
+    expect(realLeapDay.added).toBe(true);
+    expect((await readEvents(page)).filter(event => event.ruleRef === 'intent-test')).toHaveLength(2);
   });
 
   test('keeps Poll and Quiz state, XP, and Streak atomic on persistence failure', async ({ page }) => {

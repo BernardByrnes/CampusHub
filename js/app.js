@@ -1745,9 +1745,10 @@
   }
 
   function safeLegacyXpSeed(value){
-    const fallback = Number(D.student?.xp);
     if(typeof value === "number" && Number.isFinite(value) && value >= 0) return value;
-    return Number.isFinite(fallback) && fallback >= 0 ? fallback : 0;
+    // Legacy values are untrusted input. A malformed, negative, string, NaN,
+    // or Infinity value must not become a fabricated opening-balance event.
+    return null;
   }
 
   // This prototype-only event stands in for the pre-ledger scalar. Production
@@ -1778,7 +1779,10 @@
       && event.ruleRef === "prototype-opening-balance"
       && event.sourceType === "prototype-migration"
       && event.sourceId === "pre-ledger-balance"
-      && event.sourceAction === "opening-balance");
+      && event.sourceAction === "opening-balance"
+      && validateXpEvent(event).valid
+      && event.type === "correction"
+      && event.amount > 0);
   }
 
   function ensureXpLedgerState(state, options={}){
@@ -1786,10 +1790,16 @@
     const currentEvents = Array.isArray(state.xpEvents) ? state.xpEvents.slice() : [];
     const hasScalar = Object.prototype.hasOwnProperty.call(state, "xp");
     const scalarValue = hasScalar ? safeLegacyXpSeed(state.xp) : null;
-    const shouldCreateOpening = options.createOpening === true
-      || (hasScalar && currentEvents.length === 0);
-    if(shouldCreateOpening && !hasPrototypeOpeningBalance(currentEvents)){
-      currentEvents.unshift(prototypeOpeningBalanceEvent(scalarValue));
+    const shouldCreateOpening = hasScalar && scalarValue !== null && scalarValue > 0;
+    if(shouldCreateOpening){
+      // Migration precedence: a usable accepted ledger wins; only a wholly
+      // unusable event array may receive one hidden scalar opening event.
+      const projection = projectXpLedger({ ...state, xpEvents: currentEvents });
+      const hasUsableBalance = projection.acceptedEvents.some(event =>
+        (event.type === "award" || event.type === "correction") && event.amount > 0);
+      if(!hasUsableBalance && !hasPrototypeOpeningBalance(currentEvents)){
+        currentEvents.unshift(prototypeOpeningBalanceEvent(scalarValue));
+      }
     }
     state.xpEvents = currentEvents;
     // A scalar may be read only while migrating an older record; it is never
@@ -3544,6 +3554,16 @@
   }
 
   const XP_EVENT_TYPES = Object.freeze(["award", "reversal", "correction", "capped_award"]);
+  const XP_EVENT_ALLOWED_FIELDS = Object.freeze([
+    "id", "tenantId", "membershipId", "ruleRef", "amount", "timestamp",
+    "idempotencyKey", "type", "sourceType", "sourceId", "sourceAction",
+    "studentLabel", "studentVisible", "tenantDay", "reason", "referencesEventId"
+  ]);
+  const XP_EVENT_INTENT_FIELDS = Object.freeze([
+    "tenantId", "membershipId", "type", "ruleRef", "amount", "sourceType",
+    "sourceId", "sourceAction", "tenantDay", "reason", "referencesEventId",
+    "studentVisible"
+  ]);
 
   function xpEventTimestampIsUtc(value){
     if(typeof value !== "string" || !value.endsWith("Z")) return false;
@@ -3563,11 +3583,54 @@
       && event.amount !== 0);
   }
 
+  // JSON persistence gives us plain values, but this stable serializer also
+  // keeps diagnostics and projection selection deterministic for hand-edited
+  // records and test fixtures without depending on insertion order.
+  function stableXpJson(value, stack=[]){
+    if(value === null) return "null";
+    if(typeof value === "string" || typeof value === "number" || typeof value === "boolean"){
+      const encoded = JSON.stringify(value);
+      return encoded === undefined ? String(value) : encoded;
+    }
+    if(typeof value === "undefined") return "undefined";
+    if(typeof value !== "object") return JSON.stringify(String(value));
+    if(stack.includes(value)) return '"[Circular]"';
+    const nextStack = stack.concat(value);
+    if(Array.isArray(value)) return `[${value.map(item => stableXpJson(item, nextStack)).join(",")}]`;
+    return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableXpJson(value[key], nextStack)}`).join(",")}}`;
+  }
+
+  function xpEventStableKey(event){
+    return stableXpJson(event);
+  }
+
+  function xpEventIntent(event){
+    const intent = {};
+    XP_EVENT_INTENT_FIELDS.forEach(key => {
+      if(key === "tenantDay" || key === "reason" || key === "referencesEventId"){
+        intent[key] = event?.[key] === undefined ? null : event[key];
+      } else if(key === "studentVisible"){
+        intent[key] = event?.[key] === undefined ? event?.type !== "capped_award" : event[key];
+      } else {
+        intent[key] = event?.[key];
+      }
+    });
+    return stableXpJson(intent);
+  }
+
+  function xpEventHasUnknownFields(event){
+    if(!event || typeof event !== "object" || Array.isArray(event)) return false;
+    return Object.keys(event).some(key => !XP_EVENT_ALLOWED_FIELDS.includes(key));
+  }
+
   function validateXpEvent(event, options={}){
     const requireOwnership = options.requireOwnership !== false;
     if(!event || typeof event !== "object" || Array.isArray(event)) return { valid:false, code:"INVALID_EVENT" };
+    if(xpEventHasUnknownFields(event)) return { valid:false, code:"UNKNOWN_EVENT_FIELD" };
     const requiredStrings = ["id", "ruleRef", "timestamp", "idempotencyKey", "type", "sourceType", "sourceId", "sourceAction"];
     if(requiredStrings.some(key => typeof event[key] !== "string" || !event[key].trim())) return { valid:false, code:"INVALID_EVENT_FIELDS" };
+    if(typeof event.tenantId !== "string" || !event.tenantId.trim()
+      || typeof event.membershipId !== "string" || !event.membershipId.trim()) return { valid:false, code:"INVALID_OWNERSHIP" };
     if(!Number.isFinite(event.amount)) return { valid:false, code:"INVALID_AMOUNT" };
     if(!XP_EVENT_TYPES.includes(event.type)) return { valid:false, code:"INVALID_TYPE" };
     if(!xpEventTimestampIsUtc(event.timestamp)) return { valid:false, code:"INVALID_TIMESTAMP" };
@@ -3576,9 +3639,6 @@
       if(event.tenantId !== ownership.tenantId || event.membershipId !== ownership.membershipId){
         return { valid:false, code:"OWNERSHIP_MISMATCH" };
       }
-    } else if(typeof event.tenantId !== "string" || !event.tenantId.trim()
-      || typeof event.membershipId !== "string" || !event.membershipId.trim()){
-      return { valid:false, code:"INVALID_OWNERSHIP" };
     }
     if(event.type === "award" && !(event.amount > 0)) return { valid:false, code:"INVALID_AWARD_AMOUNT" };
     if(event.type === "correction" && !(event.amount > 0)) return { valid:false, code:"INVALID_CORRECTION_AMOUNT" };
@@ -3592,8 +3652,18 @@
       && (typeof event.referencesEventId !== "string" || !event.referencesEventId.trim())){
       return { valid:false, code:"REFERENCED_EVENT_REQUIRED" };
     }
+    if(event.studentLabel !== undefined && typeof event.studentLabel !== "string"){
+      return { valid:false, code:"INVALID_LABEL" };
+    }
     if(event.studentVisible !== undefined && typeof event.studentVisible !== "boolean"){
       return { valid:false, code:"INVALID_VISIBILITY" };
+    }
+    if(event.reason !== undefined && (typeof event.reason !== "string" || !event.reason.trim())){
+      return { valid:false, code:"INVALID_REASON" };
+    }
+    if(event.referencesEventId !== undefined
+      && (typeof event.referencesEventId !== "string" || !event.referencesEventId.trim())){
+      return { valid:false, code:"INVALID_REFERENCE" };
     }
     if(event.tenantDay !== undefined && event.tenantDay !== null && !isCanonicalTenantDay(event.tenantDay)){
       return { valid:false, code:"INVALID_TENANT_DAY" };
@@ -3621,19 +3691,24 @@
   function buildXpEvent(eventInput={}){
     const ownership = stateOwnershipFields();
     const type = eventInput.type;
+    const hasId = Object.prototype.hasOwnProperty.call(eventInput, "id");
+    const hasTimestamp = Object.prototype.hasOwnProperty.call(eventInput, "timestamp");
+    const hasStudentLabel = Object.prototype.hasOwnProperty.call(eventInput, "studentLabel");
+    const hasTenantId = Object.prototype.hasOwnProperty.call(eventInput, "tenantId");
+    const hasMembershipId = Object.prototype.hasOwnProperty.call(eventInput, "membershipId");
     const event = {
-      id: typeof eventInput.id === "string" && eventInput.id.trim() ? eventInput.id.trim() : createXpEventId(),
-      tenantId: ownership.tenantId,
-      membershipId: ownership.membershipId,
+      id: hasId ? eventInput.id : createXpEventId(),
+      tenantId: hasTenantId ? eventInput.tenantId : ownership.tenantId,
+      membershipId: hasMembershipId ? eventInput.membershipId : ownership.membershipId,
       ruleRef: eventInput.ruleRef,
       amount: eventInput.amount,
-      timestamp: eventInput.timestamp || new Date().toISOString(),
+      timestamp: hasTimestamp ? eventInput.timestamp : new Date().toISOString(),
       idempotencyKey: eventInput.idempotencyKey,
       type,
       sourceType: eventInput.sourceType,
       sourceId: eventInput.sourceId,
       sourceAction: eventInput.sourceAction,
-      studentLabel: eventInput.studentLabel || xpEventLabel({ ...eventInput, type }),
+      studentLabel: hasStudentLabel ? eventInput.studentLabel : xpEventLabel({ ...eventInput, type }),
       studentVisible: eventInput.studentVisible === undefined ? type !== "capped_award" : eventInput.studentVisible
     };
     ["reason", "referencesEventId", "tenantDay"].forEach(key=>{
@@ -3642,46 +3717,218 @@
     return event;
   }
 
+  function compareXpRecords(a, b){
+    const keyCompare = a.stableKey.localeCompare(b.stableKey);
+    return keyCompare || a.index - b.index;
+  }
+
+  function projectXpLedger(state){
+    const events = Array.isArray(state?.xpEvents) ? state.xpEvents : [];
+    const records = events.map((event, index) => ({
+      event,
+      index,
+      stableKey: xpEventStableKey(event),
+      intent: xpEventIntent(event),
+      validation: validateXpEvent(event)
+    }));
+    const problems = new Set();
+    const quarantinedIndexes = new Set();
+    const quarantine = (record, code) => {
+      if(record) quarantinedIndexes.add(record.index);
+      if(code) problems.add(code);
+    };
+
+    // Structural validation and ownership are the first gate. Grouping by ID
+    // before selecting candidates prevents a malformed duplicate from winning
+    // merely because it appeared earlier in persisted JSON.
+    const idGroups = new Map();
+    records.forEach(record => {
+      const id = record.event?.id;
+      if(typeof id !== "string" || !id.trim()){
+        if(!record.validation.valid) quarantine(record, record.validation.code);
+        else quarantine(record, "INVALID_EVENT_FIELDS");
+        return;
+      }
+      if(!idGroups.has(id)) idGroups.set(id, []);
+      idGroups.get(id).push(record);
+    });
+    const idCandidates = [];
+    idGroups.forEach(group => {
+      group.sort(compareXpRecords);
+      if(group.length === 1){
+        if(group[0].validation.valid) idCandidates.push(group[0]);
+        else quarantine(group[0], group[0].validation.code);
+        return;
+      }
+      problems.add("DUPLICATE_EVENT_ID");
+      const allValid = group.every(record => record.validation.valid);
+      const exactEquivalent = allValid && group.every(record => record.stableKey === group[0].stableKey);
+      if(exactEquivalent){
+        idCandidates.push(group[0]);
+        group.slice(1).forEach(record => quarantine(record, "DUPLICATE_EVENT_ID"));
+      } else {
+        group.forEach(record => quarantine(record, record.validation.valid ? "DUPLICATE_EVENT_ID" : record.validation.code));
+      }
+    });
+
+    // An idempotency key represents one operation intent. Same-intent replay
+    // is reduced to one deterministic record; conflicting intent quarantines
+    // the complete group so input order cannot change the balance.
+    const idempotencyGroups = new Map();
+    idCandidates.forEach(record => {
+      const key = record.event.idempotencyKey;
+      if(!idempotencyGroups.has(key)) idempotencyGroups.set(key, []);
+      idempotencyGroups.get(key).push(record);
+    });
+    const intentCandidates = [];
+    idempotencyGroups.forEach(group => {
+      group.sort(compareXpRecords);
+      if(group.length === 1){
+        intentCandidates.push(group[0]);
+        return;
+      }
+      problems.add("DUPLICATE_IDEMPOTENCY_KEY");
+      const sameIntent = group.every(record => record.intent === group[0].intent);
+      if(sameIntent){
+        intentCandidates.push(group[0]);
+        group.slice(1).forEach(record => quarantine(record, "DUPLICATE_IDEMPOTENCY_KEY"));
+      } else {
+        problems.add("IDEMPOTENCY_CONFLICT");
+        group.forEach(record => quarantine(record, "IDEMPOTENCY_CONFLICT"));
+      }
+    });
+
+    // Automatic awards have a second, conceptual source uniqueness rule.
+    // Corrections remain append-only and may share a source intentionally.
+    const sourceGroups = new Map();
+    intentCandidates.filter(record => record.event.type === "award").forEach(record => {
+      const source = xpEventSourceIdentity(record.event);
+      if(!sourceGroups.has(source)) sourceGroups.set(source, []);
+      sourceGroups.get(source).push(record);
+    });
+    const sourceAccepted = new Set(intentCandidates.filter(record => record.event.type !== "award"));
+    sourceGroups.forEach(group => {
+      group.sort(compareXpRecords);
+      if(group.length === 1){
+        sourceAccepted.add(group[0]);
+        return;
+      }
+      problems.add("DUPLICATE_SOURCE");
+      const sameIntent = group.every(record => record.intent === group[0].intent);
+      if(!sameIntent){
+        problems.add("DUPLICATE_SOURCE_CONFLICT");
+        group.forEach(record => quarantine(record, "DUPLICATE_SOURCE_CONFLICT"));
+      } else {
+        sourceAccepted.add(group[0]);
+        group.slice(1).forEach(record => quarantine(record, "DUPLICATE_SOURCE"));
+      }
+    });
+
+    const baseCandidates = [...sourceAccepted].sort(compareXpRecords);
+    const positiveSources = new Map();
+    baseCandidates.forEach(record => {
+      const event = record.event;
+      if((event.type === "award" || event.type === "correction") && event.amount > 0){
+        positiveSources.set(event.id, record);
+      }
+    });
+    const acceptedRecords = new Set(baseCandidates.filter(record => record.event.type !== "reversal"));
+    const reversalGroups = new Map();
+    baseCandidates.filter(record => record.event.type === "reversal").forEach(record => {
+      const referencedId = record.event.referencesEventId;
+      const source = positiveSources.get(referencedId);
+      if(!source){
+        quarantine(record, "PREREQUISITE_MISSING");
+        return;
+      }
+      if(!reversalGroups.has(referencedId)) reversalGroups.set(referencedId, { source, records:[] });
+      reversalGroups.get(referencedId).records.push(record);
+    });
+    reversalGroups.forEach(group => {
+      group.records.sort(compareXpRecords);
+      const totalReversed = group.records.reduce((sum, record) => sum + Math.abs(record.event.amount), 0);
+      if(totalReversed > group.source.event.amount){
+        problems.add("EXCESS_REVERSAL");
+        group.records.forEach(record => quarantine(record, "EXCESS_REVERSAL"));
+      } else {
+        group.records.forEach(record => acceptedRecords.add(record));
+      }
+    });
+
+    const acceptedEvents = [...acceptedRecords].sort(compareXpRecords).map(record => record.event);
+    const quarantinedEvents = records
+      .filter(record => quarantinedIndexes.has(record.index))
+      .sort(compareXpRecords)
+      .map(record => record.event);
+    const acceptedBalanceEvents = acceptedEvents.filter(xpEventIsBalanceAffecting);
+    const total = acceptedBalanceEvents.reduce((sum, event) => sum + event.amount, 0);
+    if(total < 0) problems.add("NEGATIVE_TOTAL");
+    const acceptedEventIds = [...new Set(acceptedEvents.map(event => event?.id).filter(id => typeof id === "string"))].sort();
+    const quarantinedEventIds = [...new Set(quarantinedEvents.map(event => event?.id).filter(id => typeof id === "string"))].sort();
+    const problemList = [...problems].sort();
+    return {
+      valid: problemList.length === 0,
+      total,
+      eventCount: events.length,
+      acceptedEvents,
+      acceptedEventIds,
+      acceptedEventCount: acceptedEvents.length,
+      quarantinedEvents,
+      quarantinedEventIds,
+      quarantinedEventCount: quarantinedEvents.length,
+      problems: problemList
+    };
+  }
+
   // Canonical append-only boundary. Existing events are never edited or
   // removed; corrections and reversals are represented by new events.
   function appendXpEvent(state, eventInput={}){
     if(!state || typeof state !== "object" || Array.isArray(state)) return { added:false, reason:"INVALID_STATE" };
+    if(!eventInput || typeof eventInput !== "object" || Array.isArray(eventInput)) return { added:false, reason:"INVALID_EVENT" };
+    if(xpEventHasUnknownFields(eventInput)) return { added:false, reason:"UNKNOWN_EVENT_FIELD" };
     const existingEvents = Array.isArray(state.xpEvents) ? state.xpEvents : [];
     if(!Array.isArray(state.xpEvents)) state.xpEvents = existingEvents;
     const event = buildXpEvent(eventInput);
     const validation = validateXpEvent(event);
     if(!validation.valid) return { added:false, reason:validation.code };
-    if(existingEvents.some(existing => existing && existing.id === event.id)){
-      return { added:false, reason:"duplicate-event-id" };
+    const existingProjection = projectXpLedger(state);
+    const existingAcceptedIds = new Set(existingProjection.acceptedEventIds);
+    const sameId = existingEvents.find(existing => existing && existing.id === event.id);
+    if(sameId) return { added:false, reason:"duplicate-event-id" };
+    const sameIdempotency = existingEvents
+      .filter(existing => existing
+        && existing.tenantId === event.tenantId
+        && existing.membershipId === event.membershipId
+        && existing.idempotencyKey === event.idempotencyKey)
+      .sort((a, b) => xpEventStableKey(a).localeCompare(xpEventStableKey(b)));
+    if(sameIdempotency.length){
+      const replay = sameIdempotency.find(existing => existingAcceptedIds.has(existing.id)
+        && validateXpEvent(existing).valid
+        && xpEventIntent(existing) === xpEventIntent(event));
+      if(replay) return { added:false, reason:"idempotent", event:replay };
+      return { added:false, reason:"IDEMPOTENCY_CONFLICT" };
     }
-    const sameIdempotency = existingEvents.find(existing => existing
-      && existing.tenantId === event.tenantId
-      && existing.membershipId === event.membershipId
-      && existing.idempotencyKey === event.idempotencyKey);
-    if(sameIdempotency) return { added:false, reason:"idempotent", event:sameIdempotency };
 
     // Automatic positive awards are unique by conceptual source as well as
     // by the exact idempotency key. Prototype opening balance is a migration
     // correction, so it is intentionally outside this automatic-award rule.
     if(event.type === "award"){
-      const duplicateSource = existingEvents.find(existing => existing
+      const duplicateSource = existingProjection.acceptedEvents.find(existing => existing
         && existing.type === "award"
         && xpEventSourceIdentity(existing) === xpEventSourceIdentity(event));
       if(duplicateSource) return { added:false, reason:"source-duplicate", event:duplicateSource };
     }
 
     if(event.type === "reversal"){
-      const referenced = existingEvents.find(existing => existing
+      const referenced = existingProjection.acceptedEvents.find(existing => existing
         && existing.id === event.referencesEventId
-        && existing.tenantId === event.tenantId
-        && existing.membershipId === event.membershipId
-        && xpEventIsBalanceAffecting(existing)
+        && (existing.type === "award" || existing.type === "correction")
         && existing.amount > 0);
       if(!referenced) return { added:false, reason:"PREREQUISITE_MISSING" };
-      const priorReversalAmount = existingEvents
+      const priorReversalAmount = existingProjection.acceptedEvents
         .filter(existing => existing && existing.type === "reversal" && existing.referencesEventId === referenced.id)
-        .reduce((sum, existing) => sum + (Number.isFinite(existing.amount) ? existing.amount : 0), 0);
-      if(Math.abs(priorReversalAmount + event.amount) > referenced.amount){
+        .reduce((sum, existing) => sum + Math.abs(existing.amount), 0);
+      if(priorReversalAmount + Math.abs(event.amount) > referenced.amount){
         return { added:false, reason:"EXCESS_REVERSAL" };
       }
     }
@@ -3692,78 +3939,15 @@
   }
 
   function balanceXpEventsForState(state){
-    if(!Array.isArray(state?.xpEvents)) return [];
-    const ownership = stateOwnershipFields();
-    const seenIds = new Set();
-    const seenIdempotencyKeys = new Set();
-    const seenAutomaticSources = new Set();
-    return state.xpEvents.filter(event => {
-      if(!xpEventIsBalanceAffecting(event) || !validateXpEvent(event).valid
-        || event.tenantId !== ownership.tenantId || event.membershipId !== ownership.membershipId) return false;
-      if(seenIds.has(event.id) || seenIdempotencyKeys.has(event.idempotencyKey)) return false;
-      if(event.type === "award"){
-        const source = xpEventSourceIdentity(event);
-        if(seenAutomaticSources.has(source)) return false;
-        seenAutomaticSources.add(source);
-      }
-      seenIds.add(event.id);
-      seenIdempotencyKeys.add(event.idempotencyKey);
-      return true;
-    });
+    return projectXpLedger(state).acceptedEvents.filter(xpEventIsBalanceAffecting);
   }
 
   function xpTotalForState(state){
-    return balanceXpEventsForState(state).reduce((sum, event) => sum + event.amount, 0);
+    return projectXpLedger(state).total;
   }
 
   function reconcileXpLedger(state){
-    const events = Array.isArray(state?.xpEvents) ? state.xpEvents : [];
-    const problems = [];
-    const ids = new Set();
-    const idempotencyKeys = new Set();
-    const sourceIdentities = new Set();
-    events.forEach((event, index)=>{
-      const validation = validateXpEvent(event, { requireOwnership:false });
-      if(!validation.valid) problems.push(`${validation.code}:${index}`);
-      const id = event?.id;
-      if(typeof id === "string" && id){
-        if(ids.has(id)) problems.push(`DUPLICATE_EVENT_ID:${id}`);
-        ids.add(id);
-      }
-      const idempotencyKey = event?.idempotencyKey;
-      if(typeof idempotencyKey === "string" && idempotencyKey){
-        if(idempotencyKeys.has(idempotencyKey)) problems.push(`DUPLICATE_IDEMPOTENCY_KEY:${idempotencyKey}`);
-        idempotencyKeys.add(idempotencyKey);
-      }
-      if(validation.valid && event.type === "award"){
-        const source = xpEventSourceIdentity(event);
-        if(sourceIdentities.has(source)) problems.push(`DUPLICATE_SOURCE:${source}`);
-        sourceIdentities.add(source);
-      }
-    });
-    const ownership = stateOwnershipFields();
-    events.forEach((event, index)=>{
-      if(event && (event.tenantId !== ownership.tenantId || event.membershipId !== ownership.membershipId)){
-        problems.push(`OWNERSHIP_MISMATCH:${index}`);
-      }
-      if(event?.type === "reversal"){
-        const referenced = events.find(candidate => candidate?.id === event.referencesEventId
-          && candidate.tenantId === ownership.tenantId
-          && candidate.membershipId === ownership.membershipId
-          && xpEventIsBalanceAffecting(candidate)
-          && candidate.amount > 0);
-        if(!referenced) problems.push(`PREREQUISITE_MISSING:${index}`);
-        else {
-          const reversalAmount = events.filter(candidate => candidate?.type === "reversal"
-            && candidate.referencesEventId === referenced.id)
-            .reduce((sum, candidate) => sum + (Number.isFinite(candidate.amount) ? candidate.amount : 0), 0);
-          if(Math.abs(reversalAmount) > referenced.amount) problems.push(`EXCESS_REVERSAL:${index}`);
-        }
-      }
-    });
-    const total = xpTotalForState(state);
-    if(total < 0) problems.push("NEGATIVE_TOTAL");
-    return { valid:problems.length === 0, total, eventCount:events.length, problems };
+    return projectXpLedger(state);
   }
 
   function canonicalDemoStreakState(){
@@ -3775,7 +3959,9 @@
   }
 
   function isCanonicalTenantDay(value){
-    return typeof value === "string" && /^(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(value);
+    if(typeof value !== "string" || !/^(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(value)) return false;
+    const date = new Date(`${value}T00:00:00Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
   }
 
   const TENANT_WEEKDAY_NAMES = Object.freeze([
@@ -3793,7 +3979,6 @@
   function parseTenantDay(value){
     if(!isCanonicalTenantDay(value)) return null;
     const date = new Date(`${value}T00:00:00Z`);
-    if(Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10)!==value) return null;
     return date;
   }
 
@@ -4253,8 +4438,11 @@
       getXpTotal(){
         return xpTotalForState(participationState());
       },
+      projectXpLedger(){
+        return JSON.parse(JSON.stringify(projectXpLedger(participationState())));
+      },
       reconcileXpLedger(){
-        return reconcileXpLedger(participationState());
+        return JSON.parse(JSON.stringify(reconcileXpLedger(participationState())));
       },
       appendXpEvent(eventInput={}){
         const state = participationState();
