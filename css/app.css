@@ -1,7 +1,7 @@
 /* App-specific tweaks that layer over components */
-.main > section[role="tabpanel"],
+.main > .view,
 .main > div[data-view] { display:none; }
-.main > section[role="tabpanel"].is-active,
+.main > .view.is-active,
 .main > div[data-view].is-active { display:block; }
 
 .view { animation: fadeIn .18s ease; }
@@ -63,6 +63,7 @@
 }
 .home-icon-link:hover { background:var(--surface-muted); }
 .app-header #notifBtn.home-bell-target { width:var(--control-min-h); height:var(--control-min-h); flex:0 0 var(--control-min-h); }
+#homePlaySummary .meta { color:var(--body); }
 
 /* Publication detail */
 .news-subheader { display:flex; align-items:center; gap:10px; padding:2px 0 10px; }

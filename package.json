@@ -4,13 +4,16 @@
   "type": "module",
   "scripts": {
     "check:js": "node --check js/demo-data.js && node --check js/participation-evaluator.js && node --check js/streak-engine.js && node --check js/app.js",
+    "check:quality": "node scripts/check-quality-budgets.mjs",
     "test": "playwright test",
+    "test:a11y": "playwright test tests/accessibility.spec.js --project=canonical-mobile",
     "test:visual": "playwright test tests/visual-regression.spec.js",
     "test:visual:update": "playwright test tests/visual-regression.spec.js --update-snapshots",
     "test:headed": "playwright test --headed",
     "test:report": "playwright show-report"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "^1.55.0"
   }
 }

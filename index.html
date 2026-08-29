@@ -6,15 +6,12 @@
 <meta name="color-scheme" content="light" />
 <meta name="description" content="CampusHub — The digital home of student life. Makerere University Guild." />
 <title>CampusHub — Makerere University Guild</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/tokens.css" />
 <link rel="stylesheet" href="css/components.css" />
 <link rel="stylesheet" href="css/app.css" />
 </head>
 <body>
-<a class="skip-link" href="#main">Skip to content</a>
+<a class="skip-link" href="#main">Skip to main content</a>
 <div class="app">
   <div class="shell" id="shell">
     <!-- Header -->
@@ -59,7 +56,7 @@
     <main class="main" id="main" tabindex="-1">
 
       <!-- HOME -->
-      <section id="view-home" data-view="home" class="view is-active" role="tabpanel" aria-labelledby="tab-home">
+      <section id="view-home" data-view="home" class="view is-active">
         <h1 class="visually-hidden">Home</h1>
         <!-- Priority Notice -->
         <article class="card priority card-pad" id="homePriority" role="note" aria-label="Priority Notice">
@@ -216,7 +213,7 @@
       </section>
 
       <!-- DISCOVER -->
-      <section id="view-discover" data-view="discover" class="view" role="tabpanel" aria-labelledby="tab-discover" hidden>
+      <section id="view-discover" data-view="discover" class="view" hidden>
         <div class="view-head">
           <h1 class="view-title">Discover</h1>
           <p class="view-sub">News, events, opportunities and sports from across your campus.</p>
@@ -230,12 +227,12 @@
           <button class="filter-chip" type="button" aria-pressed="false" data-filter="News">News</button>
         </div>
 
-        <div id="discoverSystemState" aria-live="polite"></div>
+        <div id="discoverSystemState"></div>
         <div id="discoverList" class="stack-10" aria-live="polite"></div>
       </section>
 
       <!-- NEWS / PUBLICATION DETAIL -->
-      <section id="view-news" data-view="news" class="view" role="tabpanel" aria-labelledby="newsDetailTitle" hidden>
+      <section id="view-news" data-view="news" class="view" hidden>
         <div class="view-head news-subheader">
           <button class="icon-btn news-back" data-back type="button" aria-label="Back">‹</button>
           <div class="news-route-label">News</div>
@@ -259,7 +256,7 @@
       </section>
 
       <!-- PARTICIPATE -->
-      <section id="view-participate" data-view="participate" class="view" role="tabpanel" aria-labelledby="tab-participate" hidden>
+      <section id="view-participate" data-view="participate" class="view" hidden>
         <div class="view-head">
           <h1 class="view-title">Participate</h1>
           <p class="view-sub">Share your views through campus polls and Student Voice.</p>
@@ -278,11 +275,14 @@
             <p class="body-sm" style="margin:0;" data-field="pollHelp">Your feedback helps the Guild advocate for improvements.</p>
 
             <form id="pollForm" class="poll-options" aria-describedby="pollPrivacy">
-              <label class="poll-option"><input type="radio" name="poll" value="0" /> <span data-field="pollOptionLabel">Very good</span></label>
-              <label class="poll-option"><input type="radio" name="poll" value="1" /> <span data-field="pollOptionLabel">Good</span></label>
-              <label class="poll-option"><input type="radio" name="poll" value="2" /> <span data-field="pollOptionLabel">Average</span></label>
-              <label class="poll-option"><input type="radio" name="poll" value="3" /> <span data-field="pollOptionLabel">Poor</span></label>
-              <label class="poll-option"><input type="radio" name="poll" value="4" /> <span data-field="pollOptionLabel">Very poor</span></label>
+              <fieldset class="poll-group" aria-labelledby="pollQuestion" aria-describedby="pollPrivacy">
+                <legend class="sr-only">How would you rate the cleanliness of public restrooms on campus?</legend>
+                <label class="poll-option"><input type="radio" name="poll" value="0" /> <span data-field="pollOptionLabel">Very good</span></label>
+                <label class="poll-option"><input type="radio" name="poll" value="1" /> <span data-field="pollOptionLabel">Good</span></label>
+                <label class="poll-option"><input type="radio" name="poll" value="2" /> <span data-field="pollOptionLabel">Average</span></label>
+                <label class="poll-option"><input type="radio" name="poll" value="3" /> <span data-field="pollOptionLabel">Poor</span></label>
+                <label class="poll-option"><input type="radio" name="poll" value="4" /> <span data-field="pollOptionLabel">Very poor</span></label>
+              </fieldset>
             </form>
 
             <div class="poll-footer">
@@ -341,7 +341,7 @@
       </section>
 
       <!-- PLAY -->
-      <section id="view-play" data-view="play" class="view" role="tabpanel" aria-labelledby="tab-play" hidden>
+      <section id="view-play" data-view="play" class="view" hidden>
         <div class="view-head">
           <h1 class="view-title">Play</h1>
           <p class="view-sub">Your Daily Quiz, XP, level and streak.</p>
@@ -380,10 +380,10 @@
         <!-- Daily Quiz -->
         <article class="card card-pad" style="margin-top:10px;" id="quizCard">
           <div class="kicker kicker--play">Daily Campus Quiz</div>
-          <h2 class="quiz-title" style="margin:8px 0 6px; line-height:1.3;" data-field="quizQ">Which lake is the largest in East Africa?</h2>
+          <h2 id="quizQuestion" class="quiz-title" style="margin:8px 0 6px; line-height:1.3;" data-field="quizQ">Which lake is the largest in East Africa?</h2>
           <p class="meta"><span style="font-weight:700; color: var(--play);">+5 XP</span> for taking part • <span style="font-weight:700; color: var(--play);">+5 XP</span> bonus if correct • One attempt per day</p>
 
-          <div id="quizOptions" class="stack-8" style="margin-top:12px;" role="radiogroup" aria-label="Quiz options">
+          <div id="quizOptions" class="stack-8" style="margin-top:12px;" role="radiogroup" aria-labelledby="quizQuestion">
             <!-- injected -->
           </div>
 
@@ -411,7 +411,7 @@
       </section>
 
       <!-- ME / PROFILE -->
-      <section id="view-me" data-view="me" class="view" role="tabpanel" aria-labelledby="tab-me" hidden>
+      <section id="view-me" data-view="me" class="view" hidden>
         <div class="view-head">
           <h1 class="view-title">Me</h1>
           <p class="view-sub">Manage your account, membership and preferences.</p>
@@ -474,7 +474,7 @@
       </section>
 
       <!-- VERIFICATION -->
-      <section id="view-verification" data-view="verification" class="view" role="tabpanel" aria-label="Verification and membership" hidden>
+      <section id="view-verification" data-view="verification" class="view" hidden>
         <div class="view-head verification-subheader">
           <button class="icon-btn verification-back" data-back aria-label="Back">‹</button>
           <h1 id="verificationTitle" class="view-title" tabindex="-1">Verification &amp; membership</h1>
@@ -561,7 +561,7 @@
       </section>
 
       <!-- NOTIFICATIONS -->
-      <section id="view-notifications" data-view="notifications" class="view" role="tabpanel" aria-labelledby="notifTitle" hidden>
+      <section id="view-notifications" data-view="notifications" class="view" hidden>
         <div class="view-head notifications-subheader">
           <button class="icon-btn notifications-back" data-back type="button" aria-label="Back">‹</button>
           <div class="notifications-heading"><h1 id="notifTitle" class="view-title" tabindex="-1">Notifications</h1><p class="view-sub">Campus updates, reminders and account notices.</p></div>
@@ -571,7 +571,7 @@
       </section>
 
       <!-- EVENT DETAIL -->
-      <section id="view-event" data-view="event" class="view" role="tabpanel" aria-label="Event detail" hidden>
+      <section id="view-event" data-view="event" class="view" hidden>
         <div class="view-head event-subheader" style="display:flex; align-items:center; gap:10px;">
           <button class="icon-btn event-back" data-back aria-label="Back">‹</button>
           <div><div class="view-title event-route-label">Event</div></div>
@@ -606,7 +606,7 @@
       </section>
 
       <!-- SPORTS DETAIL — canonical result screen with entity-aware routing -->
-      <section id="view-sports" data-view="sports" class="view" role="tabpanel" aria-label="Sports result detail" hidden>
+      <section id="view-sports" data-view="sports" class="view" hidden>
         <div class="sports-subheader">
           <button class="icon-btn sports-back" data-back aria-label="Back">‹</button>
           <div>
@@ -644,7 +644,7 @@
       </section>
 
       <!-- OPPORTUNITY DETAIL -->
-      <section id="view-opportunity" data-view="opportunity" class="view" role="tabpanel" aria-label="Opportunity detail" hidden>
+      <section id="view-opportunity" data-view="opportunity" class="view" hidden>
         <div class="view-head opportunity-subheader">
           <button class="icon-btn opportunity-back" data-back type="button" aria-label="Back">‹</button>
           <div class="opportunity-route-label">Opportunity</div>
@@ -690,9 +690,9 @@
       </section>
 
       <!-- STUDENT VOICE LISTING -->
-      <section id="view-voice" data-view="voice" class="view" role="tabpanel" aria-label="Student Voice" hidden>
+      <section id="view-voice" data-view="voice" class="view" hidden>
         <div class="view-head" style="display:flex; align-items:center; gap:10px;">
-          <button class="icon-btn" data-back aria-label="Back" style="width:36px; height:36px;">‹</button>
+          <button class="icon-btn voice-back" data-back type="button" aria-label="Back to Participate">‹</button>
           <div><h1 class="view-title">Student Voice</h1><p class="view-sub" style="margin-top:2px;">Reviewed before publication • Permitted categories only</p></div>
         </div>
         <div class="card card-pad" style="background:var(--info-soft); border-color:var(--info-border);">
@@ -709,7 +709,7 @@
       </section>
 
       <!-- STUDENT VOICE: NEW ISSUE -->
-      <section id="view-voice-new" data-view="voice-new" class="view" role="tabpanel" aria-label="Raise a campus issue" hidden>
+      <section id="view-voice-new" data-view="voice-new" class="view" hidden>
         <div class="view-head voice-composer-head" style="display:flex; align-items:center; gap:10px;">
           <div><div class="view-title">Raise an issue</div><p class="view-sub" style="margin-top:2px;">A structured route for everyday campus-service issues.</p></div>
         </div>
@@ -824,9 +824,9 @@
       </section>
 
       <!-- STUDENT VOICE: ISSUE DETAIL -->
-      <section id="view-voice-detail" data-view="voice-detail" class="view" role="tabpanel" aria-label="Student Voice issue detail" hidden>
+      <section id="view-voice-detail" data-view="voice-detail" class="view" hidden>
         <div class="view-head" style="display:flex; align-items:center; gap:10px;">
-          <button class="icon-btn" id="voiceDetailBack" type="button" aria-label="Back to Student Voice" style="width:36px; height:36px;">‹</button>
+          <button class="icon-btn voice-back" id="voiceDetailBack" type="button" aria-label="Back to Student Voice">‹</button>
           <div><div class="view-title">Student Voice</div><p class="view-sub" style="margin-top:2px;">Public issue status and updates.</p></div>
         </div>
 
@@ -863,7 +863,7 @@
       </section>
 
       <!-- PRIVACY -->
-      <section id="view-privacy" data-view="privacy" class="view" role="tabpanel" aria-label="Privacy and transparency" hidden>
+      <section id="view-privacy" data-view="privacy" class="view" hidden>
         <div class="view-head privacy-subheader">
           <button class="icon-btn privacy-back" data-back aria-label="Back">‹</button>
           <div class="privacy-heading">

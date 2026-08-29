@@ -676,13 +676,13 @@
       return;
     }
     if(host.querySelector('.discover-offline-banner')) return;
-    host.innerHTML = '<div class="discover-offline-banner" role="status">You’re offline. Showing cached campus information.</div>';
+    host.innerHTML = '<div class="discover-offline-banner" role="status" aria-atomic="true">You’re offline. Showing cached campus information.</div>';
   }
 
   function renderDiscoverLoading(list){
     list.setAttribute('aria-busy', 'true');
     list.innerHTML = `<div class="discover-loading">
-      <p class="sr-only" role="status">Loading campus information.</p>
+      <p class="sr-only">Loading campus information.</p>
       <div class="discover-skeletons" aria-hidden="true">
         <div class="discover-skeleton"><span class="discover-skeleton__line discover-skeleton__line--kicker"></span><span class="discover-skeleton__line discover-skeleton__line--title"></span><span class="discover-skeleton__line discover-skeleton__line--body"></span></div>
         <div class="discover-skeleton"><span class="discover-skeleton__line discover-skeleton__line--kicker"></span><span class="discover-skeleton__line discover-skeleton__line--title"></span><span class="discover-skeleton__line discover-skeleton__line--body"></span></div>
@@ -693,7 +693,7 @@
 
   function renderDiscoverError(list){
     list.removeAttribute('aria-busy');
-    list.innerHTML = `<div class="discover-state discover-error" role="status">
+    list.innerHTML = `<div class="discover-state discover-error">
       <p>We couldn’t load campus information.</p>
       <button id="discoverTryAgain" class="btn" type="button">Try again</button>
     </div>`;
@@ -705,6 +705,10 @@
     if(!list) return;
     syncDiscoverSearchControls();
     syncDiscoverSystemBanner();
+    // Cached offline content is not re-announced as a whole list; the offline
+    // status banner is the single intentional announcement for that state.
+    if(discoverSystemState === "offline") list.removeAttribute('aria-live');
+    else list.setAttribute('aria-live', 'polite');
     if(discoverSystemState === "loading"){
       renderDiscoverLoading(list);
       return;
@@ -2905,6 +2909,7 @@
   let pendingEventDetailFocus = false;
   let pendingDiscoverSearchFocus = false;
   let pendingDiscoverFilterFocus = false;
+  let hasPresentedInitialView = false;
 
   function showView(name){
     const target = views.includes(name) ? name : "home";
@@ -3014,9 +3019,11 @@
         activeFilter?.scrollIntoView({block:'nearest', inline:'nearest'});
         activeFilter?.focus({preventScroll:true});
       }
-    } else if(main) {
+    } else if(main && hasPresentedInitialView) {
       main.focus({preventScroll:true});
     }
+
+    hasPresentedInitialView = true;
 
     // analytics-like: no op
   }

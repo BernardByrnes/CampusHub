@@ -71,7 +71,7 @@ test.describe('Phase 8H Discover resilient system states', () => {
 
     expect(new URL(page.url()).hash).toBe('#discover');
     await expect(page.locator('#discoverList')).toHaveAttribute('aria-busy', 'true');
-    await expect(page.locator('#discoverList .sr-only[role="status"]')).toHaveText('Loading campus information.');
+    await expect(page.locator('#discoverList .sr-only')).toHaveText('Loading campus information.');
     await expect(page.locator('#discoverList .discover-skeleton')).toHaveCount(3);
     await expect(page.locator('#discoverList .discover-skeletons')).toHaveAttribute('aria-hidden', 'true');
     await expect(page.locator('#discoverList [data-discover-id]')).toHaveCount(0);
@@ -103,7 +103,7 @@ test.describe('Phase 8H Discover resilient system states', () => {
     await page.getByLabel('Search campus content').fill('CoCIS');
     await setDiscoverState(page, 'error');
 
-    await expect(page.locator('#discoverList .discover-error')).toHaveAttribute('role', 'status');
+    await expect(page.locator('#discoverList')).toHaveAttribute('aria-live', 'polite');
     await expect(page.locator('#discoverList')).toContainText('We couldn’t load campus information.');
     await expect(page.getByRole('button', { name: 'Try again' })).toBeVisible();
     await expect(page.locator('#discoverList')).not.toContainText('No campus information matches that search.');
