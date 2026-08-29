@@ -111,12 +111,14 @@ test.describe('Phase 8C canonical tenant-day streak integration', () => {
 
   test('qualifies affirmative RSVP but not RSVP clearing', async ({ page }) => {
     await resetDemo(page);
-    const startingXp = await page.evaluate(() => window.CampusHubDemo.student.xp);
+    const startingXp = await readXp(page);
+    const rsvpXp = await page.evaluate(() => Number(window.CampusHubDemo.demoConfig.xp.eventRsvp));
     await goTo(page, '#events/guild-debate');
     await page.locator('#rsvpGoing').click();
     await expect(page.locator('#rsvpGoing')).toHaveAttribute('aria-pressed', 'true');
     expect((await readState(page)).streakState.count).toBe(4);
-    expect(await page.evaluate(() => window.CampusHubDemo.student.xp)).toBe(startingXp);
+    expect(await readXp(page)).toBe(startingXp + rsvpXp);
+    expect(await page.evaluate(() => window.CampusHubDemo.student.xp)).toBe(340);
 
     await resetDemo(page);
     await setStoredState(page, { state:{ rsvp:'going' } });

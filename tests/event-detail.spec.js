@@ -13,6 +13,8 @@ const EVENT = Object.freeze({
   imageAlt: 'Makerere University Kampala campus entrance with students walking'
 });
 
+const STATE_KEY = 'campushub:state:v3:tenant-makerere:membership-demo-001';
+
 const STALE_COPY = [
   'Open to all verified members (L1+).',
   'Please arrive by 1:45 PM for seating.',
@@ -51,6 +53,18 @@ async function resetDemo(page) {
   await page.waitForFunction(() => typeof window.CampusHubDebug?.resetDemo === 'function');
   await page.evaluate(() => window.CampusHubDebug.resetDemo());
   await page.evaluate(() => document.querySelectorAll('#toastWrap .toast').forEach(toast => toast.remove()));
+}
+
+async function readState(page) {
+  return page.evaluate(key => JSON.parse(localStorage.getItem(key) || 'null'), STATE_KEY);
+}
+
+async function readXp(page) {
+  return page.evaluate(() => window.CampusHubDebug.getXpTotal());
+}
+
+async function readRsvpEvents(page) {
+  return page.evaluate(() => window.CampusHubDebug.getXpEvents().filter(event => event.ruleRef === 'event-rsvp'));
 }
 
 async function expectDiscoverNav(page) {
@@ -162,49 +176,115 @@ test.describe('Phase 8J canonical Event detail', () => {
     expect(new URL(page.url()).hash).toBe('#discover');
   });
 
-  test('preserves RSVP Going, Interested, clear, zero XP, and tenant-day streak behavior', async ({ page }) => {
+  test('awards one configured RSVP XP event across affirmative changes and withdrawal', async ({ page }) => {
     await resetDemo(page);
     await goTo(page, '#events/guild-debate');
-    const startingXp = await page.evaluate(() => window.CampusHubDemo.student.xp);
-    const startingStreak = await page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state:v3:tenant-makerere:membership-demo-001')).streakState.count);
+    const startingXp = await readXp(page);
+    const eventRsvpXp = await page.evaluate(() => Number(window.CampusHubDemo.demoConfig.xp.eventRsvp));
+    const startingStreak = (await readState(page)).streakState.count;
 
     await page.locator('#rsvpGoing').click();
     await expect(page.locator('#rsvpGoing')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('#rsvpGoing')).toHaveText('Going ✓');
-    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state:v3:tenant-makerere:membership-demo-001')).rsvp)).toBe('going');
-    expect(await page.evaluate(() => window.CampusHubDemo.student.xp)).toBe(startingXp);
-    const afterGoingStreak = await page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state:v3:tenant-makerere:membership-demo-001')).streakState.count);
+    expect((await readState(page)).rsvp).toBe('going');
+    expect(await readXp(page)).toBe(startingXp + eventRsvpXp);
+    expect(await readRsvpEvents(page)).toHaveLength(1);
+    const afterGoingStreak = (await readState(page)).streakState.count;
     expect(afterGoingStreak).toBeGreaterThanOrEqual(startingStreak);
-
-    await page.locator('#rsvpGoing').click();
-    await expect(page.locator('#rsvpGoing')).toHaveAttribute('aria-pressed', 'false');
-    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state:v3:tenant-makerere:membership-demo-001')).rsvp)).toBe(null);
-    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state:v3:tenant-makerere:membership-demo-001')).streakState.count)).toBe(afterGoingStreak);
-    expect(await page.evaluate(() => window.CampusHubDemo.student.xp)).toBe(startingXp);
 
     await page.locator('#rsvpInterested').click();
     await expect(page.locator('#rsvpInterested')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('#rsvpInterested')).toHaveText('Interested ✓');
-    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state:v3:tenant-makerere:membership-demo-001')).rsvp)).toBe('interested');
-    expect(await page.evaluate(() => window.CampusHubDemo.student.xp)).toBe(startingXp);
+    expect((await readState(page)).rsvp).toBe('interested');
+    expect(await readXp(page)).toBe(startingXp + eventRsvpXp);
+    expect(await readRsvpEvents(page)).toHaveLength(1);
+
+    await page.locator('#rsvpGoing').click();
+    await expect(page.locator('#rsvpGoing')).toHaveAttribute('aria-pressed', 'true');
+    expect((await readState(page)).rsvp).toBe('going');
+    expect(await readXp(page)).toBe(startingXp + eventRsvpXp);
+    expect(await readRsvpEvents(page)).toHaveLength(1);
+
+    await page.locator('#rsvpGoing').click();
+    await expect(page.locator('#rsvpGoing')).toHaveAttribute('aria-pressed', 'false');
+    expect((await readState(page)).rsvp).toBe(null);
+    expect((await readState(page)).streakState.count).toBe(afterGoingStreak);
+    expect(await readXp(page)).toBe(startingXp + eventRsvpXp);
+    expect(await readRsvpEvents(page)).toHaveLength(1);
+
+    await page.locator('#rsvpInterested').click();
+    await expect(page.locator('#rsvpInterested')).toHaveAttribute('aria-pressed', 'true');
+    expect((await readState(page)).rsvp).toBe('interested');
+    expect(await readXp(page)).toBe(startingXp + eventRsvpXp);
+    expect(await readRsvpEvents(page)).toHaveLength(1);
+
+    await resetDemo(page);
+    await goTo(page, '#events/guild-debate');
+    await page.locator('#rsvpInterested').click();
+    expect((await readState(page)).rsvp).toBe('interested');
+    expect(await readXp(page)).toBe(startingXp + eventRsvpXp);
+    expect(await readRsvpEvents(page)).toHaveLength(1);
   });
 
   test('keeps Save independent from RSVP, XP, and streak state', async ({ page }) => {
     await resetDemo(page);
     await goTo(page, '#events/guild-debate');
-    const before = await page.evaluate(() => {
-      const state = JSON.parse(localStorage.getItem('campushub:state:v3:tenant-makerere:membership-demo-001'));
-      return { xp: window.CampusHubDemo.student.xp, rsvp: state.rsvp, streak: state.streakState.count };
-    });
+    const before = { xp: await readXp(page), state: await readState(page), events: await readRsvpEvents(page) };
 
     await page.locator('#eventSave').click();
     await expect(page.locator('#eventSave')).toHaveText('Saved ✓');
     await expect(page.locator('#eventSave')).toHaveAttribute('aria-pressed', 'true');
-    const after = await page.evaluate(() => {
-      const state = JSON.parse(localStorage.getItem('campushub:state:v3:tenant-makerere:membership-demo-001'));
-      return { xp: window.CampusHubDemo.student.xp, rsvp: state.rsvp, streak: state.streakState.count };
-    });
-    expect(after).toEqual(before);
+    expect(await readXp(page)).toBe(before.xp);
+    expect((await readState(page)).rsvp).toBe(before.state.rsvp);
+    expect((await readState(page)).streakState.count).toBe(before.state.streakState.count);
+    expect(await readRsvpEvents(page)).toEqual(before.events);
+
+    await page.locator('#rsvpGoing').click();
+    await expect(page.locator('#rsvpGoing')).toHaveText('Going ✓');
+    const eventRsvpXp = await page.evaluate(() => Number(window.CampusHubDemo.demoConfig.xp.eventRsvp));
+    expect(await readXp(page)).toBe(before.xp + eventRsvpXp);
+    expect(await readRsvpEvents(page)).toHaveLength(1);
+  });
+
+  test('keeps RSVP XP and derived surfaces coherent after reload', async ({ page }) => {
+    await resetDemo(page);
+    await goTo(page, '#events/guild-debate');
+    await page.locator('#rsvpGoing').click();
+    const award = (await readRsvpEvents(page))[0];
+
+    await page.reload();
+    expect((await readState(page)).rsvp).toBe('going');
+    expect(await readXp(page)).toBe(345);
+    expect((await readRsvpEvents(page))[0].id).toBe(award.id);
+
+    await goTo(page, '#home');
+    await expect(page.locator('[data-field="homeXp"]')).toHaveText('345 XP');
+    await goTo(page, '#play');
+    await expect(page.locator('[data-field="xpCount"]')).toHaveText('345');
+    await expect(page.locator('#xpHistory')).toContainText('Event RSVP');
+    await expect(page.locator('#xpHistory')).toContainText('+5 XP');
+    const historyText = await page.locator('#xpHistory').innerText();
+    expect(historyText).not.toMatch(/going|interested|guild-debate|membership-demo-001/i);
+    await goTo(page, '#me');
+    await expect(page.locator('[data-field="meLevelXp"]')).toHaveText('Level 4 • 345 XP');
+  });
+
+  test('repairs a pre-existing affirmative RSVP only after a later affirmative interaction', async ({ page }) => {
+    await resetDemo(page);
+    await page.evaluate(key => {
+      const state = JSON.parse(localStorage.getItem(key));
+      state.rsvp = 'going';
+      state.xpEvents = state.xpEvents.filter(event => event.ruleRef !== 'event-rsvp');
+      localStorage.setItem(key, JSON.stringify(state));
+    }, STATE_KEY);
+    await goTo(page, '#events/guild-debate');
+    expect(await readXp(page)).toBe(340);
+    expect(await readRsvpEvents(page)).toHaveLength(0);
+
+    await page.locator('#rsvpInterested').click();
+    expect((await readState(page)).rsvp).toBe('interested');
+    expect(await readXp(page)).toBe(345);
+    expect(await readRsvpEvents(page)).toHaveLength(1);
   });
 
   test('keeps one canonical identity across Home, Discover, detail, and bounded search', async ({ page }) => {

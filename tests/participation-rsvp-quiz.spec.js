@@ -51,10 +51,11 @@ test.describe('Phase 6C RSVP and Daily Quiz GSC-14 integration', () => {
     await goTo(page, '#home');
   });
 
-  test('allows mutually exclusive RSVP changes with zero XP', async ({ page }) => {
+  test('allows mutually exclusive RSVP changes with one configured XP award', async ({ page }) => {
     await resetDemo(page);
     await goTo(page, '#events/guild-debate');
     const startingXp = await readXp(page);
+    const eventRsvpXp = await page.evaluate(() => Number(window.CampusHubDemo.demoConfig.xp.eventRsvp));
 
     await page.locator('#rsvpGoing').click();
     await expect(page.locator('#rsvpGoing')).toHaveAttribute('aria-pressed', 'true');
@@ -62,20 +63,23 @@ test.describe('Phase 6C RSVP and Daily Quiz GSC-14 integration', () => {
     await expect(page.locator('#rsvpGoing')).toHaveText('Going ✓');
     await expect(page.locator('.toast').last()).toContainText("You're on the list.");
     expect((await readState(page)).rsvp).toBe('going');
-    expect(await page.evaluate(() => window.CampusHubDemo.student.xp)).toBe(startingXp);
+    expect(await readXp(page)).toBe(startingXp + eventRsvpXp);
+    expect(await page.evaluate(() => window.CampusHubDebug.getXpEvents().filter(event => event.ruleRef === 'event-rsvp'))).toHaveLength(1);
 
     await page.locator('#rsvpInterested').click();
     await expect(page.locator('#rsvpGoing')).toHaveAttribute('aria-pressed', 'false');
     await expect(page.locator('#rsvpInterested')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.locator('.toast').last()).toContainText('Marked as interested.');
     expect((await readState(page)).rsvp).toBe('interested');
-    expect(await page.evaluate(() => window.CampusHubDemo.student.xp)).toBe(startingXp);
+    expect(await readXp(page)).toBe(startingXp + eventRsvpXp);
+    expect(await page.evaluate(() => window.CampusHubDebug.getXpEvents().filter(event => event.ruleRef === 'event-rsvp'))).toHaveLength(1);
 
     await page.locator('#rsvpInterested').click();
     await expect(page.locator('#rsvpGoing')).toHaveAttribute('aria-pressed', 'false');
     await expect(page.locator('#rsvpInterested')).toHaveAttribute('aria-pressed', 'false');
     expect((await readState(page)).rsvp).toBe(null);
-    expect(await page.evaluate(() => window.CampusHubDemo.student.xp)).toBe(startingXp);
+    expect(await readXp(page)).toBe(startingXp + eventRsvpXp);
+    expect(await page.evaluate(() => window.CampusHubDebug.getXpEvents().filter(event => event.ruleRef === 'event-rsvp'))).toHaveLength(1);
   });
 
   test('gates RSVP on membership refresh without changing RSVP or XP', async ({ page }) => {

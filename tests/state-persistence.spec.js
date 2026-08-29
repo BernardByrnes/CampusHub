@@ -27,6 +27,14 @@ async function readState(page) {
   return page.evaluate(storageKey => JSON.parse(localStorage.getItem(storageKey) || 'null'), key);
 }
 
+async function readXp(page) {
+  return page.evaluate(() => window.CampusHubDebug.getXpTotal());
+}
+
+async function readEvents(page) {
+  return page.evaluate(() => window.CampusHubDebug.getXpEvents());
+}
+
 async function readSessionDraft(page) {
   const key = await draftKey(page);
   return page.evaluate(storageKey => JSON.parse(sessionStorage.getItem(storageKey) || 'null'), key);
@@ -92,6 +100,8 @@ test.describe('Phase 8T state ownership, persistence truth, and navigation histo
     await page.locator('#eventSave').click();
     await page.locator('#rsvpGoing').click();
     await expect(page.locator('#rsvpGoing')).toHaveText('Going ✓');
+    expect(await readXp(page)).toBe(360);
+    expect((await readEvents(page)).filter(event => event.ruleRef === 'event-rsvp')).toHaveLength(1);
 
     await goTo(page, '#opportunities/ra-climate');
     await page.locator('#oppSave').click();
@@ -401,6 +411,8 @@ test.describe('Phase 8T state ownership, persistence truth, and navigation histo
     await page.locator('#rsvpGoing').click();
     await expect(page.locator('#rsvpGoing')).toHaveText('Going');
     expect(await readState(page)).toMatchObject({ saveEvent: false, rsvp: null, streakState: { count: 3 } });
+    expect(await readXp(page)).toBe(340);
+    expect((await readEvents(page)).filter(event => event.ruleRef === 'event-rsvp')).toHaveLength(0);
 
     await goTo(page, '#voice-detail/voice-water-halls');
     await page.locator('#voiceSupportButton').click();
@@ -412,6 +424,71 @@ test.describe('Phase 8T state ownership, persistence truth, and navigation histo
     await page.locator('#oppReport').click();
     await expect(page.locator('#oppReport')).toHaveText('Report suspicious opportunity');
     expect((await readState(page)).reportedOpportunityIds).toEqual([]);
+  });
+
+  test('fails a first affirmative RSVP atomically without durable state, XP, streak, or success', async ({ page }) => {
+    await setPersistence(page, 'fail');
+    await goTo(page, '#events/guild-debate');
+    await page.locator('#rsvpGoing').click();
+    await expectFailureToast(page);
+    await expect(page.locator('#rsvpGoing')).toHaveText('Going');
+    await expect(page.locator('.toast').filter({ hasText: "You're on the list." })).toHaveCount(0);
+    expect(await readState(page)).toMatchObject({ rsvp: null, streakState: { count: 3 } });
+    expect(await readXp(page)).toBe(340);
+    expect((await readEvents(page)).filter(event => event.ruleRef === 'event-rsvp')).toHaveLength(0);
+
+    await page.reload();
+    expect(await readState(page)).toMatchObject({ rsvp: null, streakState: { count: 3 } });
+    expect(await readXp(page)).toBe(340);
+    expect((await readEvents(page)).filter(event => event.ruleRef === 'event-rsvp')).toHaveLength(0);
+  });
+
+  test('keeps an existing RSVP and award durable when withdrawal persistence fails', async ({ page }) => {
+    await goTo(page, '#events/guild-debate');
+    await page.locator('#rsvpGoing').click();
+    await expect(page.locator('#rsvpGoing')).toHaveText('Going ✓');
+    expect(await readXp(page)).toBe(345);
+    expect((await readEvents(page)).filter(event => event.ruleRef === 'event-rsvp')).toHaveLength(1);
+
+    await setPersistence(page, 'fail');
+    await page.locator('#rsvpGoing').click();
+    await expectFailureToast(page);
+    await expect(page.locator('#rsvpGoing')).toHaveText('Going ✓');
+    expect(await readState(page)).toMatchObject({ rsvp: 'going' });
+    expect(await readXp(page)).toBe(345);
+    expect((await readEvents(page)).filter(event => event.ruleRef === 'event-rsvp')).toHaveLength(1);
+
+    await page.reload();
+    expect(await readState(page)).toMatchObject({ rsvp: 'going' });
+    expect(await readXp(page)).toBe(345);
+    expect((await readEvents(page)).filter(event => event.ruleRef === 'event-rsvp')).toHaveLength(1);
+  });
+
+  test('rejects an unsafe RSVP award append without saving RSVP or streak state', async ({ page }) => {
+    await goTo(page, '#events/guild-debate');
+    const conflicting = await page.evaluate(() => window.CampusHubDebug.appendXpEvent({
+      type: 'award',
+      ruleRef: 'event-rsvp',
+      amount: 6,
+      idempotencyKey: 'xp:award:event-rsvp:guild-debate',
+      sourceType: 'event-rsvp',
+      sourceId: 'guild-debate',
+      sourceAction: 'rsvp',
+      tenantDay: '2026-05-20',
+      studentLabel: 'Event RSVP',
+      studentVisible: true
+    }));
+    expect(conflicting.added).toBe(true);
+    const before = { state: await readState(page), xp: await readXp(page), events: await readEvents(page) };
+
+    await page.locator('#rsvpGoing').click();
+    await expectFailureToast(page);
+    await expect(page.locator('#rsvpGoing')).toHaveText('Going');
+    await expect(page.locator('.toast').filter({ hasText: "You're on the list." })).toHaveCount(0);
+    expect((await readState(page)).rsvp).toBe(before.state.rsvp);
+    expect((await readState(page)).streakState).toEqual(before.state.streakState);
+    expect(await readXp(page)).toBe(before.xp);
+    expect(await readEvents(page)).toEqual(before.events);
   });
 
   test('fails Voice submission without publishing, XP, streak, or a confirmation claim', async ({ page }) => {

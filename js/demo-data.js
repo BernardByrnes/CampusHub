@@ -13,7 +13,7 @@ window.CampusHubDemo = {
     strongerVerificationMethods: []
   },
 
-  // Prototype-only arithmetic configuration; this is not student-facing XP policy.
+  // Prototype-only tenant arithmetic configuration; this is not universal or student-facing XP policy.
   demoConfig: {
     // Opaque prototype ownership identifiers. These model the tenant/
     // membership boundary without exposing PII or claiming browser storage
@@ -30,7 +30,8 @@ window.CampusHubDemo = {
       isInRecess: false
     },
     xp: {
-      pollParticipation: 5
+      pollParticipation: 5,
+      eventRsvp: 5
     },
     voiceParticipation: {
       requiredAssurance: "L2",
@@ -382,6 +383,7 @@ window.CampusHubDemo = {
     { action:"Daily Quiz participation", xp:"+5 XP", note:"One attempt per day" },
     { action:"Daily Quiz correct answer bonus", xp:"+5 XP", note:"Added when your answer is correct" },
     { action:"Poll participation", xp:"Configured", note:"Awarded once per poll; identical regardless of option; amount set by this tenant" },
+    { action:"Event RSVP", xp:"Configured", note:"Awarded once per event; amount set by this tenant" },
     { action:"Profile completion", xp:"+10 XP", note:"One-time" }
   ],
 

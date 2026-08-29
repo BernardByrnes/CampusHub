@@ -74,6 +74,22 @@ function importedXpEvent(overrides = {}) {
   };
 }
 
+function eventRsvpInput(overrides = {}) {
+  return {
+    type: 'award',
+    ruleRef: 'event-rsvp',
+    amount: 5,
+    idempotencyKey: 'xp:award:event-rsvp:guild-debate',
+    sourceType: 'event-rsvp',
+    sourceId: 'guild-debate',
+    sourceAction: 'rsvp',
+    tenantDay: '2026-05-20',
+    studentLabel: 'Event RSVP',
+    studentVisible: true,
+    ...overrides
+  };
+}
+
 test.describe('Phase 8T.1 append-only XP ledger and explainable progress', () => {
   test.beforeEach(async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'canonical-mobile', 'XP ledger contracts run once in canonical-mobile.');
@@ -210,6 +226,73 @@ test.describe('Phase 8T.1 append-only XP ledger and explainable progress', () =>
     expect(sourceDuplicate).toMatchObject({ added: false, reason: 'source-duplicate' });
     expect((await readEvents(page)).filter(event => event.ruleRef === 'test-award')).toHaveLength(1);
     expect(await readTotal(page)).toBe(342);
+  });
+
+  test('appends the canonical Event RSVP award with a privacy-safe event shape', async ({ page }) => {
+    await goTo(page, '#events/guild-debate');
+    await page.locator('#rsvpGoing').click();
+    const rsvpEvents = (await readEvents(page)).filter(event => event.ruleRef === 'event-rsvp');
+    expect(rsvpEvents).toHaveLength(1);
+    expect(rsvpEvents[0]).toMatchObject({
+      tenantId: 'tenant-makerere',
+      membershipId: 'membership-demo-001',
+      ruleRef: 'event-rsvp',
+      amount: 5,
+      type: 'award',
+      sourceType: 'event-rsvp',
+      sourceId: 'guild-debate',
+      sourceAction: 'rsvp',
+      tenantDay: '2026-05-20',
+      studentLabel: 'Event RSVP',
+      studentVisible: true
+    });
+    expect(rsvpEvents[0].idempotencyKey).toBe('xp:award:event-rsvp:guild-debate');
+    expect(JSON.stringify(rsvpEvents[0])).not.toMatch(/going|interested|rsvpState|choice/i);
+    expect(await readTotal(page)).toBe(345);
+    await goTo(page, '#play');
+    await expect(page.locator('#xpHistory')).toContainText('Event RSVP');
+    await expect(page.locator('#xpHistory')).toContainText('+5 XP');
+    await expect(page.locator('#xpRules')).toContainText('Event RSVP');
+    await expect(page.locator('#xpRules')).toContainText('Awarded once per event; amount set by this tenant');
+  });
+
+  test('enforces Event RSVP source uniqueness, replay idempotency, and intent conflicts', async ({ page }) => {
+    const amount = await page.evaluate(() => Number(window.CampusHubDemo.demoConfig.xp.eventRsvp));
+    const input = eventRsvpInput({ amount });
+    const first = await page.evaluate(value => window.CampusHubDebug.appendXpEvent(value), input);
+    const replay = await page.evaluate(value => window.CampusHubDebug.appendXpEvent(value), input);
+    const differentKey = await page.evaluate(value => window.CampusHubDebug.appendXpEvent({
+      ...value,
+      idempotencyKey: 'xp:award:event-rsvp:guild-debate:retry'
+    }), input);
+    const conflict = await page.evaluate(value => window.CampusHubDebug.appendXpEvent({
+      ...value,
+      amount: value.amount + 1
+    }), input);
+    expect(first.added).toBe(true);
+    expect(replay).toMatchObject({ added: false, reason: 'idempotent' });
+    expect(differentKey).toMatchObject({ added: false, reason: 'source-duplicate' });
+    expect(conflict).toMatchObject({ added: false, reason: 'IDEMPOTENCY_CONFLICT' });
+    expect((await readEvents(page)).filter(event => event.ruleRef === 'event-rsvp')).toHaveLength(1);
+    expect(await readTotal(page)).toBe(340 + amount);
+  });
+
+  test('allows one Event RSVP award per distinct event source', async ({ page }) => {
+    const amount = await page.evaluate(() => Number(window.CampusHubDemo.demoConfig.xp.eventRsvp));
+    const first = await page.evaluate(value => window.CampusHubDebug.appendXpEvent(value), eventRsvpInput({
+      amount,
+      sourceId: 'event-A',
+      idempotencyKey: 'xp:award:event-rsvp:event-A'
+    }));
+    const second = await page.evaluate(value => window.CampusHubDebug.appendXpEvent(value), eventRsvpInput({
+      amount,
+      sourceId: 'event-B',
+      idempotencyKey: 'xp:award:event-rsvp:event-B'
+    }));
+    expect(first.added).toBe(true);
+    expect(second.added).toBe(true);
+    expect((await readEvents(page)).filter(event => event.ruleRef === 'event-rsvp')).toHaveLength(2);
+    expect(await readTotal(page)).toBe(340 + amount * 2);
   });
 
   test('ledgerizes incorrect Quiz as participation only and correct Quiz as two explainable events', async ({ page }) => {
@@ -420,19 +503,25 @@ test.describe('Phase 8T.1 append-only XP ledger and explainable progress', () =>
     expect((await readEvents(page)).filter(event => event.sourceId === 'daily-quiz-2026-05-20')).toHaveLength(0);
   });
 
-  test('keeps non-award actions at zero XP and preserves fixture data', async ({ page }) => {
+  test('keeps non-award actions from adding XP except canonical RSVP and preserves fixture data', async ({ page }) => {
     const fixtureBefore = await page.evaluate(() => JSON.stringify(window.CampusHubDemo));
-    const before = (await readEvents(page)).length;
+    const beforeEvents = await readEvents(page);
+    const beforeTotal = await readTotal(page);
     await goTo(page, '#events/guild-debate');
     await page.locator('#eventSave').click();
+    expect(await readTotal(page)).toBe(beforeTotal);
+    expect(await readEvents(page)).toEqual(beforeEvents);
     await page.locator('#rsvpGoing').click();
+    expect(await readTotal(page)).toBe(beforeTotal + 5);
+    expect((await readEvents(page)).filter(event => event.ruleRef === 'event-rsvp')).toHaveLength(1);
     await goTo(page, '#opportunities/ra-climate');
     await page.locator('#oppSave').click();
     await goTo(page, '#voice-detail/voice-water-halls');
     await page.locator('#voiceSupportButton').click();
     await goTo(page, '#news/notice-classes-rescheduled');
     await goTo(page, '#play');
-    expect((await readEvents(page)).length).toBe(before);
+    expect((await readEvents(page)).length).toBe(beforeEvents.length + 1);
+    expect(await readTotal(page)).toBe(beforeTotal + 5);
     expect(await page.evaluate(() => JSON.stringify(window.CampusHubDemo))).toBe(fixtureBefore);
   });
 

@@ -2923,7 +2923,7 @@
 
   function showView(name){
     const target = views.includes(name) ? name : "home";
-    if(target === "home") hydrateTenant(participationState());
+    if(target === "home" || target === "play") hydrateTenant(participationState());
     else syncStreakPresentation(participationState());
     // hide all
     views.forEach(v=>{
@@ -3286,6 +3286,28 @@
       currentState.rsvp = nextState;
       if(nextState === 'going' || nextState === 'interested'){
         applyStreakQualification("event-rsvp", currentState);
+        const eventRsvpXp = Number(D.demoConfig?.xp?.eventRsvp);
+        const rsvpAward = appendXpEvent(currentState, {
+          type:"award",
+          ruleRef:"event-rsvp",
+          amount:eventRsvpXp,
+          idempotencyKey:`xp:award:event-rsvp:${event.id}`,
+          sourceType:"event-rsvp",
+          sourceId:event.id,
+          sourceAction:"rsvp",
+          tenantDay:D.demoConfig?.calendar?.currentTenantDay,
+          studentLabel:"Event RSVP",
+          studentVisible:true
+        });
+        if(!rsvpAward.added && !["idempotent", "source-duplicate"].includes(rsvpAward.reason)){
+          persistenceFailure(restored=>{
+            state = restored;
+            syncStreakPresentation(restored);
+            renderMe(restored);
+            reflect();
+          });
+          return;
+        }
       }
       if(!saveState(currentState)){
         persistenceFailure(restored=>{
@@ -3695,6 +3717,7 @@
     if(event?.type === "reversal") return "XP reversal";
     if(event?.type === "correction") return "XP correction";
     if(event?.ruleRef === "poll-participation") return "Poll participation";
+    if(event?.ruleRef === "event-rsvp") return "Event RSVP";
     if(event?.ruleRef === "daily-quiz-participation") return "Daily Quiz participation";
     if(event?.ruleRef === "daily-quiz-accuracy") return "Daily Quiz accuracy bonus";
     if(typeof event?.studentLabel === "string" && event.studentLabel.trim()) return event.studentLabel.trim();
