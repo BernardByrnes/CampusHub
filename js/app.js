@@ -1292,6 +1292,7 @@
     if(done){
       pendingQuizChoice = null;
       btn.hidden = true;
+      btn.disabled = true;
       fb.hidden = false;
       if(note) note.hidden = false;
       const correct = participation.optionIndex===D.quiz.correctIndex;
@@ -1318,18 +1319,20 @@
       const c = wrap.querySelector('input[name="quiz"]:checked');
       if(!c) return;
       const choice = parseInt(c.value,10);
-      pendingQuizChoice = choice;
       const state = participationState();
       const decision = evaluateParticipationAction('daily-quiz', { state, quiz:D.quiz });
       if(openParticipationGate(decision, btn, {
         returnTo:QUIZ_RETURN_ROUTE,
         returnAction:'quiz-submit'
       })) return;
-      // A stale or double-fired action must not award again for this quiz tenant-day.
-      if(quizParticipationForCurrentDay(state, D.quiz)){
+      const completion = dailyQuizCompletionOutcome(state, D.quiz);
+      if(completion.completed){
+        // GSC established current eligibility; the action layer now returns
+        // the authoritative existing result without saving or awarding again.
         renderQuiz();
         return;
       }
+      pendingQuizChoice = choice;
       const correct = choice===D.quiz.correctIndex;
       const earned = correct ? (xpPart + xpBonus) : xpPart;
       state.quizDone = true;
@@ -1975,9 +1978,7 @@
       requiredAssurance:requiredAssuranceFor(resourceContext, options),
       audienceEligible,
       verifiedAttributesPresent:p.verifiedAttributes,
-      storyPrerequisitesMet: resourceContext==="daily-quiz"
-        ? !quizParticipationForCurrentDay(state, options.quiz || D.quiz)
-        : p.storyPrerequisites
+      storyPrerequisitesMet:p.storyPrerequisites
     };
   }
 
@@ -4145,6 +4146,18 @@
     return record;
   }
 
+  // Completion is an action/finalisation outcome, not a GSC prerequisite.
+  // The existing participation record is authoritative for replay rendering.
+  function dailyQuizCompletionOutcome(state, quiz=D.quiz){
+    const currentResult = quizParticipationForCurrentDay(state, quiz);
+    if(!currentResult) return { completed:false };
+    return {
+      completed:true,
+      code:"ALREADY_COMPLETED",
+      currentResult:{ ...currentResult }
+    };
+  }
+
   function defaultState(){
     const ownership = stateOwnershipFields();
     const seedXp = Number(D.student?.xp);
@@ -4512,6 +4525,9 @@
       },
       getLastGateDecision(){
         return cloneParticipationDecision(lastParticipationDecision);
+      },
+      getDailyQuizCompletionOutcome(){
+        return JSON.parse(JSON.stringify(dailyQuizCompletionOutcome(participationState(), D.quiz)));
       },
       setScenario(name){
         if(name==='voice-canonical' || D.voiceStatusScenarios?.[name]){

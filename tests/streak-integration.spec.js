@@ -136,7 +136,13 @@ test.describe('Phase 8C canonical tenant-day streak integration', () => {
     await page.locator('#quizOptions input[value="0"]').check();
     await page.locator('#quizSubmit').click();
     await expect(page.locator('#quizFeedback')).toContainText('Correct!');
-    expect((await readState(page)).streakState.count).toBe(4);
+    const completedState = await readState(page);
+    const completedXp = await readXp(page);
+    await page.locator('#quizSubmit').evaluate(button => button.onclick());
+    await expect(page.locator('#participationGate')).toBeHidden();
+    expect((await readState(page)).streakState).toEqual(completedState.streakState);
+    expect((await readState(page)).quizParticipation).toEqual(completedState.quizParticipation);
+    expect(await readXp(page)).toBe(completedXp);
     expect(await readXp(page)).toBe(correctStartingXp + 10);
 
     await resetDemo(page);

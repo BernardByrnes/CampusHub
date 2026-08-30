@@ -380,24 +380,29 @@ test.describe('Canonical Home', () => {
     await expect(page.locator('#homeQuiz [data-testid="home-quiz-play"]')).toHaveAttribute('href', '#play');
   });
 
-  test('reflects the already-acted-on Quiz state without changing the Home poll', async ({ page }) => {
+  test('reflects the completed Quiz as Review without changing the Home poll', async ({ page }) => {
     await goTo(page);
     await expect(page.locator('[data-field="homeQuizCta"]')).toHaveText('Play');
     await expect(page.locator('#homePoll [data-testid="home-poll-respond"]')).toHaveText('Respond');
 
-    await page.evaluate(() => {
-      const state = JSON.parse(localStorage.getItem('campushub:state:v3:tenant-makerere:membership-demo-001'));
-      state.quizDone = true;
-      state.quizChoice = 0;
-      localStorage.setItem('campushub:state:v3:tenant-makerere:membership-demo-001', JSON.stringify(state));
-      location.hash = '#discover';
-    });
-    await expect(page.locator('#view-discover')).toBeVisible();
-    await page.evaluate(() => { location.hash = '#home'; });
+    await page.locator('#homeQuiz [data-testid="home-quiz-play"]').click();
+    await expect(page.locator('#view-play')).toBeVisible();
+    await page.locator('#quizOptions input[value="0"]').check();
+    await page.locator('#quizSubmit').click();
+    await expect(page.locator('#quizFeedback')).toContainText('Correct!');
+    await page.locator('#tab-home').click();
     await expect(page.locator('#view-home')).toBeVisible();
     await expect(page.locator('[data-field="homeQuizCta"]')).toHaveText('Review');
     await expect(page.locator('#homeQuiz [data-testid="home-quiz-play"]')).toHaveAttribute('href', '#play');
     await expect(page.locator('#homePoll [data-testid="home-poll-respond"]')).toHaveText('Respond');
+
+    const rawBeforeReview = await page.evaluate(() => localStorage.getItem('campushub:state:v3:tenant-makerere:membership-demo-001'));
+    await page.locator('#homeQuiz [data-testid="home-quiz-play"]').click();
+    await expect(page.locator('#view-play')).toBeVisible();
+    await expect(page.locator('#quizFeedback')).toContainText('Correct!');
+    await expect(page.locator('#quizCompleteNote')).toBeVisible();
+    await expect(page.locator('#quizSubmit')).toBeHidden();
+    expect(await page.evaluate(() => localStorage.getItem('campushub:state:v3:tenant-makerere:membership-demo-001'))).toBe(rawBeforeReview);
   });
 
   test('shows the quiet Play summary using the canonical student state', async ({ page }) => {

@@ -28,6 +28,14 @@ async function readTotal(page) {
   return page.evaluate(() => window.CampusHubDebug.getXpTotal());
 }
 
+async function readQuizOutcome(page) {
+  return page.evaluate(() => window.CampusHubDebug.getDailyQuizCompletionOutcome());
+}
+
+async function readRawState(page) {
+  return page.evaluate(key => localStorage.getItem(key), V3_STATE_KEY);
+}
+
 async function submitPoll(page, option = '0') {
   await goTo(page, '#participate');
   await page.locator(`#pollForm input[value="${option}"]`).check();
@@ -324,14 +332,34 @@ test.describe('Phase 8T.1 append-only XP ledger and explainable progress', () =>
 
   test('keeps Quiz duplicate attempts stable across a stale submit and reload', async ({ page }) => {
     await submitQuiz(page, '0');
-    const before = await readEvents(page);
+    const before = {
+      raw: await readRawState(page),
+      state: await readState(page),
+      events: await readEvents(page),
+      xp: await readTotal(page),
+      streak: (await readState(page)).streakState
+    };
+    expect(await readQuizOutcome(page)).toEqual({
+      completed:true,
+      code:'ALREADY_COMPLETED',
+      currentResult:before.state.quizParticipation
+    });
     await page.reload();
     await goTo(page, '#play');
-    expect(await readEvents(page)).toEqual(before);
-    expect(await readTotal(page)).toBe(350);
-    await page.locator('#quizSubmit').evaluate(button => button.click());
-    expect(await readEvents(page)).toEqual(before);
-    expect(await readTotal(page)).toBe(350);
+    expect(await readEvents(page)).toEqual(before.events);
+    expect(await readTotal(page)).toBe(before.xp);
+    await page.locator('#quizSubmit').evaluate(button => button.onclick());
+    await expect(page.locator('#participationGate')).toBeHidden();
+    await expect(page.locator('#quizFeedback')).toContainText('Correct!');
+    expect(await readQuizOutcome(page)).toEqual({
+      completed:true,
+      code:'ALREADY_COMPLETED',
+      currentResult:before.state.quizParticipation
+    });
+    expect(await readRawState(page)).toBe(before.raw);
+    expect(await readEvents(page)).toEqual(before.events);
+    expect(await readTotal(page)).toBe(before.xp);
+    expect((await readState(page)).streakState).toEqual(before.streak);
   });
 
   test('supports append-only correction and bounded reversal semantics', async ({ page }) => {

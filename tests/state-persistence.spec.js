@@ -31,6 +31,10 @@ async function readXp(page) {
   return page.evaluate(() => window.CampusHubDebug.getXpTotal());
 }
 
+async function readQuizOutcome(page) {
+  return page.evaluate(() => window.CampusHubDebug.getDailyQuizCompletionOutcome());
+}
+
 async function readEvents(page) {
   return page.evaluate(() => window.CampusHubDebug.getXpEvents());
 }
@@ -400,6 +404,34 @@ test.describe('Phase 8T state ownership, persistence truth, and navigation histo
     await page.reload();
     expect(await readState(page)).toMatchObject({ pollDone: false, quizDone: false, streakState: { count: 3 } });
     expect(await page.evaluate(() => window.CampusHubDebug.getXpTotal())).toBe(340);
+  });
+
+  test('keeps an already-completed Quiz replay read-only after reload', async ({ page }) => {
+    await goTo(page, '#play');
+    await page.locator('#quizOptions input[value="0"]').check();
+    await page.locator('#quizSubmit').click();
+    await expect(page.locator('#quizFeedback')).toContainText('Correct!');
+    const before = {
+      raw: await page.evaluate(() => localStorage.getItem('campushub:state:v3:tenant-makerere:membership-demo-001')),
+      state: await readState(page),
+      xp: await readXp(page),
+      events: await readEvents(page)
+    };
+
+    await page.reload();
+    await expect(page.locator('#quizCompleteNote')).toBeVisible();
+    await page.locator('#quizSubmit').evaluate(button => button.onclick());
+    await expect(page.locator('#participationGate')).toBeHidden();
+    await expect(page.locator('#quizFeedback')).toContainText('Correct!');
+    expect(await readQuizOutcome(page)).toEqual({
+      completed:true,
+      code:'ALREADY_COMPLETED',
+      currentResult:before.state.quizParticipation
+    });
+    expect(await page.evaluate(() => localStorage.getItem('campushub:state:v3:tenant-makerere:membership-demo-001'))).toBe(before.raw);
+    expect(await readState(page)).toEqual(before.state);
+    expect(await readXp(page)).toBe(before.xp);
+    expect(await readEvents(page)).toEqual(before.events);
   });
 
   test('fails Save, RSVP, Voice support, and Opportunity report without success state', async ({ page }) => {

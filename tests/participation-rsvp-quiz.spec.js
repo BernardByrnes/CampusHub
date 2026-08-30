@@ -21,6 +21,18 @@ async function readXp(page) {
   return page.evaluate(() => window.CampusHubDebug.getXpTotal());
 }
 
+async function readEvents(page) {
+  return page.evaluate(() => window.CampusHubDebug.getXpEvents());
+}
+
+async function readRawState(page) {
+  return page.evaluate(key => localStorage.getItem(key), PARTICIPATION_STATE_KEY);
+}
+
+async function readQuizOutcome(page) {
+  return page.evaluate(() => window.CampusHubDebug.getDailyQuizCompletionOutcome());
+}
+
 async function expectGateDecision(page, expected) {
   await expect(page.locator('#participationGate')).toBeVisible();
   await expect.poll(() => page.evaluate(() => window.CampusHubDebug.getLastGateDecision())).toEqual({
@@ -265,27 +277,168 @@ test.describe('Phase 6C RSVP and Daily Quiz GSC-14 integration', () => {
     });
   });
 
-  test('prevents a second same-tenant-day Quiz award after navigation and a stale action', async ({ page }) => {
+  test('returns ALREADY_COMPLETED for an eligible stale Quiz submit without mutation', async ({ page }) => {
+    await resetDemo(page);
+    await goTo(page, '#play');
+    expect(await readQuizOutcome(page)).toEqual({ completed:false });
+    await page.locator('#quizOptions input[value="0"]').check();
+    await page.locator('#quizSubmit').click();
+    await expect(page.locator('#quizFeedback')).toContainText('Correct!');
+    await expect(page.locator('#quizCompleteNote')).toHaveText('Today’s quiz is complete. A new quiz will be available tomorrow.');
+    const before = {
+      raw: await readRawState(page),
+      state: await readState(page),
+      events: await readEvents(page),
+      xp: await readXp(page),
+      toastCount: await page.locator('#toastWrap .toast').count()
+    };
+
+    await page.locator('#quizSubmit').evaluate(button => {
+      button.onclick();
+      button.onclick();
+    });
+    await expect(page.locator('#participationGate')).toBeHidden();
+    await expect(page.locator('#quizFeedback')).toContainText('Correct!');
+    await expect(page.locator('#quizSubmit')).toBeHidden();
+    await expect(page.locator('#quizSubmit')).toBeDisabled();
+    await expect(page.locator('#quizOptions input:checked')).toBeDisabled();
+    expect(await readQuizOutcome(page)).toEqual({
+      completed:true,
+      code:'ALREADY_COMPLETED',
+      currentResult:before.state.quizParticipation
+    });
+    expect(await readRawState(page)).toBe(before.raw);
+    expect(await readEvents(page)).toEqual(before.events);
+    expect(await readXp(page)).toBe(before.xp);
+    expect(await page.locator('#toastWrap .toast').count()).toBe(before.toastCount);
+
+    await goTo(page, '#home');
+    await expect(page.locator('[data-field="homeQuizCta"]')).toHaveText('Review');
+    await goTo(page, '#play');
+    await page.locator('#quizSubmit').evaluate(button => button.onclick());
+    await expect(page.locator('#participationGate')).toBeHidden();
+    await expect(page.locator('#quizFeedback')).toContainText('Correct!');
+    expect(await readQuizOutcome(page)).toEqual({
+      completed:true,
+      code:'ALREADY_COMPLETED',
+      currentResult:before.state.quizParticipation
+    });
+    expect(await readRawState(page)).toBe(before.raw);
+    expect(await readEvents(page)).toEqual(before.events);
+    expect(await readXp(page)).toBe(before.xp);
+  });
+
+  test('replays a wrong-answer result without rescoring or awarding accuracy XP', async ({ page }) => {
+    await resetDemo(page);
+    await goTo(page, '#play');
+    await page.locator('#quizOptions input[value="1"]').check();
+    await page.locator('#quizSubmit').click();
+    await expect(page.locator('#quizFeedback')).toContainText('Not quite.');
+    const before = {
+      raw: await readRawState(page),
+      state: await readState(page),
+      events: await readEvents(page),
+      xp: await readXp(page)
+    };
+    expect(before.state.quizParticipation.optionIndex).toBe(1);
+    expect(before.state.quizParticipation.xpAwarded).toBe(5);
+    expect(before.events.filter(event => event.ruleRef === 'daily-quiz-accuracy')).toHaveLength(0);
+
+    await page.reload();
+    await expect(page.locator('#quizFeedback')).toContainText('Not quite.');
+    await expect(page.locator('#quizFeedback')).toContainText('Correct answer: Lake Victoria.');
+    await page.locator('#quizSubmit').evaluate(button => button.click());
+    await expect(page.locator('#participationGate')).toBeHidden();
+    await expect(page.locator('#quizFeedback')).toContainText('Not quite.');
+    expect(await readQuizOutcome(page)).toEqual({
+      completed:true,
+      code:'ALREADY_COMPLETED',
+      currentResult:before.state.quizParticipation
+    });
+    expect(await readRawState(page)).toBe(before.raw);
+    expect(await readEvents(page)).toEqual(before.events);
+    expect(await readXp(page)).toBe(before.xp);
+    expect((await readEvents(page)).filter(event => event.ruleRef === 'daily-quiz-accuracy')).toHaveLength(0);
+  });
+
+  test('checks current GSC membership eligibility before a completed Quiz replay', async ({ page }) => {
     await resetDemo(page);
     await goTo(page, '#play');
     await page.locator('#quizOptions input[value="0"]').check();
     await page.locator('#quizSubmit').click();
     await expect(page.locator('#quizFeedback')).toContainText('Correct!');
-    const completedXp = await readXp(page);
-    const completedState = await readState(page);
+    await page.evaluate(key => {
+      const state = JSON.parse(localStorage.getItem(key));
+      state.membership.status = 'refresh';
+      localStorage.setItem(key, JSON.stringify(state));
+    }, PARTICIPATION_STATE_KEY);
+    await page.reload();
+    await expect(page.locator('#quizFeedback')).toBeVisible();
+    expect((await readState(page)).membership.status).toBe('refresh');
+    const beforeReplay = {
+      raw: await readRawState(page),
+      state: await readState(page),
+      events: await readEvents(page),
+      xp: await readXp(page)
+    };
 
-    await goTo(page, '#home');
+    await page.locator('#quizSubmit').evaluate(button => button.onclick());
+    await expectGateDecision(page, {
+      step:'membership-state',
+      variant:'membership-refresh',
+      resourceContext:'daily-quiz'
+    });
+    await expect(page.locator('#quizFeedback')).toBeVisible();
+    await expect(page.locator('#quizCompleteNote')).toBeVisible();
+    expect(await readQuizOutcome(page)).toEqual({
+      completed:true,
+      code:'ALREADY_COMPLETED',
+      currentResult:beforeReplay.state.quizParticipation
+    });
+    expect(await readRawState(page)).toBe(beforeReplay.raw);
+    expect(await readEvents(page)).toEqual(beforeReplay.events);
+    expect(await readXp(page)).toBe(beforeReplay.xp);
+  });
+
+  test('keeps a genuine Quiz story prerequisite failure in GSC step eight', async ({ page }) => {
+    await resetDemo(page);
+    await page.evaluate(key => {
+      const state = JSON.parse(localStorage.getItem(key));
+      state.participation.storyPrerequisites = false;
+      localStorage.setItem(key, JSON.stringify(state));
+    }, PARTICIPATION_STATE_KEY);
+    await page.reload();
     await goTo(page, '#play');
-    await page.locator('#quizSubmit').evaluate(button => button.click());
+    expect(await readQuizOutcome(page)).toEqual({ completed:false });
+    await page.locator('#quizOptions input[value="0"]').check();
+    await page.locator('#quizSubmit').click();
     await expectGateDecision(page, {
       step:'story-prerequisites',
       variant:'prerequisites-unmet',
       resourceContext:'daily-quiz'
     });
-    expect(await readXp(page)).toBe(completedXp);
-    expect(await readState(page)).toMatchObject({
-      quizParticipation:completedState.quizParticipation
+    expect(await readQuizOutcome(page)).toEqual({ completed:false });
+    expect((await readState(page)).quizParticipation).toBe(null);
+  });
+
+  test('keeps GSC membership precedence for a fresh Quiz with several failures', async ({ page }) => {
+    await resetDemo(page);
+    await page.evaluate(key => {
+      const state = JSON.parse(localStorage.getItem(key));
+      state.membership.status = 'refresh';
+      state.participation.storyPrerequisites = false;
+      localStorage.setItem(key, JSON.stringify(state));
+    }, PARTICIPATION_STATE_KEY);
+    await page.reload();
+    await goTo(page, '#play');
+    await page.locator('#quizOptions input[value="0"]').check();
+    await page.locator('#quizSubmit').click();
+    await expectGateDecision(page, {
+      step:'membership-state',
+      variant:'membership-refresh',
+      resourceContext:'daily-quiz'
     });
+    expect(await readQuizOutcome(page)).toEqual({ completed:false });
   });
 
   test('keeps Event Detail and Play usable without horizontal overflow at all focused widths', async ({ page }) => {
