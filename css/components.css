@@ -68,7 +68,7 @@
 .icon-btn {
   width:40px; height:40px; border-radius: 999px;
   border:1px solid var(--border); background: var(--surface);
-  display:inline-grid; place-items:center; cursor:pointer; position:relative;
+  display:inline-grid; place-items:center; cursor:pointer; position:relative; flex-shrink:0;
   color: var(--text); text-decoration:none;
 }
 .voice-back { width:44px; height:44px; flex:0 0 44px; }

@@ -291,6 +291,60 @@ test.describe('Phase 8U WCAG A/AA accessibility gate', () => {
     expect(count).toBeGreaterThan(0);
   });
 
+  test('notification bell keeps a practical 44px target across the 320px route matrix', async ({ page }, testInfo) => {
+    onlyProject(testInfo, 'small-mobile');
+    test.setTimeout(120_000);
+    const measurements = [];
+    for (const route of TARGET_ROUTES) {
+      await openRoute(page, route);
+      const button = page.locator('#notifBtn');
+      await expect(button).toBeVisible();
+      const metrics = await button.evaluate(element => {
+        const style = getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        const inset = Number.parseFloat(style.getPropertyValue('--touch-target-inset')) || 0;
+        const practical = {
+          left: rect.left - inset,
+          right: rect.right + inset,
+          top: rect.top - inset,
+          bottom: rect.bottom + inset,
+          width: rect.width + inset * 2,
+          height: rect.height + inset * 2
+        };
+        const brand = element.closest('.header-row')?.querySelector('.brand')?.getBoundingClientRect();
+        return {
+          raw: { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom, width: rect.width, height: rect.height },
+          practical,
+          computed: {
+            minWidth: style.minWidth,
+            minHeight: style.minHeight,
+            width: style.width,
+            height: style.height,
+            flex: style.flex,
+            flexShrink: style.flexShrink,
+            padding: style.padding,
+            boxSizing: style.boxSizing
+          },
+          brand: brand ? { left: brand.left, right: brand.right, top: brand.top, bottom: brand.bottom } : null,
+          viewport: { width: window.innerWidth, height: window.innerHeight },
+          documentWidth: Math.max(document.documentElement.scrollWidth, document.body?.scrollWidth || 0)
+        };
+      });
+      measurements.push({ route, ...metrics });
+      console.log(`[notification-target] ${route} ${JSON.stringify(metrics)}`);
+      expect(metrics.raw.width, `${route} notification bell visual width`).toBeGreaterThanOrEqual(40);
+      expect(metrics.raw.height, `${route} notification bell visual height`).toBeGreaterThanOrEqual(40);
+      expect(metrics.practical.width, `${route} notification bell width`).toBeGreaterThanOrEqual(44);
+      expect(metrics.practical.height, `${route} notification bell height`).toBeGreaterThanOrEqual(44);
+      expect(metrics.practical.left, `${route} notification bell left edge`).toBeGreaterThanOrEqual(0);
+      expect(metrics.practical.right, `${route} notification bell right edge`).toBeLessThanOrEqual(metrics.viewport.width);
+      expect(metrics.brand, `${route} notification bell header brand`).not.toBeNull();
+      expect(metrics.raw.left, `${route} notification bell must not overlap tenant brand`).toBeGreaterThanOrEqual(metrics.brand.right);
+      expect(metrics.documentWidth, `${route} document width`).toBeLessThanOrEqual(metrics.viewport.width);
+    }
+    expect(measurements).toHaveLength(TARGET_ROUTES.length);
+  });
+
   test('skip link is first, visible on focus, and moves focus to the one main landmark', async ({ page }, testInfo) => {
     onlyProject(testInfo, 'canonical-mobile');
     await openRoute(page, '#home');
