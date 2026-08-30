@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { assertMinimumTarget } from './helpers/accessibility.js';
 
 async function goTo(page, hash) {
   await page.goto(`/${hash}`);
@@ -217,9 +218,8 @@ test.describe('Phase 7B frozen component geometry', () => {
         visualBackground: visual.backgroundColor
       };
     });
+    await assertMinimumTarget(page, '#discover');
     expect(metrics.tagName).toBe('BUTTON');
-    expect(metrics.targetHeight).toBeGreaterThanOrEqual(44);
-    expect(metrics.targetWidth).toBeGreaterThanOrEqual(44);
     expect(metrics.visualHeight).toBeGreaterThanOrEqual(37);
     expect(metrics.visualHeight).toBeLessThanOrEqual(39);
     expect(metrics.insetVisualHeight).toBeGreaterThanOrEqual(37);
