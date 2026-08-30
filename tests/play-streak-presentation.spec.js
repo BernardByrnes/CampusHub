@@ -114,6 +114,11 @@ test.describe('Phase 8E state-driven Play streak presentation', () => {
   test('uses singular grammar and clears stale completion claims after a missed-day reset', async ({ page }) => {
     await setStreakState(page, { count:4, lastQualifiedTenantDay:'2026-05-18' });
     await page.reload();
+    await expect(page.locator('[data-field="homeStreak"]')).toHaveText('0 day streak');
+    await goTo(page, '#play');
+    await expect(page.locator('[data-field="streakDuration"]')).toHaveText('0 days');
+    await expect(page.locator('[data-field="streakActivitySummary"]')).toHaveText('No active streak');
+    await goTo(page, '#home');
     await submitPoll(page);
     expect(await readStreakState(page)).toEqual({ count:1, lastQualifiedTenantDay:'2026-05-20' });
 

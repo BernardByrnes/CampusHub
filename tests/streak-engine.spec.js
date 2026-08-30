@@ -10,6 +10,15 @@ const canonicalInput = (overrides = {}) => ({
   ...overrides
 });
 
+const projectionInput = (overrides = {}) => ({
+  tenantDay: '2026-05-20',
+  currentStreak: 0,
+  lastQualifiedTenantDay: null,
+  previousActiveTenantDay: null,
+  isInRecess: false,
+  ...overrides
+});
+
 async function apply(page, overrides = {}) {
   return page.evaluate(input => window.CampusHubStreak.applyQualifyingActivity(input), canonicalInput(overrides));
 }
@@ -25,6 +34,10 @@ async function thrownError(page, overrides = {}) {
   }, canonicalInput(overrides));
 }
 
+async function derive(page, overrides = {}) {
+  return page.evaluate(input => window.CampusHubStreak.deriveCurrentStreak(input), projectionInput(overrides));
+}
+
 test.describe('Phase 8B canonical tenant-day streak engine', () => {
   test.beforeEach(async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'canonical-mobile', 'Pure streak contract runs once in canonical-mobile.');
@@ -32,15 +45,177 @@ test.describe('Phase 8B canonical tenant-day streak engine', () => {
     await page.waitForFunction(() => typeof window.CampusHubStreak?.applyQualifyingActivity === 'function');
   });
 
-  test('exposes exactly the four qualifying activities as frozen data', async ({ page }) => {
+  test('exposes the pure projection and exactly the four qualifying activities as frozen data', async ({ page }) => {
     const api = await page.evaluate(() => ({
       keys: Object.keys(window.CampusHubStreak),
       activities: window.CampusHubStreak.QUALIFYING_ACTIVITIES,
-      frozen: Object.isFrozen(window.CampusHubStreak.QUALIFYING_ACTIVITIES)
+      frozen: Object.isFrozen(window.CampusHubStreak.QUALIFYING_ACTIVITIES),
+      projection: typeof window.CampusHubStreak.deriveCurrentStreak,
+      validator: typeof window.CampusHubStreak.isValidTenantDay
     }));
-    expect(api.keys).toEqual(['applyQualifyingActivity', 'QUALIFYING_ACTIVITIES']);
+    expect(api.keys).toEqual(['applyQualifyingActivity', 'deriveCurrentStreak', 'isValidTenantDay', 'QUALIFYING_ACTIVITIES']);
     expect(api.activities).toEqual(['daily-quiz', 'poll-response', 'event-rsvp', 'voice-submission']);
     expect(api.frozen).toBe(true);
+    expect(api.projection).toBe('function');
+    expect(api.validator).toBe('function');
+  });
+
+  test('projects a missed active day to zero without changing the stored tuple', async ({ page }) => {
+    await expect(derive(page, {
+      currentStreak: 4,
+      lastQualifiedTenantDay: '2026-05-18',
+      previousActiveTenantDay: '2026-05-19'
+    })).resolves.toEqual({
+      streak: 0,
+      lastQualifiedTenantDay: '2026-05-18',
+      qualifiedToday: false,
+      resetForMissedDay: true,
+      paused: false,
+      status: 'missed-reset'
+    });
+  });
+
+  test('keeps the stored streak while waiting on the previous active day', async ({ page }) => {
+    await expect(derive(page, {
+      currentStreak: 4,
+      lastQualifiedTenantDay: '2026-05-19',
+      previousActiveTenantDay: '2026-05-19'
+    })).resolves.toEqual({
+      streak: 4,
+      lastQualifiedTenantDay: '2026-05-19',
+      qualifiedToday: false,
+      resetForMissedDay: false,
+      paused: false,
+      status: 'continuing'
+    });
+  });
+
+  test('retains the stored streak and marks today qualified when already active today', async ({ page }) => {
+    await expect(derive(page, {
+      currentStreak: 4,
+      lastQualifiedTenantDay: '2026-05-20',
+      previousActiveTenantDay: '2026-05-19'
+    })).resolves.toEqual({
+      streak: 4,
+      lastQualifiedTenantDay: '2026-05-20',
+      qualifiedToday: true,
+      resetForMissedDay: false,
+      paused: false,
+      status: 'active-today'
+    });
+  });
+
+  test('pauses the stored streak during recess without resetting it', async ({ page }) => {
+    await expect(derive(page, {
+      tenantDay: '2026-06-03',
+      currentStreak: 5,
+      lastQualifiedTenantDay: '2026-05-20',
+      previousActiveTenantDay: '2026-05-19',
+      isInRecess: true
+    })).resolves.toEqual({
+      streak: 5,
+      lastQualifiedTenantDay: '2026-05-20',
+      qualifiedToday: false,
+      resetForMissedDay: false,
+      paused: true,
+      status: 'recess-paused'
+    });
+  });
+
+  test('keeps the stored streak on the first active day after recess', async ({ page }) => {
+    await expect(derive(page, {
+      tenantDay: '2026-06-08',
+      currentStreak: 5,
+      lastQualifiedTenantDay: '2026-05-29',
+      previousActiveTenantDay: '2026-05-29'
+    })).resolves.toMatchObject({
+      streak: 5,
+      resetForMissedDay: false,
+      status: 'continuing'
+    });
+  });
+
+  test('uses a safe reset when no previous active day can prove continuity', async ({ page }) => {
+    await expect(derive(page, {
+      currentStreak: 4,
+      lastQualifiedTenantDay: '2026-05-18'
+    })).resolves.toMatchObject({
+      streak: 0,
+      resetForMissedDay: true,
+      status: 'missed-reset'
+    });
+  });
+
+  test('projects without mutating input and freezes the result', async ({ page }) => {
+    const result = await page.evaluate(input => {
+      const before = JSON.stringify(input);
+      const output = window.CampusHubStreak.deriveCurrentStreak(input);
+      return {
+        before,
+        after: JSON.stringify(input),
+        frozen: Object.isFrozen(output),
+        keys: Object.keys(output)
+      };
+    }, projectionInput({ currentStreak: 4, lastQualifiedTenantDay: '2026-05-18', previousActiveTenantDay: '2026-05-19' }));
+    expect(result.after).toBe(result.before);
+    expect(result.frozen).toBe(true);
+    expect(result.keys).toEqual([
+      'streak',
+      'lastQualifiedTenantDay',
+      'qualifiedToday',
+      'resetForMissedDay',
+      'paused',
+      'status'
+    ]);
+  });
+
+  test('keeps tenant-day validity identical at the mutation and read boundaries', async ({ page }) => {
+    const cases = [
+      ['2026-05-20', true],
+      ['2028-02-29', true],
+      ['2026-02-31', false],
+      ['2026-04-31', false],
+      ['2026-13-01', false],
+      ['2026-00-20', false]
+    ];
+    const results = await page.evaluate(values => values.map(([value]) => {
+      const mutationAccepted = (() => {
+        try {
+          window.CampusHubStreak.applyQualifyingActivity({
+            activityType: 'daily-quiz',
+            tenantDay: value,
+            currentStreak: 0,
+            lastQualifiedTenantDay: null,
+            previousActiveTenantDay: null,
+            isInRecess: false
+          });
+          return true;
+        } catch(error) {
+          return false;
+        }
+      })();
+      const readAccepted = (() => {
+        try {
+          window.CampusHubStreak.deriveCurrentStreak({
+            tenantDay: value,
+            currentStreak: 0,
+            lastQualifiedTenantDay: null,
+            previousActiveTenantDay: null,
+            isInRecess: false
+          });
+          return true;
+        } catch(error) {
+          return false;
+        }
+      })();
+      return { value, mutationAccepted, readAccepted, validator: window.CampusHubStreak.isValidTenantDay(value) };
+    }), cases);
+    expect(results).toEqual(cases.map(([value, accepted]) => ({
+      value,
+      mutationAccepted: accepted,
+      readAccepted: accepted,
+      validator: accepted
+    })));
   });
 
   test('starts a first active-day streak at one', async ({ page }) => {

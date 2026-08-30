@@ -47,17 +47,24 @@
     return [4, 6, 9, 11].includes(month) ? 30 : 31;
   }
 
-  function assertTenantDay(value, field, allowNull=false){
-    if(value===null && allowNull) return;
-    if(typeof value!=="string") inputError(field, "must be a canonical YYYY-MM-DD string or null");
+  // Tenant days are strict calendar values. This is the single date semantic
+  // shared by the mutation and read-projection boundaries.
+  function isValidTenantDay(value, allowNull=false){
+    if(value===null && allowNull) return true;
+    if(typeof value!=="string") return false;
     const match = TENANT_DAY_PATTERN.exec(value);
-    if(!match) inputError(field, "must use canonical YYYY-MM-DD format");
+    if(!match) return false;
     const year = Number(match[1]);
     const month = Number(match[2]);
     const day = Number(match[3]);
-    if(month < 1 || month > 12 || day < 1 || day > daysInMonth(year, month)){
-      inputError(field, "must be a valid calendar date");
-    }
+    return month >= 1 && month <= 12 && day >= 1 && day <= daysInMonth(year, month);
+  }
+
+  function assertTenantDay(value, field, allowNull=false){
+    if(value===null && allowNull) return;
+    if(typeof value!=="string") inputError(field, "must be a canonical YYYY-MM-DD string or null");
+    if(!TENANT_DAY_PATTERN.test(value)) inputError(field, "must use canonical YYYY-MM-DD format");
+    if(!isValidTenantDay(value)) inputError(field, "must be a valid calendar date");
   }
 
   function assertActivityType(activityType){
@@ -74,6 +81,79 @@
 
   function assertBoolean(value, field){
     if(typeof value!=="boolean") inputError(field, "must be a boolean");
+  }
+
+  // Pure current-state projection for visible streak surfaces. It uses only
+  // canonical tenant-day facts and never reads the clock, DOM, or storage.
+  function deriveCurrentStreak(input){
+    assertInputObject(input);
+
+    ["currentStreak", "tenantDay", "isInRecess"].forEach(field=>{
+      if(!hasOwn(input, field)) inputError(field, "is required");
+    });
+
+    const lastQualifiedTenantDay = hasOwn(input, "lastQualifiedTenantDay")
+      ? input.lastQualifiedTenantDay
+      : null;
+    const previousActiveTenantDay = hasOwn(input, "previousActiveTenantDay")
+      ? input.previousActiveTenantDay
+      : null;
+
+    assertTenantDay(input.tenantDay, "tenantDay");
+    assertTenantDay(lastQualifiedTenantDay, "lastQualifiedTenantDay", true);
+    assertTenantDay(previousActiveTenantDay, "previousActiveTenantDay", true);
+    assertStreak(input.currentStreak);
+    assertBoolean(input.isInRecess, "isInRecess");
+
+    const currentStreak = input.currentStreak;
+    const tenantDay = input.tenantDay;
+
+    if(input.isInRecess){
+      return Object.freeze({
+        streak: currentStreak,
+        lastQualifiedTenantDay,
+        qualifiedToday: false,
+        resetForMissedDay: false,
+        paused: true,
+        status: "recess-paused"
+      });
+    }
+
+    if(lastQualifiedTenantDay===tenantDay){
+      return Object.freeze({
+        streak: currentStreak,
+        lastQualifiedTenantDay,
+        qualifiedToday: true,
+        resetForMissedDay: false,
+        paused: false,
+        status: "active-today"
+      });
+    }
+
+    if(lastQualifiedTenantDay!==null && lastQualifiedTenantDay===previousActiveTenantDay){
+      return Object.freeze({
+        streak: currentStreak,
+        lastQualifiedTenantDay,
+        qualifiedToday: false,
+        resetForMissedDay: false,
+        paused: false,
+        status: "continuing"
+      });
+    }
+
+    // A positive count with no last-qualified day is incoherent and cannot
+    // prove an active streak. A missing previous active day likewise cannot
+    // prove continuity, so a historical positive streak is shown as reset;
+    // no device-time inference is permitted.
+    const missed = currentStreak > 0 && lastQualifiedTenantDay!==null;
+    return Object.freeze({
+      streak: 0,
+      lastQualifiedTenantDay,
+      qualifiedToday: false,
+      resetForMissedDay: missed,
+      paused: false,
+      status: missed ? "missed-reset" : "not-started"
+    });
   }
 
   function applyQualifyingActivity(input){
@@ -139,6 +219,8 @@
 
   root.CampusHubStreak = Object.freeze({
     applyQualifyingActivity,
+    deriveCurrentStreak,
+    isValidTenantDay,
     QUALIFYING_ACTIVITIES
   });
 })(window);

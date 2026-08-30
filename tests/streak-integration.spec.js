@@ -254,6 +254,65 @@ test.describe('Phase 8C canonical tenant-day streak integration', () => {
     await expect(page.locator('#toastWrap')).not.toContainText(/lost|missed|reset/i);
   });
 
+  test('projects a missed day consistently on Home, Play, and Me without persisting a read reset', async ({ page }) => {
+    await resetDemo(page);
+    await setStoredState(page, { streakState:{ count:4, lastQualifiedTenantDay:'2026-05-18' } });
+    const rawBefore = await page.evaluate(key => localStorage.getItem(key), STATE_KEY);
+
+    await page.evaluate(() => { window.location.hash = '#play'; });
+    await expect(page.locator('#view-play')).toBeVisible();
+    await expect(page.locator('[data-field="streakDuration"]')).toHaveText('0 days');
+    await expect(page.locator('[data-field="streakActivitySummary"]')).toHaveText('No active streak');
+
+    await page.evaluate(() => { window.location.hash = '#home'; });
+    await expect(page.locator('#view-home')).toBeVisible();
+    await expect(page.locator('[data-field="homeStreak"]')).toHaveText('0 day streak');
+    await expect(page.locator('[data-testid="home-play-link"]')).toHaveAttribute('aria-label', 'Open Play: Level 4, 340 XP, 0 day streak');
+
+    await page.evaluate(() => { window.location.hash = '#me'; });
+    await expect(page.locator('#view-me')).toBeVisible();
+    await expect(page.locator('[data-field="meStreak"]')).toHaveText('Streak 0 days');
+
+    const rawAfter = await page.evaluate(key => localStorage.getItem(key), STATE_KEY);
+    expect(rawAfter).toBe(rawBefore);
+    expect((await readState(page)).streakState).toEqual({ count:4, lastQualifiedTenantDay:'2026-05-18' });
+  });
+
+  test('keeps the read reset stable across reload until the next qualifying action', async ({ page }) => {
+    await resetDemo(page);
+    await setStoredState(page, { streakState:{ count:4, lastQualifiedTenantDay:'2026-05-18' } });
+    await page.reload();
+    await expect(page.locator('[data-field="homeStreak"]')).toHaveText('0 day streak');
+    await goTo(page, '#play');
+    await expect(page.locator('[data-field="streakDuration"]')).toHaveText('0 days');
+    expect((await readState(page)).streakState).toEqual({ count:4, lastQualifiedTenantDay:'2026-05-18' });
+
+    await submitPoll(page);
+    expect((await readState(page)).streakState).toEqual({ count:1, lastQualifiedTenantDay:'2026-05-20' });
+    await page.reload();
+    await expect(page.locator('[data-field="streakDuration"]')).toHaveText('1 day');
+    expect((await readState(page)).streakState).toEqual({ count:1, lastQualifiedTenantDay:'2026-05-20' });
+  });
+
+  test('normalizes a corrupt streak tuple as one coherent fallback', async ({ page }) => {
+    await resetDemo(page);
+    await setStoredState(page, { streakState:{ count:999, lastQualifiedTenantDay:'2026-02-31' } });
+    await page.reload();
+    expect((await readState(page)).streakState).toEqual({ count:3, lastQualifiedTenantDay:'2026-05-19' });
+    await expect(page.locator('[data-field="homeStreak"]')).toHaveText('3 day streak');
+    await expect(page.locator('[data-field="homeStreak"]')).not.toContainText('999');
+  });
+
+  test('normalizes a positive count with a null date to the empty tuple', async ({ page }) => {
+    await resetDemo(page);
+    await setStoredState(page, { streakState:{ count:999, lastQualifiedTenantDay:null } });
+    await page.reload();
+    expect((await readState(page)).streakState).toEqual({ count:0, lastQualifiedTenantDay:null });
+    await expect(page.locator('[data-field="homeStreak"]')).toHaveText('0 day streak');
+    await goTo(page, '#play');
+    await expect(page.locator('[data-field="streakActivitySummary"]')).toHaveText('No qualifying activity yet');
+  });
+
   test('pauses during recess while Poll behavior and XP remain normal', async ({ page }) => {
     await resetDemo(page);
     await page.evaluate(() => { window.CampusHubDemo.demoConfig.calendar.isInRecess = true; });

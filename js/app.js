@@ -4227,16 +4227,23 @@
 
   function canonicalDemoStreakState(){
     const fixture = D.streakState || {};
-    return {
-      count: typeof fixture.count === "number" && Number.isInteger(fixture.count) && fixture.count>=0 ? fixture.count : 0,
-      lastQualifiedTenantDay: typeof fixture.lastQualifiedTenantDay === "string" ? fixture.lastQualifiedTenantDay : null
-    };
+    const count = typeof fixture.count === "number" && Number.isInteger(fixture.count) && fixture.count>=0
+      ? fixture.count
+      : null;
+    const lastQualifiedTenantDay = fixture.lastQualifiedTenantDay===null
+      ? null
+      : typeof fixture.lastQualifiedTenantDay === "string" && isCanonicalTenantDay(fixture.lastQualifiedTenantDay)
+        ? fixture.lastQualifiedTenantDay
+        : null;
+    if(count===null || (lastQualifiedTenantDay===null && count!==0)){
+      return { count:0, lastQualifiedTenantDay:null };
+    }
+    return { count, lastQualifiedTenantDay };
   }
 
   function isCanonicalTenantDay(value){
-    if(typeof value !== "string" || !/^(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(value)) return false;
-    const date = new Date(`${value}T00:00:00Z`);
-    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+    return typeof window.CampusHubStreak?.isValidTenantDay === "function"
+      && window.CampusHubStreak.isValidTenantDay(value);
   }
 
   const TENANT_WEEKDAY_NAMES = Object.freeze([
@@ -4292,13 +4299,24 @@
   function ensureStreakState(state){
     const fallback = canonicalDemoStreakState();
     const stored = state?.streakState;
-    const count = stored && typeof stored.count === "number" && Number.isInteger(stored.count) && stored.count>=0
-      ? stored.count
-      : fallback.count;
-    const lastQualifiedTenantDay = stored && (stored.lastQualifiedTenantDay===null || isCanonicalTenantDay(stored.lastQualifiedTenantDay))
-      ? stored.lastQualifiedTenantDay
-      : fallback.lastQualifiedTenantDay;
-    state.streakState = { count, lastQualifiedTenantDay };
+    const isObject = stored && typeof stored === "object" && !Array.isArray(stored);
+    const countValid = isObject && typeof stored.count === "number" && Number.isInteger(stored.count) && stored.count>=0;
+    const lastPresent = isObject && Object.prototype.hasOwnProperty.call(stored, "lastQualifiedTenantDay");
+    const lastValid = lastPresent && (stored.lastQualifiedTenantDay===null || isCanonicalTenantDay(stored.lastQualifiedTenantDay));
+    const nullTuple = lastValid && stored.lastQualifiedTenantDay===null;
+    const normalized = !isObject || !countValid || !lastValid
+      ? fallback
+      : nullTuple
+        ? { count:0, lastQualifiedTenantDay:null }
+        : { count:stored.count, lastQualifiedTenantDay:stored.lastQualifiedTenantDay };
+    // Keep valid tuples (including a missed-day tuple) untouched on reads so
+    // presentation cannot become an implicit localStorage mutation. A
+    // malformed tuple is replaced as one coherent value for later writes.
+    if(!isObject
+      || stored.count!==normalized.count
+      || stored.lastQualifiedTenantDay!==normalized.lastQualifiedTenantDay){
+      state.streakState = normalized;
+    }
     return state;
   }
 
@@ -4325,18 +4343,27 @@
   function syncStreakPresentation(state, progress=null){
     const normalizedState = ensureStreakState(state || {});
     const currentProgress = progress || studentProgressForState(normalizedState);
-    const streak = normalizedState.streakState.count;
-    const lastQualifiedTenantDay = normalizedState.streakState.lastQualifiedTenantDay;
     const calendar = D.demoConfig?.calendar || {};
     const currentTenantDay = calendar.currentTenantDay;
-    const inRecess = calendar.isInRecess === true;
+    const streakProjection = window.CampusHubStreak.deriveCurrentStreak({
+      currentStreak: normalizedState.streakState.count,
+      lastQualifiedTenantDay: normalizedState.streakState.lastQualifiedTenantDay,
+      tenantDay: currentTenantDay,
+      previousActiveTenantDay: calendar.previousActiveTenantDay ?? null,
+      isInRecess: calendar.isInRecess === true
+    });
+    const streak = streakProjection.streak;
+    const lastQualifiedTenantDay = streakProjection.lastQualifiedTenantDay;
+    const inRecess = streakProjection.paused;
     const streakCopy = formatStreakCopy(streak);
     const lastQualifiedWeekday = weekdayNameForTenantDay(lastQualifiedTenantDay);
-    const summary = lastQualifiedWeekday
-      ? (lastQualifiedTenantDay===currentTenantDay && !inRecess
-        ? "Active today"
-        : `Last active ${lastQualifiedWeekday}`)
-      : "No qualifying activity yet";
+    const summary = streakProjection.status === "active-today"
+      ? "Active today"
+      : streakProjection.status === "missed-reset"
+        ? "No active streak"
+        : lastQualifiedWeekday
+          ? `Last active ${lastQualifiedWeekday}`
+          : "No qualifying activity yet";
     setEntityField('[data-field="streakDuration"]', streakCopy.duration);
     setEntityField('[data-field="streakActivitySummary"]', summary);
     setEntityField('[data-field="homeStreak"]', streakCopy.compact);
@@ -4352,7 +4379,7 @@
       weekElement.setAttribute('aria-label', 'Current tenant week');
       weekElement.innerHTML = week.map(day=>{
         const isToday = day.tenantDay===currentTenantDay;
-        const isQualifiedToday = isToday && !inRecess && lastQualifiedTenantDay===currentTenantDay;
+        const isQualifiedToday = isToday && streakProjection.qualifiedToday;
         const isLastQualified = !isToday && day.tenantDay===lastQualifiedTenantDay;
         const isPausedToday = isToday && inRecess;
         const classes = ['day-pill'];
