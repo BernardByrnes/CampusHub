@@ -22,6 +22,44 @@ function expectAtLeastWithSubpixelTolerance(actual, minimum, epsilon = 0.01, mes
   expect(actual + epsilon, message).toBeGreaterThanOrEqual(minimum);
 }
 
+const FROZEN_HOME_ORDER = [
+  'homePriority',
+  'homeHero',
+  'homePoll',
+  'homeEvent',
+  'homeSports',
+  'homeOpp',
+  'homeVoice',
+  'homeQuiz',
+  'homePlaySummary'
+];
+
+async function resetDemoAndGoHome(page) {
+  await goTo(page, '#home');
+  await page.waitForFunction(() => typeof window.CampusHubDebug?.resetDemo === 'function');
+  await page.evaluate(() => window.CampusHubDebug.resetDemo());
+}
+
+async function visibleHomeOrder(page) {
+  return page.locator('#view-home > [id]').evaluateAll(nodes => nodes
+    .filter(node => !node.hidden)
+    .map(node => node.id));
+}
+
+async function completeCanonicalPoll(page) {
+  await page.locator('#homePoll [data-testid="home-poll-respond"]').click();
+  await page.locator('#pollForm input[type="radio"]').first().check();
+  await page.locator('#submitPoll').click();
+  await expect(page.locator('#pollSuccess')).toBeVisible();
+}
+
+async function completeCanonicalQuiz(page) {
+  await page.locator('#homeQuiz [data-testid="home-quiz-play"]').click();
+  await page.locator('#quizOptions input[type="radio"]').first().check();
+  await page.locator('#quizSubmit').click();
+  await expect(page.locator('#quizFeedback')).toBeVisible();
+}
+
 test.describe('Canonical Home', () => {
   test.beforeEach(async ({ page }) => {
     // The prototype references Google Fonts, but the test environment blocks
@@ -378,6 +416,189 @@ test.describe('Canonical Home', () => {
     await expect(page.locator('#homeQuiz')).toContainText('accuracy bonus');
     await expect(page.locator('#homeQuiz')).not.toContainText('+10 XP');
     await expect(page.locator('#homeQuiz [data-testid="home-quiz-play"]')).toHaveAttribute('href', '#play');
+  });
+
+  test('labels a responded Poll with a quiet review affordance and preserves it after reload', async ({ page }) => {
+    await resetDemoAndGoHome(page);
+    const pollLink = page.locator('#homePoll [data-testid="home-poll-respond"]');
+    await expect(pollLink).toHaveText('Respond');
+    await expect(page.locator('[data-field="homePollState"]')).toBeHidden();
+
+    await completeCanonicalPoll(page);
+    await page.locator('#tab-home').click();
+    await expect(page.locator('#view-home')).toBeVisible();
+    await expect(page.locator('#homePoll [data-field="homePollState"]')).toHaveText('Responded');
+    await expect(page.locator('#homePoll [data-field="homePollState"]')).toBeVisible();
+    await expect(pollLink).toHaveText('Review');
+    await expect(pollLink).toHaveAttribute('href', '#participate');
+    await expect(pollLink).toHaveAttribute('aria-label', 'Review your recorded poll response');
+    await expect(page.locator('#homePoll')).toHaveClass(/home-card--acted/);
+    await expect(page.locator('#homePoll')).not.toContainText('Very good');
+    await expect(page.locator('#homePoll')).not.toContainText('Very poor');
+    expect(await visibleHomeOrder(page)).toEqual(FROZEN_HOME_ORDER);
+
+    await page.reload();
+    await expect(page.locator('#homePoll [data-field="homePollState"]')).toBeVisible();
+    await expect(pollLink).toHaveText('Review');
+    expect(await visibleHomeOrder(page)).toEqual(FROZEN_HOME_ORDER);
+  });
+
+  test('derives Event Going and Interested labels from RSVP state, but not from Save', async ({ page }) => {
+    await resetDemoAndGoHome(page);
+    await page.goto('/#events/guild-debate');
+    await page.locator('#rsvpGoing').click();
+    await expect(page.locator('#rsvpGoing')).toHaveText('Going ✓');
+    await page.locator('#rsvpInterested').click();
+    await expect(page.locator('#rsvpInterested')).toHaveText('Interested ✓');
+    await page.locator('#tab-home').click();
+    await expect(page.locator('#homeEvent [data-field="homeEventState"]')).toHaveText('Interested');
+    await expect(page.locator('#homeEvent [data-field="homeEventState"]')).toBeVisible();
+    await expect(page.locator('#homeEvent')).toHaveClass(/home-card--acted/);
+
+    await page.reload();
+    await expect(page.locator('#homeEvent [data-field="homeEventState"]')).toHaveText('Interested');
+
+    await page.goto('/#events/guild-debate');
+    await page.locator('#rsvpInterested').click();
+    await expect(page.locator('#rsvpInterested')).toHaveText('Interested');
+    await page.locator('#tab-home').click();
+    await expect(page.locator('#homeEvent [data-field="homeEventState"]')).toBeHidden();
+    await expect(page.locator('#homeEvent')).not.toHaveClass(/home-card--acted/);
+    await expect(page.locator('#homeEvent')).not.toContainText('Going');
+    await expect(page.locator('#homeEvent')).not.toContainText('Interested');
+
+    await page.goto('/#events/guild-debate');
+    await page.locator('#eventSave').click();
+    await expect(page.locator('#eventSave')).toHaveText('Saved ✓');
+    await page.locator('#tab-home').click();
+    await expect(page.locator('#homeEvent [data-field="homeEventState"]')).toBeHidden();
+    await expect(page.locator('#homeEvent')).not.toHaveClass(/home-card--acted/);
+  });
+
+  test('keeps the exact frozen Home order when Poll, Event, and Quiz are all acted', async ({ page }) => {
+    await resetDemoAndGoHome(page);
+    await completeCanonicalPoll(page);
+    await page.goto('/#events/guild-debate');
+    await page.locator('#rsvpGoing').click();
+    await page.locator('#tab-home').click();
+    await completeCanonicalQuiz(page);
+    await page.locator('#tab-home').click();
+    await expect(page.locator('#view-home')).toBeVisible();
+    await expect(page.locator('#homePoll [data-field="homePollState"]')).toHaveText('Responded');
+    await expect(page.locator('#homeEvent [data-field="homeEventState"]')).toHaveText('Going');
+    await expect(page.locator('[data-field="homeQuizCta"]')).toHaveText('Review');
+    expect(await visibleHomeOrder(page)).toEqual(FROZEN_HOME_ORDER);
+    await page.reload();
+    expect(await visibleHomeOrder(page)).toEqual(FROZEN_HOME_ORDER);
+    await expect(page.locator('#homePlaySummary')).toBeVisible();
+  });
+
+  test('resets acted Home presentation and isolates foreign membership state', async ({ page }) => {
+    await resetDemoAndGoHome(page);
+    const foreignKey = 'campushub:state:v3:tenant-foreign:membership-foreign-001';
+    await page.evaluate(key => localStorage.setItem(key, JSON.stringify({
+      schemaVersion: 3,
+      tenantId: 'tenant-foreign',
+      membershipId: 'membership-foreign-001',
+      pollDone: true,
+      rsvp: 'going',
+      quizDone: true,
+      quizParticipation: { quizId: 'daily-quiz-2026-05-20', tenantDay: '2026-05-20', optionIndex: 0, xpAwarded: 10 }
+    })), foreignKey);
+    await page.reload();
+    await expect(page.locator('#homePoll [data-testid="home-poll-respond"]')).toHaveText('Respond');
+    await expect(page.locator('#homePoll [data-field="homePollState"]')).toBeHidden();
+    await expect(page.locator('#homeEvent [data-field="homeEventState"]')).toBeHidden();
+    await expect(page.locator('[data-field="homeQuizCta"]')).toHaveText('Play');
+
+    await completeCanonicalPoll(page);
+    await page.locator('#tab-home').click();
+    await completeCanonicalQuiz(page);
+    await page.locator('#tab-home').click();
+    await expect(page.locator('#homePoll [data-field="homePollState"]')).toBeVisible();
+    await expect(page.locator('[data-field="homeQuizCta"]')).toHaveText('Review');
+    await page.evaluate(() => window.CampusHubDebug.resetDemo());
+    await expect(page.locator('#homePoll [data-testid="home-poll-respond"]')).toHaveText('Respond');
+    await expect(page.locator('#homePoll [data-field="homePollState"]')).toBeHidden();
+    await expect(page.locator('#homeEvent [data-field="homeEventState"]')).toBeHidden();
+    await expect(page.locator('[data-field="homeQuizCta"]')).toHaveText('Play');
+    expect(await page.evaluate(key => Boolean(localStorage.getItem(key)), foreignKey)).toBe(true);
+  });
+
+  test('provides pure acted-state and deterministic within-slot candidate contracts', async ({ page }) => {
+    await resetDemoAndGoHome(page);
+    const result = await page.evaluate(() => {
+      const poll = window.CampusHubDebug.homeActedStateFor({
+        kind: 'poll',
+        entity: window.CampusHubDemo.poll,
+        state: { pollDone: true }
+      });
+      const event = window.CampusHubDebug.homeActedStateFor({
+        kind: 'event',
+        entity: window.CampusHubDemo.featuredEvent,
+        state: { rsvp: 'interested' }
+      });
+      const quiz = window.CampusHubDebug.homeActedStateFor({
+        kind: 'quiz',
+        entity: window.CampusHubDemo.quiz,
+        state: { quizParticipation: { quizId: window.CampusHubDemo.quiz.id, tenantDay: window.CampusHubDemo.quiz.tenantDay, optionIndex: 0 } }
+      });
+      const candidates = [
+        { id: 'candidate-a', acted: true, recency: 99 },
+        { id: 'candidate-b', acted: false, recency: 1 },
+        { id: 'candidate-c', acted: false, recency: 50, eligible: false }
+      ];
+      const select = input => window.CampusHubDebug.selectHomeCandidate(input, {
+        actedStateFor: candidate => ({ acted: candidate.acted }),
+        primaryRankFor: candidate => candidate.recency
+      });
+      const unactedPreferred = select(candidates);
+      const primaryRank = select(candidates.map(candidate => ({ ...candidate, acted: false })));
+      const tied = [
+        { id: 'zeta', acted: false, recency: 10 },
+        { id: 'alpha', acted: false, recency: 10 }
+      ];
+      const permutations = [tied, tied.slice().reverse()].map(select).map(candidate => candidate?.id);
+      return { poll, event, quiz, unactedPreferred, primaryRank, permutations };
+    });
+    expect(result.poll).toEqual({ acted: true, state: 'responded', rankPenalty: 1 });
+    expect(result.event).toEqual({ acted: true, state: 'interested', rankPenalty: 1 });
+    expect(result.quiz).toEqual({ acted: true, state: 'complete', rankPenalty: 1 });
+    expect(result.unactedPreferred.id).toBe('candidate-b');
+    expect(result.primaryRank.id).toBe('candidate-a');
+    expect(result.permutations).toEqual(['alpha', 'alpha']);
+  });
+
+  test('keeps acted Home state usable and restrained across the frozen responsive widths', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'The acted-state responsive matrix runs once from the desktop project.');
+    await resetDemoAndGoHome(page);
+    await completeCanonicalPoll(page);
+    await page.goto('/#events/guild-debate');
+    await page.locator('#rsvpGoing').click();
+    await page.locator('#tab-home').click();
+    await completeCanonicalQuiz(page);
+    await page.locator('#tab-home').click();
+    for (const viewport of [
+      { width: 320, height: 844 },
+      { width: 390, height: 844 },
+      { width: 430, height: 932 },
+      { width: 768, height: 1024 },
+      { width: 1280, height: 900 }
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.reload();
+      await expect(page.locator('#homePoll [data-field="homePollState"]')).toBeVisible();
+      await expect(page.locator('#homeEvent [data-field="homeEventState"]')).toBeVisible();
+      await expect(page.locator('[data-field="homeQuizCta"]')).toHaveText('Review');
+      const metrics = await page.evaluate(() => ({
+        documentWidth: document.documentElement.scrollWidth,
+        viewportWidth: window.innerWidth,
+        homeWidth: document.querySelector('#view-home')?.getBoundingClientRect().width || 0
+      }));
+      expect(metrics.documentWidth).toBeLessThanOrEqual(metrics.viewportWidth + 1);
+      expect(metrics.homeWidth).toBeLessThanOrEqual(metrics.viewportWidth + 1);
+      expect(await visibleHomeOrder(page)).toEqual(FROZEN_HOME_ORDER);
+    }
   });
 
   test('reflects the completed Quiz as Review without changing the Home poll', async ({ page }) => {

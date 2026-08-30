@@ -51,6 +51,20 @@
 /* Canonical Home affordances */
 .priority-link { display:block; color:inherit; text-decoration:none; }
 .home-action { min-height:var(--control-min-h); }
+.home-card--acted {
+  background:var(--surface-muted);
+  border-color:var(--border-strong);
+}
+.home-action--acted {
+  background:var(--surface-muted) !important;
+  border-color:var(--border) !important;
+  color:var(--text-muted) !important;
+}
+.home-action--acted:hover {
+  background:var(--surface-sunken) !important;
+  color:var(--text-strong) !important;
+}
+.home-acted-chip { margin-top:6px; }
 .home-icon-link {
   width:var(--control-min-h);
   height:var(--control-min-h);

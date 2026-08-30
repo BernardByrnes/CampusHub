@@ -278,6 +278,116 @@
     return selected;
   }
 
+  function normalizeHomeKind(kind){
+    const normalized = String(kind == null ? "" : kind).trim().toLowerCase().replace(/[\s_]+/g, "-");
+    return ({
+      news: "publication",
+      publication: "publication",
+      story: "publication",
+      opportunity: "opportunity",
+      opportunities: "opportunity",
+      event: "event",
+      events: "event",
+      sports: "sports",
+      "student-voice": "voice",
+      "daily-quiz": "quiz"
+    })[normalized] || normalized;
+  }
+
+  function pollParticipationForCurrentPoll(state, entity=D.poll){
+    if(state?.pollDone !== true) return false;
+    // The prototype has one canonical Poll. An explicitly supplied entity is
+    // still checked so a future candidate cannot inherit another poll's receipt.
+    return !entity?.id || !D.poll?.id || entity.id === D.poll.id;
+  }
+
+  // Cross-section order is frozen by Blueprint §16.1. Membership acted-state
+  // is a within-slot demotion/preference signal under CH-HOM-001.
+  function homeActedStateFor(input={}){
+    const { kind, entity, state } = input || {};
+    const normalizedKind = normalizeHomeKind(kind);
+    let acted = false;
+    let stateName = "pending";
+    if(normalizedKind === "poll"){
+      acted = pollParticipationForCurrentPoll(state, entity || D.poll);
+      stateName = acted ? "responded" : "pending";
+    } else if(normalizedKind === "event"){
+      acted = state?.rsvp === "going" || state?.rsvp === "interested";
+      stateName = acted ? state.rsvp : "pending";
+    } else if(normalizedKind === "quiz"){
+      acted = Boolean(quizParticipationForCurrentDay(state, entity || D.quiz));
+      stateName = acted ? "complete" : "pending";
+    }
+    return { acted, state: stateName, rankPenalty: acted ? 1 : 0 };
+  }
+
+  function candidateIdForHome(candidate){
+    const value = candidate?.canonicalId ?? candidate?.id ?? candidate?.entityId;
+    return value == null ? "" : String(value);
+  }
+
+  function candidateOrderForHome(candidate){
+    const value = candidate?.canonicalOrder ?? candidate?.order ?? candidate?.position;
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : Number.POSITIVE_INFINITY;
+  }
+
+  function candidateActedStateForHome(candidate, actedStateFor){
+    const resolved = typeof actedStateFor === "function"
+      ? actedStateFor(candidate)
+      : (candidate?.actedState || (Object.prototype.hasOwnProperty.call(candidate || {}, "acted")
+        ? { acted: candidate.acted }
+        : homeActedStateFor({
+          kind: candidate?.kind,
+          entity: candidate?.entity || candidate,
+          state: candidate?.state
+        })));
+    if(typeof resolved === "boolean") return { acted: resolved };
+    return resolved && typeof resolved === "object" ? resolved : { acted:false };
+  }
+
+  function primaryRankForHome(candidate, primaryRankFor){
+    const value = typeof primaryRankFor === "function"
+      ? primaryRankFor(candidate)
+      : candidate?.primaryRank;
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : 0;
+  }
+
+  function selectHomeCandidate(candidates, options={}){
+    if(!Array.isArray(candidates)) return null;
+    const records = [];
+    candidates.forEach((candidate, index)=>{
+      if(!candidate || typeof candidate !== "object") return;
+      if(candidate.eligible === false || candidate.renderable === false || candidate.hidden === true) return;
+      if(typeof options.isEligible === "function" && !options.isEligible(candidate)) return;
+      if(typeof options.isRenderable === "function" && !options.isRenderable(candidate)) return;
+      records.push({
+        candidate,
+        index,
+        actedState: candidateActedStateForHome(candidate, options.actedStateFor),
+        primaryRank: primaryRankForHome(candidate, options.primaryRankFor)
+      });
+    });
+    records.sort((left, right)=>{
+      const actedCompare = Number(Boolean(left.actedState.acted)) - Number(Boolean(right.actedState.acted));
+      if(actedCompare) return actedCompare;
+      if(left.primaryRank !== right.primaryRank) return right.primaryRank - left.primaryRank;
+      const leftId = candidateIdForHome(left.candidate);
+      const rightId = candidateIdForHome(right.candidate);
+      if(leftId !== rightId) return leftId < rightId ? -1 : 1;
+      const leftOrder = candidateOrderForHome(left.candidate);
+      const rightOrder = candidateOrderForHome(right.candidate);
+      if(leftOrder !== rightOrder){
+        if(Number.isFinite(leftOrder) && Number.isFinite(rightOrder)) return leftOrder - rightOrder;
+        if(Number.isFinite(leftOrder)) return -1;
+        if(Number.isFinite(rightOrder)) return 1;
+      }
+      return left.index - right.index;
+    });
+    return records[0]?.candidate || null;
+  }
+
   function resolveVoiceDetailEntity(issueId){
     const publicIssue = findVoiceIssue(issueId);
     if(publicIssue) return publicIssue;
@@ -309,6 +419,35 @@
   function setEntityField(selector, value){
     const element = $(selector);
     if(element) element.textContent = value == null ? "" : String(value);
+  }
+
+  function syncHomeActedSurface(cardSelector, actedState, options={}){
+    const card = $(cardSelector);
+    if(!card) return;
+    const acted = Boolean(actedState?.acted);
+    card.classList.toggle("home-card--acted", acted);
+    card.dataset.homeState = actedState?.state || "pending";
+    card.dataset.homeActed = acted ? "true" : "false";
+
+    if(options.chipSelector){
+      const chip = card.querySelector(options.chipSelector);
+      if(chip){
+        const label = typeof options.stateLabel === "function"
+          ? options.stateLabel(actedState)
+          : options.stateLabel;
+        chip.textContent = acted ? (label || actedState?.state || "Acted") : "";
+        chip.dataset.homeState = actedState?.state || "pending";
+        chip.hidden = !acted;
+      }
+    }
+    if(options.actionSelector){
+      const action = card.querySelector(options.actionSelector);
+      if(action){
+        action.classList.toggle("home-action--acted", acted);
+        if(acted && options.actedAriaLabel) action.setAttribute("aria-label", options.actedAriaLabel);
+        else if(!acted && options.defaultAriaLabel) action.setAttribute("aria-label", options.defaultAriaLabel);
+      }
+    }
   }
 
   // Opportunity destinations are deliberately strict: malformed, relative,
@@ -554,11 +693,20 @@
       setEntityField('[data-field="homePollKicker"]', homePoll.kicker);
       setEntityField('[data-field="homePollTitle"]', homePoll.question);
       setEntityField('[data-field="homePollMeta"]', homePoll.closes);
+      const pollActedState = homeActedStateFor({ kind:"poll", entity:homePoll, state:normalizedState });
       const pollLink = $('#homePoll [data-testid="home-poll-respond"]');
       if(pollLink){
         pollLink.href = homePoll.href || "#participate";
-        pollLink.textContent = homePoll.cta || "Respond";
+        pollLink.textContent = pollActedState.acted ? "Review" : (homePoll.cta || "Respond");
+        pollLink.setAttribute("aria-label", pollActedState.acted
+          ? "Review your recorded poll response"
+          : "Respond to the campus poll");
       }
+      syncHomeActedSurface('#homePoll', pollActedState, {
+        chipSelector:'[data-field="homePollState"]',
+        stateLabel:"Responded",
+        actionSelector:'[data-testid="home-poll-respond"]'
+      });
     }
     hydratePollContent();
     const homeEvent = D.featuredEvent;
@@ -567,8 +715,17 @@
       setEntityField('[data-field="homeEventTitle"]', homeEvent.title);
       setEntityField('[data-field="homeEventDate"]', `${homeEvent.date} • ${homeEvent.time}`);
       setEntityField('[data-field="homeEventVenue"]', homeEvent.venue);
+      const eventActedState = homeActedStateFor({ kind:"event", entity:homeEvent, state:normalizedState });
       const eventLink = $('#homeEvent [data-testid="home-event-link"]');
-      if(eventLink) eventLink.href = homeEvent.href;
+      if(eventLink){
+        eventLink.href = homeEvent.href;
+        eventLink.setAttribute("aria-label", `View ${homeEvent.title} details`);
+      }
+      syncHomeActedSurface('#homeEvent', eventActedState, {
+        chipSelector:'[data-field="homeEventState"]',
+        stateLabel:state => state.state === "going" ? "Going" : "Interested",
+        actionSelector:'[data-testid="home-event-link"]'
+      });
     }
     const homeOpportunity = D.opportunity;
     if(homeOpportunity){
@@ -621,7 +778,17 @@
     setEntityField('[data-field="homeQuizQuestion"]', D.quiz.question);
     setEntityField('[data-field="homeQuizXpParticipation"]', `+${D.quiz.xpParticipation || 5} XP`);
     setEntityField('[data-field="homeQuizXpBonus"]', `+${D.quiz.xpBonus || 5} XP`);
-    setEntityField('[data-field="homeQuizCta"]', quizParticipationForCurrentDay(normalizedState, D.quiz) ? "Review" : "Play");
+    const quizActedState = homeActedStateFor({ kind:"quiz", entity:D.quiz, state:normalizedState });
+    setEntityField('[data-field="homeQuizCta"]', quizActedState.acted ? "Review" : "Play");
+    const quizLink = $('#homeQuiz [data-testid="home-quiz-play"]');
+    if(quizLink){
+      quizLink.setAttribute("aria-label", quizActedState.acted
+        ? "Review today's quiz result"
+        : "Play today's quiz");
+    }
+    syncHomeActedSurface('#homeQuiz', quizActedState, {
+      actionSelector:'[data-testid="home-quiz-play"]'
+    });
     setEntityField('[data-field="homeLevel"]', `Level ${progress.level}`);
     setEntityField('[data-field="homeXp"]', `${progress.xp} XP`);
   }
@@ -4528,6 +4695,13 @@
       },
       getDailyQuizCompletionOutcome(){
         return JSON.parse(JSON.stringify(dailyQuizCompletionOutcome(participationState(), D.quiz)));
+      },
+      homeActedStateFor(input={}){
+        return { ...homeActedStateFor(input) };
+      },
+      selectHomeCandidate(candidates, options={}){
+        const selected = selectHomeCandidate(candidates, options);
+        return selected == null ? null : JSON.parse(JSON.stringify(selected));
       },
       setScenario(name){
         if(name==='voice-canonical' || D.voiceStatusScenarios?.[name]){
