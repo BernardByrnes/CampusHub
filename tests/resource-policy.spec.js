@@ -73,6 +73,69 @@ test.describe('Phase 8U.8 resource exposure policy contract', () => {
     expect(decisions.verifiedL3.exposed).toBe(true);
   });
 
+  test('fails closed when precomputed visibility conflicts with viewer facts', async ({ page }) => {
+    const decisions = await page.evaluate(() => {
+      const policy = window.CampusHubResourcePolicy;
+      const base = { audienceEligible: true, lifecycleVisible: true };
+      const evaluate = overrides => policy.evaluatePublicationExposure({ ...base, ...overrides });
+      const invalidValues = ['true', 1, null, {}, []].map(visibilityEligible => evaluate({
+        visibility: 'MEMBERS',
+        visibilityEligible
+      }));
+
+      return {
+        membersPublicVisitorConflict: evaluate({
+          visibility: 'MEMBERS',
+          viewerClass: 'PUBLIC_VISITOR',
+          tenantPublicSurfaceEnabled: true,
+          visibilityEligible: true
+        }),
+        membersL1Agreement: evaluate({
+          visibility: 'MEMBERS',
+          viewerClass: 'MEMBER_L1',
+          visibilityEligible: true
+        }),
+        verifiedL1Agreement: evaluate({
+          visibility: 'VERIFIED_MEMBERS',
+          viewerClass: 'MEMBER_L1',
+          visibilityEligible: false
+        }),
+        verifiedL2Conflict: evaluate({
+          visibility: 'VERIFIED_MEMBERS',
+          viewerClass: 'MEMBER_L2',
+          visibilityEligible: false
+        }),
+        publicSurfaceConflict: evaluate({
+          visibility: 'PUBLIC',
+          viewerClass: 'PUBLIC_VISITOR',
+          tenantPublicSurfaceEnabled: false,
+          visibilityEligible: true
+        }),
+        precomputedOnly: evaluate({
+          visibility: 'MEMBERS',
+          visibilityEligible: true
+        }),
+        derivedOnly: evaluate({
+          visibility: 'MEMBERS',
+          viewerClass: 'MEMBER_L1'
+        }),
+        invalidValues
+      };
+    });
+
+    expect(decisions.membersPublicVisitorConflict).toMatchObject({ exposed: false, reason: 'VISIBILITY_REQUIRED' });
+    expect(decisions.membersL1Agreement.exposed).toBe(true);
+    expect(decisions.verifiedL1Agreement).toMatchObject({ exposed: false, reason: 'VISIBILITY_REQUIRED' });
+    expect(decisions.verifiedL2Conflict).toMatchObject({ exposed: false, reason: 'VISIBILITY_REQUIRED' });
+    expect(decisions.publicSurfaceConflict).toMatchObject({ exposed: false, reason: 'VISIBILITY_REQUIRED' });
+    expect(decisions.precomputedOnly.exposed).toBe(true);
+    expect(decisions.derivedOnly.exposed).toBe(true);
+    expect(decisions.invalidValues).toHaveLength(5);
+    for(const decision of decisions.invalidValues){
+      expect(decision).toMatchObject({ exposed: false, reason: 'VISIBILITY_REQUIRED' });
+    }
+  });
+
   test('requires explicit visibility and audience facts for Publication exposure', async ({ page }) => {
     const decisions = await page.evaluate(() => {
       const policy = window.CampusHubResourcePolicy;
