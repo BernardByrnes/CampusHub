@@ -92,6 +92,18 @@ async function openRoute(page, route, { reset = true } = {}) {
     await page.goto(`/${route}`);
   }
   await expect(page.locator(`#view-${expectedView}.is-active`)).toHaveCount(1);
+  await waitForActiveViewSettled(page);
+}
+
+async function waitForActiveViewSettled(page) {
+  // The approved view transition starts at opacity .6. Axe must inspect the
+  // canonical fully opaque state; blended transition colors are not design
+  // tokens and can fail contrast during the first 180ms of the animation.
+  await page.evaluate(async () => {
+    const activeView = document.querySelector('.view.is-active');
+    const animations = activeView?.getAnimations?.() || [];
+    await Promise.all(animations.map(animation => animation.finished.catch(() => undefined)));
+  });
 }
 
 function onlyProject(testInfo, projectName) {
@@ -99,6 +111,15 @@ function onlyProject(testInfo, projectName) {
 }
 
 test.describe('Phase 8U WCAG A/AA accessibility gate', () => {
+  test('canonical Axe route setup settles the active view transition', async ({ page }, testInfo) => {
+    onlyProject(testInfo, 'canonical-mobile');
+    await openRoute(page, '#discover');
+    await expect.poll(() => page.locator('#view-discover').evaluate(view => ({
+      opacity: getComputedStyle(view).opacity,
+      runningAnimations: view.getAnimations().filter(animation => animation.playState === 'running').length
+    }))).toEqual({ opacity: '1', runningAnimations: 0 });
+  });
+
   test('Axe reports zero WCAG A/AA violations on every canonical route', async ({ page }, testInfo) => {
     onlyProject(testInfo, 'canonical-mobile');
     test.setTimeout(180_000);
