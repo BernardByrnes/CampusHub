@@ -28,6 +28,23 @@ async function storedState(page) {
   return page.evaluate(() => JSON.parse(localStorage.getItem('campushub:state:v3:tenant-makerere:membership-demo-001')));
 }
 
+async function setAssuranceLevel(page, level) {
+  await page.evaluate(nextLevel => {
+    const state = window.CampusHubDebug.getCurrentState();
+    state.membership.assuranceLevel = nextLevel;
+    state.membership.status = 'active';
+    state.participation.demoScenario = 'normal';
+    localStorage.setItem(window.CampusHubDebug.getStateStorageKey(), JSON.stringify(state));
+  }, level);
+  await page.reload();
+  await expect(page.locator('#view-opportunity')).toBeVisible();
+}
+
+async function setOpportunityScenario(page, name) {
+  await page.evaluate(scenario => window.CampusHubDebug.setOpportunityScenario(scenario), name);
+  await expect(page.locator('#view-opportunity')).toBeVisible();
+}
+
 test.describe('Opportunity external destination safety', () => {
   test.beforeEach(async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'canonical-mobile', 'Detailed Opportunity contract tests run once on the canonical mobile project.');
@@ -75,8 +92,138 @@ test.describe('Opportunity external destination safety', () => {
     await expect(page.locator('#oppRequirements')).toContainText('Academic transcript');
     await expect(page.locator('#oppApply')).toHaveText('Apply on provider site');
     await expect(page.locator('#oppApply')).toBeVisible();
+    await expect(page.locator('#oppApply')).toBeEnabled();
+    await expect(page.locator('#oppAssuranceNote')).toBeHidden();
+    await expect(page.locator('#oppReviewVerification')).toBeHidden();
+    await expect(page.locator('#view-opportunity')).toHaveAttribute('data-opportunity-apply-policy', 'allowed');
+    expect(await page.evaluate(() => window.CampusHubDebug.evaluateOpportunityAction())).toMatchObject({
+      allowed: true,
+      reason: null,
+      requiredAssurance: 'L2',
+      currentAssurance: 'L2'
+    });
     await expect(page.locator('#oppReport')).toHaveText('Report suspicious opportunity');
     await expect(page.locator('#leaveCampusHubContinue')).toHaveAttribute('href', 'https://www.mak.ac.ug/');
+  });
+
+  test('allows L3 assurance without changing the canonical Apply experience', async ({ page }) => {
+    await resetAndGo(page);
+    await setAssuranceLevel(page, 3);
+
+    await expect(page.locator('[data-field="oppRequiredAssurance"]')).toHaveText('L2 required');
+    await expect(page.locator('#oppApply')).toHaveText('Apply on provider site');
+    await expect(page.locator('#oppApply')).toBeVisible();
+    await expect(page.locator('#oppApply')).toBeEnabled();
+    await expect(page.locator('#oppAssuranceNote')).toBeHidden();
+    await expect(page.locator('#oppReviewVerification')).toBeHidden();
+    expect(await page.evaluate(() => window.CampusHubDebug.evaluateOpportunityAction())).toMatchObject({
+      allowed: true,
+      requiredAssurance: 'L2',
+      currentAssurance: 'L3'
+    });
+
+    await page.locator('#oppApply').click();
+    await expect(page.locator('#leaveCampusHubDialog')).toBeVisible();
+  });
+
+  test('keeps the Opportunity readable but replaces Apply with verification at L1', async ({ page }) => {
+    await resetAndGo(page);
+    await page.evaluate(() => window.CampusHubDebug.setScenario('assurance-required'));
+
+    await expect(page.locator('#view-opportunity')).toHaveAttribute('data-opportunity-apply-policy', 'ASSURANCE_REQUIRED');
+    await expect(page.locator('[data-field="oppRequiredAssurance"]')).toHaveText('L2 required');
+    await expect(page.locator('[data-field="oppDetailTitle"]')).toHaveText('Research Assistant — Climate Resilience');
+    await expect(page.locator('[data-field="oppProvider2"]')).toContainText('Makerere University');
+    await expect(page.locator('[data-field="oppDeadline2"]')).toHaveText('30 May 2026');
+    await expect(page.locator('[data-field="oppDescription"]')).toContainText('climate adaptation strategies');
+    await expect(page.locator('[data-field="oppEligibility"]')).toContainText('Year 2+ Geography');
+    await expect(page.locator('#oppRequirements')).toContainText('Academic transcript');
+    await expect(page.locator('#oppApply')).toBeHidden();
+    await expect(page.locator('#oppApply')).toBeDisabled();
+    await expect(page.locator('#oppReviewVerification')).toBeVisible();
+    await expect(page.locator('#oppReviewVerification')).toHaveText('Review verification');
+    await expect(page.locator('#oppReviewVerification')).toHaveAttribute('href', '#verification');
+    await expect(page.locator('#oppReviewVerification')).toHaveAttribute('aria-label', 'Review verification to continue to Research Assistant — Climate Resilience');
+    await expect(page.locator('#oppAssuranceNote')).toHaveText('L2 — Roster Match is required to continue to the provider application.');
+    await expect(page.locator('#oppAssuranceNote')).toBeVisible();
+    await expect(page.locator('#oppReport')).toBeEnabled();
+    await expect(page.locator('#oppSave')).toBeEnabled();
+    await expect(page.locator('#leaveCampusHubDialog')).toBeHidden();
+    expect(await page.evaluate(() => window.CampusHubDebug.evaluateOpportunityAction())).toEqual({
+      allowed: false,
+      reason: 'ASSURANCE_REQUIRED',
+      requiredAssurance: 'L2',
+      currentAssurance: 'L1'
+    });
+
+    // Programmatic activation cannot bypass the policy or open the external dialog.
+    await page.evaluate(() => document.querySelector('#oppApply')?.click());
+    await expect(page.locator('#leaveCampusHubDialog')).toBeHidden();
+  });
+
+  test('applies the same calm denial at L0', async ({ page }) => {
+    await resetAndGo(page);
+    await setAssuranceLevel(page, 0);
+
+    await expect(page.locator('#oppApply')).toBeHidden();
+    await expect(page.locator('#oppReviewVerification')).toBeVisible();
+    await expect(page.locator('#oppAssuranceNote')).toHaveText('L2 — Roster Match is required to continue to the provider application.');
+    await expect(page.locator('#leaveCampusHubDialog')).toBeHidden();
+    expect(await page.evaluate(() => window.CampusHubDebug.evaluateOpportunityAction())).toMatchObject({
+      allowed: false,
+      reason: 'ASSURANCE_REQUIRED',
+      requiredAssurance: 'L2',
+      currentAssurance: 'L0'
+    });
+  });
+
+  test('routes denied Apply to Verification and returns to the Opportunity', async ({ page }) => {
+    await resetAndGo(page);
+    await page.evaluate(() => window.CampusHubDebug.setScenario('assurance-required'));
+
+    await page.locator('#oppReviewVerification').click();
+    await expect(page.locator('#view-verification')).toBeVisible();
+    await expect(page.locator('[data-field="assuranceTitle"]')).toHaveText('L1 — Weak Affiliation');
+    await expect(page.locator('#leaveCampusHubDialog')).toBeHidden();
+    expect(new URL(page.url()).hash).toBe('#verification');
+
+    await page.locator('#view-verification [data-back]').click();
+    await expect(page.locator('#view-opportunity')).toBeVisible();
+    expect(new URL(page.url()).hash).toBe('#opportunities/ra-climate');
+    await expect(page.locator('#oppReviewVerification')).toBeVisible();
+    await expect(page.locator('#oppApply')).toBeHidden();
+  });
+
+  test('does not automatically resume the external hand-off after assurance improves', async ({ page }) => {
+    await resetAndGo(page);
+    await page.evaluate(() => window.CampusHubDebug.setScenario('assurance-required'));
+    await page.locator('#oppReviewVerification').click();
+    await expect(page.locator('#view-verification')).toBeVisible();
+
+    await page.locator('#startRosterMatch').click();
+    await expect(page.locator('[data-field="assuranceTitle"]')).toHaveText('L2 — Roster Match');
+    await expect(page.locator('#leaveCampusHubDialog')).toBeHidden();
+    await page.locator('#view-verification [data-back]').click();
+    await expect(page.locator('#view-opportunity')).toBeVisible();
+    await expect(page.locator('#oppApply')).toBeVisible();
+    await expect(page.locator('#oppApply')).toBeEnabled();
+    await expect(page.locator('#leaveCampusHubDialog')).toBeHidden();
+
+    await page.locator('#oppApply').click();
+    await expect(page.locator('#leaveCampusHubDialog')).toBeVisible();
+  });
+
+  test('removes a previously open dialog when assurance drops while the page is open', async ({ page }) => {
+    await resetAndGo(page);
+    await page.locator('#oppApply').click();
+    await expect(page.locator('#leaveCampusHubDialog')).toBeVisible();
+
+    await page.evaluate(() => window.CampusHubDebug.setScenario('assurance-required'));
+    await expect(page.locator('#leaveCampusHubDialog')).toBeHidden();
+    await expect(page.locator('#oppApply')).toBeHidden();
+    await expect(page.locator('#oppReviewVerification')).toBeVisible();
+    await expect(page.locator('#leaveCampusHubContinue')).toBeHidden();
+    expect(await page.locator('#leaveCampusHubContinue').getAttribute('href')).toBeNull();
   });
 
   test('opens the dedicated native leave-campus dialog without changing route', async ({ page }) => {
@@ -143,6 +290,84 @@ test.describe('Opportunity external destination safety', () => {
       expect(await page.locator('#leaveCampusHubContinue').getAttribute('href')).toBeNull();
       expect(page.url()).toContain('#opportunities/ra-climate');
     }
+  });
+
+  test('gives lifecycle and destination failures precedence over assurance', async ({ page }) => {
+    await resetAndGo(page);
+    await setOpportunityScenario(page, 'expired');
+    await page.evaluate(() => window.CampusHubDebug.setScenario('assurance-required'));
+
+    await expect(page.locator('#oppStatus')).toHaveText('Expired');
+    await expect(page.locator('#oppApply')).toBeHidden();
+    await expect(page.locator('#oppReviewVerification')).toBeHidden();
+    await expect(page.locator('#oppAssuranceNote')).toBeHidden();
+    await expect(page.locator('#oppReport')).toBeEnabled();
+    expect(await page.evaluate(() => window.CampusHubDebug.evaluateOpportunityAction())).toMatchObject({
+      allowed: false,
+      reason: 'LIFECYCLE_UNAVAILABLE'
+    });
+
+    await page.evaluate(() => {
+      window.CampusHubDemo.opportunity.externalUrl = 'http://example.com/apply';
+      window.CampusHubDebug.setOpportunityScenario('normal');
+    });
+    await expect(page.locator('#oppStatus')).toBeHidden();
+    await expect(page.locator('#oppApply')).toBeHidden();
+    await expect(page.locator('#oppReviewVerification')).toBeHidden();
+    await expect(page.locator('#oppAssuranceNote')).toBeHidden();
+    expect(await page.evaluate(() => window.CampusHubDebug.evaluateOpportunityAction())).toMatchObject({
+      allowed: false,
+      reason: 'INVALID_DESTINATION'
+    });
+    await expect(page.locator('#leaveCampusHubDialog')).toBeHidden();
+  });
+
+  test('keeps Save and Report independent at L1 with no XP or Streak credit', async ({ page }) => {
+    await resetAndGo(page);
+    await page.evaluate(() => window.CampusHubDebug.setScenario('assurance-required'));
+    const before = await storedState(page);
+
+    await page.locator('#oppSave').click();
+    await expect(page.locator('#oppSave')).toHaveText('Saved ✓');
+    await page.locator('#oppReport').click();
+    await expect(page.locator('#oppReport')).toHaveText('Report sent ✓');
+    const after = await storedState(page);
+    expect(after.saveOpp).toBe(true);
+    expect(after.reportedOpportunityIds).toEqual(['ra-climate']);
+    expect(after.xpEvents).toEqual(before.xpEvents);
+    expect(after.streakState).toEqual(before.streakState);
+    await expect(page.locator('#oppReviewVerification')).toBeVisible();
+    await expect(page.locator('#leaveCampusHubDialog')).toBeHidden();
+  });
+
+  test('keeps the policy pure, safe, and outside GSC-14', async ({ page }) => {
+    await resetAndGo(page);
+    const decisions = await page.evaluate(() => {
+      const opportunity = { ...window.CampusHubDemo.opportunity };
+      const state = window.CampusHubDebug.getCurrentState();
+      const at = level => ({ ...state, membership: { ...state.membership, assuranceLevel: level } });
+      const decide = (entity, level) => window.CampusHubDebug.evaluateOpportunityAction(entity, at(level));
+      return {
+        ranks: ['L0', 'L1', 'L2', 'L3', 'L9', 'Verified', '', true].map(value => window.CampusHubDebug.assuranceRank(value)),
+        l0: decide(opportunity, 0),
+        l1: decide(opportunity, 1),
+        l2: decide(opportunity, 2),
+        l3: decide(opportunity, 3),
+        requiredL0: decide({ ...opportunity, requiredAssurance: 'L0' }, 2),
+        malformed: decide({ ...opportunity, requiredAssurance: 'L9' }, 3),
+        expired: decide({ ...opportunity, deadlineTenantDay: '2020-01-01' }, 1),
+        invalidUrl: decide({ ...opportunity, externalUrl: 'http://example.com' }, 1)
+      };
+    });
+    expect(decisions.ranks).toEqual([0, 1, 2, 3, null, null, null, null]);
+    expect(decisions.l0).toMatchObject({ allowed: false, reason: 'ASSURANCE_REQUIRED', requiredAssurance: 'L2', currentAssurance: 'L0' });
+    expect(decisions.l1).toMatchObject({ allowed: false, reason: 'ASSURANCE_REQUIRED', requiredAssurance: 'L2', currentAssurance: 'L1' });
+    expect(decisions.l2).toMatchObject({ allowed: true, reason: null, requiredAssurance: 'L2', currentAssurance: 'L2' });
+    expect(decisions.l3).toMatchObject({ allowed: true, reason: null, requiredAssurance: 'L2', currentAssurance: 'L3' });
+    expect(decisions.requiredL0).toMatchObject({ allowed: true, reason: null, requiredAssurance: 'L0', currentAssurance: 'L2' });
+    expect(decisions.malformed).toMatchObject({ allowed: false, reason: 'INVALID_POLICY' });
+    expect(decisions.expired).toMatchObject({ allowed: false, reason: 'LIFECYCLE_UNAVAILABLE' });
+    expect(decisions.invalidUrl).toMatchObject({ allowed: false, reason: 'INVALID_DESTINATION' });
   });
 
   test('reports once, persists idempotently, and does not award XP or streak credit', async ({ page }) => {
@@ -230,6 +455,49 @@ test.describe('Opportunity external destination safety', () => {
       for (const height of dialogLayout.actionHeights) expect(height).toBeGreaterThanOrEqual(44);
       await page.keyboard.press('Escape');
       await expect(page.locator('#leaveCampusHubDialog')).toBeHidden();
+    }
+  });
+
+  test('keeps the denied Opportunity action state usable across the required responsive matrix', async ({ page }) => {
+    await resetAndGo(page);
+    await page.evaluate(() => window.CampusHubDebug.setScenario('assurance-required'));
+    const sizes = [
+      { width: 320, height: 844 },
+      { width: 390, height: 844 },
+      { width: 430, height: 932 },
+      { width: 768, height: 1024 },
+      { width: 1280, height: 900 }
+    ];
+
+    for (const size of sizes) {
+      await page.setViewportSize(size);
+      await page.goto('/#opportunities/ra-climate');
+      await expect(page.locator('#view-opportunity')).toBeVisible();
+      await expect(page.locator('#oppAssuranceNote')).toBeVisible();
+      await expect(page.locator('#oppReviewVerification')).toBeVisible();
+      await expect(page.locator('#oppApply')).toBeHidden();
+      await expect(page.locator('#leaveCampusHubDialog')).toBeHidden();
+
+      const deniedLayout = await page.evaluate(() => {
+        const note = document.querySelector('#oppAssuranceNote')?.getBoundingClientRect();
+        const verification = document.querySelector('#oppReviewVerification')?.getBoundingClientRect();
+        const shell = document.querySelector('#shell')?.getBoundingClientRect();
+        return {
+          documentWidth: document.documentElement.scrollWidth,
+          viewportWidth: window.innerWidth,
+          noteWidth: note?.width ?? 0,
+          noteHeight: note?.height ?? 0,
+          verificationWidth: verification?.width ?? 0,
+          verificationHeight: verification?.height ?? 0,
+          shellWidth: shell?.width ?? 0
+        };
+      });
+      expect(deniedLayout.documentWidth).toBeLessThanOrEqual(deniedLayout.viewportWidth + 1);
+      expect(deniedLayout.noteWidth).toBeGreaterThan(0);
+      expect(deniedLayout.noteWidth).toBeLessThanOrEqual(deniedLayout.shellWidth + 1);
+      expect(deniedLayout.noteHeight).toBeGreaterThan(0);
+      expect(deniedLayout.verificationWidth).toBeGreaterThanOrEqual(44);
+      expect(deniedLayout.verificationHeight).toBeGreaterThanOrEqual(44);
     }
   });
 });

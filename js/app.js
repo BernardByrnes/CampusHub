@@ -205,6 +205,44 @@
     };
   }
 
+  function assuranceRank(value){
+    if(typeof value === "number" || (typeof value === "string" && /^\s*\d+\s*$/.test(value))){
+      const numeric = Number(value);
+      return Number.isInteger(numeric) && numeric >= 0 && numeric < ASSURANCE_CODES.length ? numeric : null;
+    }
+    const code = String(value == null ? "" : value).trim().toUpperCase();
+    const rank = ASSURANCE_CODES.indexOf(code);
+    return rank >= 0 ? rank : null;
+  }
+
+  // Opportunity Apply is an external hand-off policy, not a GSC-14 participation
+  // context. The resource's declared assurance requirement is enforced here
+  // without changing the shared participation evaluator.
+  function evaluateOpportunityAction(opportunity=D.opportunity, state=participationState()){
+    const requiredRank = assuranceRank(opportunity?.requiredAssurance);
+    const requiredAssurance = requiredRank === null ? null : ASSURANCE_CODES[requiredRank];
+    const currentRank = assuranceRank(state?.membership?.assuranceLevel);
+    const currentAssurance = currentRank === null ? null : ASSURANCE_CODES[currentRank];
+    const base = { allowed:false, reason:null, requiredAssurance, currentAssurance };
+
+    if(!opportunity || typeof opportunity !== "object"){
+      return { ...base, reason:"RESOURCE_UNAVAILABLE" };
+    }
+    if(!opportunityLifecycle(opportunity).active){
+      return { ...base, reason:"LIFECYCLE_UNAVAILABLE" };
+    }
+    if(!isSafeExternalHttpsUrl(opportunity.externalUrl)){
+      return { ...base, reason:"INVALID_DESTINATION" };
+    }
+    if(requiredRank === null || currentRank === null){
+      return { ...base, reason:"INVALID_POLICY" };
+    }
+    if(currentRank < requiredRank){
+      return { ...base, reason:"ASSURANCE_REQUIRED" };
+    }
+    return { ...base, allowed:true };
+  }
+
   function findPublication(entityId){
     if(!entityId || !Array.isArray(D.publications)) return null;
     return D.publications.find(publication => publication.id.toLowerCase() === entityId.toLowerCase()) || null;
@@ -526,23 +564,50 @@
       });
     }
 
+    const policy = evaluateOpportunityAction(opportunity, participationState());
+    const assuranceDenied = policy.reason === "ASSURANCE_REQUIRED";
+    const requiredLabel = policy.requiredAssurance
+      ? assuranceLabel(assuranceRank(policy.requiredAssurance))
+      : "Required assurance";
+    const assuranceNote = $('#oppAssuranceNote');
+    if(assuranceNote){
+      assuranceNote.hidden = !assuranceDenied;
+      assuranceNote.textContent = assuranceDenied
+        ? `${requiredLabel} is required to continue to the provider application.`
+        : "";
+    }
+    const verificationLink = $('#oppReviewVerification');
+    if(verificationLink){
+      verificationLink.hidden = !assuranceDenied;
+      verificationLink.href = "#verification";
+      verificationLink.setAttribute("aria-label", `Review verification to continue to ${opportunity.title}`);
+    }
+
+    const opportunityView = $('#view-opportunity');
+    if(opportunityView){
+      opportunityView.dataset.opportunityApplyPolicy = policy.allowed ? "allowed" : (policy.reason || "unavailable");
+    }
     const apply = $('#oppApply');
     const destination = !lifecycle.expired && isSafeExternalHttpsUrl(opportunity.externalUrl) ? opportunity.externalUrl : "";
     if(apply){
-      apply.hidden = !destination;
-      apply.disabled = !destination;
+      apply.hidden = !policy.allowed;
+      apply.disabled = !policy.allowed;
     }
     const continueLink = $('#leaveCampusHubContinue');
     if(continueLink){
-      continueLink.hidden = !destination;
-      if(destination) continueLink.href = destination;
+      continueLink.hidden = !policy.allowed;
+      if(policy.allowed && destination){
+        continueLink.href = destination;
+        continueLink.target = "_blank";
+        continueLink.rel = "noopener noreferrer";
+      }
       else {
         continueLink.removeAttribute("href");
         continueLink.removeAttribute("target");
         continueLink.removeAttribute("rel");
       }
     }
-    if(!destination){
+    if(!policy.allowed || !destination){
       const dialog = $('#leaveCampusHubDialog');
       if(dialog?.open && typeof dialog.close === "function") dialog.close();
     }
@@ -3367,7 +3432,8 @@
     apply?.addEventListener('click', event=>{
       event.preventDefault();
       const opportunity = D.opportunity;
-      if(opportunityLifecycle(opportunity).expired || !isSafeExternalHttpsUrl(opportunity?.externalUrl)){
+      const policy = evaluateOpportunityAction(opportunity, participationState());
+      if(!policy.allowed){
         renderOpportunityEntity(opportunity);
         return;
       }
@@ -3386,11 +3452,16 @@
       // Keep the validated destination on the dedicated anchor; the browser
       // owns opening it in a new tab and applies noopener protection.
       const opportunity = D.opportunity;
-      if(opportunityLifecycle(opportunity).expired || !isSafeExternalHttpsUrl(opportunity?.externalUrl)){
+      const policy = evaluateOpportunityAction(opportunity, participationState());
+      if(!policy.allowed){
         event.preventDefault();
+        closeDialog();
+        renderOpportunityEntity(opportunity);
         return;
       }
       continueLink.href = opportunity.externalUrl;
+      continueLink.target = "_blank";
+      continueLink.rel = "noopener noreferrer";
     });
     stay?.addEventListener('click', closeDialog);
     dialog.addEventListener('close', restoreFocus);
@@ -4743,6 +4814,12 @@
         hydrateTenant(state);
         renderDiscover();
         if(location.hash.toLowerCase() === "#opportunities/ra-climate") renderOpportunityEntity(D.opportunity);
+      },
+      assuranceRank(value){
+        return assuranceRank(value);
+      },
+      evaluateOpportunityAction(opportunity=D.opportunity, state=participationState()){
+        return { ...evaluateOpportunityAction(opportunity, state) };
       },
       getOpportunityLifecycle(){
         return { ...opportunityLifecycle(D.opportunity) };

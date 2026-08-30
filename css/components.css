@@ -390,6 +390,8 @@
 
 /* Safe external Opportunity hand-off */
 .opportunity-actions { display:grid; gap:8px; }
+.opportunity-assurance-note { margin:0; color:var(--text-muted); }
+.opportunity-verification-link { width:100%; }
 .leave-campus-dialog {
   width:min(420px, calc(100% - 24px));
   max-height:calc(100dvh - 32px);
