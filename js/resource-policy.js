@@ -53,8 +53,15 @@
 
   function visibilityEligible(input){
     if(!isRecord(input) || !VISIBILITY_VALUES.includes(input.visibility)) return false;
-    if(hasOwn(input, "visibilityEligible")) return input.visibilityEligible === true;
-    return viewerCanPassVisibility(input);
+    const hasPrecomputed = hasOwn(input, "visibilityEligible");
+    if(!hasPrecomputed) return viewerCanPassVisibility(input);
+    if(typeof input.visibilityEligible !== "boolean") return false;
+    if(!hasOwn(input, "viewerClass")) return input.visibilityEligible;
+
+    // Precomputed-only and derived-only inputs are both valid. When viewer
+    // facts are also supplied, contradictory authorization facts fail closed.
+    const derived = viewerCanPassVisibility(input);
+    return input.visibilityEligible === derived && input.visibilityEligible;
   }
 
   function audienceEligibility(input){
