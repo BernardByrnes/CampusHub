@@ -175,3 +175,147 @@ export async function assertVisibleFocusIndicator(page, selector) {
     throw new Error(`No visible focus indicator for ${selector}: ${JSON.stringify(style)}`);
   }
 }
+
+/**
+ * Assert that the focused element remains practically visible after the
+ * browser has scrolled it into view.  This deliberately checks known shell
+ * chrome and other fixed/sticky rectangles rather than attempting pixel-level
+ * occlusion or computer-vision analysis.
+ */
+export async function assertFocusedElementNotObscured(page, label = 'focused element') {
+  const result = await page.evaluate(() => {
+    const focused = document.activeElement;
+    if (!focused || focused === document.body || focused === document.documentElement) {
+      return { error: 'no focusable element is active' };
+    }
+
+    const rect = focused.getBoundingClientRect();
+    const viewport = { left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight };
+    const visible = {
+      left: Math.max(rect.left, viewport.left),
+      top: Math.max(rect.top, viewport.top),
+      right: Math.min(rect.right, viewport.right),
+      bottom: Math.min(rect.bottom, viewport.bottom)
+    };
+    if (rect.width <= 0 || rect.height <= 0 || visible.right <= visible.left || visible.bottom <= visible.top) {
+      return {
+        error: 'focused element has no meaningful visible intersection with the viewport',
+        rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom },
+        viewport
+      };
+    }
+
+    const overlapArea = (first, second) => {
+      const width = Math.max(0, Math.min(first.right, second.right) - Math.max(first.left, second.left));
+      const height = Math.max(0, Math.min(first.bottom, second.bottom) - Math.max(first.top, second.top));
+      return width * height;
+    };
+    const describe = element => ({
+      selector: element.id ? `#${element.id}` : `.${[...element.classList].join('.')}`,
+      position: getComputedStyle(element).position,
+      rect: (() => {
+        const box = element.getBoundingClientRect();
+        return { left: box.left, top: box.top, right: box.right, bottom: box.bottom };
+      })()
+    });
+    const persistentSelectors = [
+      '.app-header',
+      '.bottom-nav',
+      'dialog[open]',
+      'dialog[open] .participation-gate__panel',
+      'dialog[open] .leave-campus-dialog__panel'
+    ];
+    const candidates = [...document.querySelectorAll('body *')].filter(element => {
+      const style = getComputedStyle(element);
+      const explicitlyKnown = persistentSelectors.some(selector => element.matches(selector));
+      return explicitlyKnown || style.position === 'fixed' || style.position === 'sticky';
+    });
+    const obstructors = candidates
+      .filter(element => element !== focused && !element.contains(focused))
+      .map(element => ({ element, rect: element.getBoundingClientRect() }))
+      .filter(({ rect }) => rect.width > 0 && rect.height > 0)
+      .filter(({ rect }) => overlapArea(rect, visible) > 0)
+      .map(({ element }) => describe(element));
+
+    return {
+      rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom },
+      viewport,
+      obstructors
+    };
+  });
+
+  if (result.error || result.obstructors?.length) {
+    throw new Error(`Focused element obscured at ${label}: ${JSON.stringify(result)}`);
+  }
+  return result;
+}
+
+/**
+ * Inject the WCAG text-spacing stress values as test-only CSS.  No shipped
+ * stylesheet is changed; the attribute also makes the test condition explicit
+ * while debugging a failure.
+ */
+export async function injectTextSpacingStress(page) {
+  await page.addStyleTag({
+    content: `
+      html[data-a11y-text-spacing-stress] *,
+      html[data-a11y-text-spacing-stress] *::before,
+      html[data-a11y-text-spacing-stress] *::after {
+        line-height: 1.5 !important;
+        letter-spacing: 0.12em !important;
+        word-spacing: 0.16em !important;
+      }
+      html[data-a11y-text-spacing-stress] p,
+      html[data-a11y-text-spacing-stress] li {
+        margin-block-start: 2em !important;
+        margin-block-end: 2em !important;
+      }
+    `
+  });
+  await page.evaluate(() => {
+    document.documentElement.dataset.a11yTextSpacingStress = 'true';
+  });
+}
+
+/**
+ * Detect content that is actually clipped by a non-scrollable fixed-height
+ * component under a stress style. Intentionally scrollable regions are left
+ * to their own overflow contract.
+ */
+export async function assertNoTextClipping(page, route) {
+  const clipped = await page.evaluate(() => {
+    const ignored = element => (
+      element.matches('html, body, img, svg, .shell, .hero-media, .detail-hero, .brand-mark, .filters, .toast-wrap, .sr-only, .visually-hidden')
+      || element.closest('[aria-hidden="true"]')
+      || element.closest('.filters')
+      || ['auto', 'scroll'].includes(getComputedStyle(element).overflowY)
+    );
+    const visible = element => {
+      const style = getComputedStyle(element);
+      return style.display !== 'none' && style.visibility !== 'hidden' && element.getClientRects().length > 0;
+    };
+    const hasMeaningfulContent = element => (
+      element.matches('a, button, input, select, textarea, [role], h1, h2, h3, h4, p, li, dt, dd, legend, label')
+      || [...element.children].some(child => child.matches('a, button, input, select, textarea, [role]'))
+    );
+    return [...document.querySelectorAll('body *')]
+      .filter(element => visible(element) && !ignored(element) && hasMeaningfulContent(element))
+      .filter(element => {
+        const style = getComputedStyle(element);
+        const clippedOverflow = ['hidden', 'clip'].includes(style.overflowY) || ['hidden', 'clip'].includes(style.overflow);
+        return clippedOverflow && element.scrollHeight > element.clientHeight + 1;
+      })
+      .slice(0, 12)
+      .map(element => ({
+        selector: element.id ? `#${element.id}` : `.${[...element.classList].join('.')}`,
+        text: (element.innerText || element.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 120),
+        clientHeight: element.clientHeight,
+        scrollHeight: element.scrollHeight,
+        overflowY: getComputedStyle(element).overflowY
+      }));
+  });
+  if (clipped.length) {
+    throw new Error(`Text/content clipping at ${route}: ${JSON.stringify(clipped)}`);
+  }
+  return clipped;
+}
