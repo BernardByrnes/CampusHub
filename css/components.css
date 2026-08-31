@@ -121,6 +121,9 @@
 .filter-btn { width:var(--control-min-h); height:var(--control-min-h); border-radius:var(--inner-radius); border:1px solid var(--border); background:var(--surface); display:grid; place-items:center; cursor:pointer; }
 
 /* main */
+html {
+  scroll-padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + var(--space-4));
+}
 .main {
   flex:1;
   padding: 12px var(--content-gutter) calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + var(--section-gap));
@@ -1064,3 +1067,18 @@
 .stack-8 { display:grid; gap:8px; }
 .stack-10 { display:grid; gap:10px; }
 .inline-meta { display:flex; flex-wrap:wrap; gap:8px; align-items:center; font-size:var(--type-meta-size); color: var(--text-muted); }
+
+/* Keep keyboard focus perceivable when the user forces a system color palette. */
+@media (forced-colors: active) {
+  :focus-visible,
+  .search input:focus-visible,
+  .seg-btn:focus-visible,
+  .voice-field-input:focus-visible,
+  .voice-issue-card:focus-visible,
+  .search:has(input:focus-visible),
+  .voice-category:has(input:focus-visible) {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+    box-shadow: none;
+  }
+}
