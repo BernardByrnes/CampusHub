@@ -106,6 +106,79 @@ async function waitForActiveViewSettled(page) {
   });
 }
 
+async function focusByKeyboard(page, selector, { last = false, maxTabs = 100 } = {}) {
+  const target = last ? page.locator(selector).last() : page.locator(selector).first();
+  await expect(target).toBeVisible();
+  await page.evaluate(() => {
+    document.activeElement?.blur();
+    window.scrollTo(0, 0);
+  });
+  for (let tab = 0; tab < maxTabs; tab += 1) {
+    await page.keyboard.press('Tab');
+    if (await target.evaluate(element => document.activeElement === element)) return target;
+  }
+  throw new Error(`Keyboard Tab order did not reach ${selector}`);
+}
+
+async function focusChromeMetrics(page) {
+  return page.evaluate(() => {
+    const focused = document.activeElement;
+    const focusedRect = focused?.getBoundingClientRect();
+    const component = focused?.matches('input[type="radio"], input[type="checkbox"]')
+      ? focused.closest('label')
+      : focused;
+    const componentRect = component?.getBoundingClientRect();
+    const headerElement = document.querySelector('.app-header');
+    const header = headerElement?.getBoundingClientRect();
+    const nav = document.querySelector('.bottom-nav')?.getBoundingClientRect();
+    const overlaps = (first, second) => Boolean(first && second
+      && Math.min(first.right, second.right) > Math.max(first.left, second.left)
+      && Math.min(first.bottom, second.bottom) > Math.max(first.top, second.top));
+    return {
+      active: focused ? {
+        tag: focused.tagName,
+        id: focused.id,
+        name: focused.getAttribute('aria-label') || focused.labels?.[0]?.innerText?.trim() || focused.innerText?.trim()
+      } : null,
+      focusedRect: focusedRect ? {
+        left: focusedRect.left,
+        top: focusedRect.top,
+        right: focusedRect.right,
+        bottom: focusedRect.bottom,
+        width: focusedRect.width,
+        height: focusedRect.height
+      } : null,
+      componentRect: componentRect ? {
+        left: componentRect.left,
+        top: componentRect.top,
+        right: componentRect.right,
+        bottom: componentRect.bottom,
+        width: componentRect.width,
+        height: componentRect.height
+      } : null,
+      bottomNavRect: nav ? { top: nav.top, bottom: nav.bottom, height: nav.height } : null,
+      headerRect: header ? { top: header.top, bottom: header.bottom, height: header.height } : null,
+      bottomNavOverlap: overlaps(componentRect, nav),
+      stickyHeaderOverlap: Boolean(header && !headerElement?.contains(focused) && overlaps(focusedRect, header)),
+      scrollY
+    };
+  });
+}
+
+async function focusIndicatorStyle(page, selector, { last = false } = {}) {
+  const locator = last ? page.locator(selector).last() : page.locator(selector).first();
+  return locator.evaluate(element => {
+    const style = getComputedStyle(element);
+    return {
+      outlineStyle: style.outlineStyle,
+      outlineWidth: style.outlineWidth,
+      outlineColor: style.outlineColor,
+      outlineOffset: style.outlineOffset,
+      boxShadow: style.boxShadow
+    };
+  });
+}
+
 function onlyProject(testInfo, projectName) {
   test.skip(testInfo.project.name !== projectName, `This check runs once in ${projectName}.`);
 }
@@ -583,6 +656,108 @@ test.describe('Phase 8U WCAG A/AA accessibility gate', () => {
     await assertVisibleFocusIndicator(page, '#pollForm input[type="radio"]');
     await openRoute(page, '#voice-detail/voice-water-halls');
     await assertVisibleFocusIndicator(page, '#voiceDetailBack');
+  });
+
+  test('keyboard-focused quiz options clear the fixed bottom navigation', async ({ page }, testInfo) => {
+    onlyProject(testInfo, 'canonical-mobile');
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await openRoute(page, '#play');
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Tab');
+    for (let arrow = 0; arrow < 3; arrow += 1) await page.keyboard.press('ArrowDown');
+
+    const focused = page.locator('#quizOptions input[type="radio"]').last();
+    await expect(focused).toBeFocused();
+    const metrics = await focusChromeMetrics(page);
+    console.log(`[focus-obscuration] ${JSON.stringify(metrics)}`);
+    expect(metrics.active).toMatchObject({ tag: 'INPUT', name: 'Lake Edward' });
+    expect(metrics.bottomNavOverlap).toBe(false);
+    expect(metrics.stickyHeaderOverlap).toBe(false);
+    expect(metrics.bottomNavRect.top - metrics.focusedRect.bottom).toBeGreaterThanOrEqual(1);
+    expect(metrics.componentRect.bottom).toBeLessThanOrEqual(metrics.bottomNavRect.top);
+  });
+
+  test('forced-colors keeps keyboard focus indicators perceivable across shared controls', async ({ page }, testInfo) => {
+    onlyProject(testInfo, 'canonical-mobile');
+    await page.emulateMedia({ forcedColors: 'active' });
+    const supported = await page.evaluate(() => window.matchMedia('(forced-colors: active)').matches);
+    if (!supported) {
+      test.skip(true, 'This browser does not expose reliable forced-colors emulation.');
+      return;
+    }
+
+    const cases = [
+      ['#home', '#globalSearch', 'global search'],
+      ['#home', '#tab-home', 'bottom navigation item'],
+      ['#notifications', '#notifBtn', 'notification button'],
+      ['#participate', '#pollForm input[type="radio"]', 'poll option'],
+      ['#events/guild-debate', '#rsvpGoing', 'event RSVP control'],
+      ['#play', '#quizOptions input[type="radio"]', 'quiz option'],
+      ['#discover', '#view-discover .filter-chip', 'filter chip'],
+      ['#voice-new', 'input[name="voiceCategory"]', 'voice category']
+    ];
+
+    const results = [];
+    for (const [route, selector, label] of cases) {
+      await openRoute(page, route);
+      await focusByKeyboard(page, selector);
+      const style = await focusIndicatorStyle(page, selector);
+      expect(style.outlineStyle, `${label} outline style`).not.toBe('none');
+      expect(Number.parseFloat(style.outlineWidth), `${label} outline width`).toBeGreaterThan(0);
+      results.push({ label, style });
+    }
+
+    await openRoute(page, '#voice-new');
+    await page.getByRole('radio', { name: 'Wi-Fi', exact: true }).check();
+    await page.locator('#voiceCategoryContinue').click();
+    await expect(page.locator('#voiceStepDetails')).toBeVisible();
+    await focusByKeyboard(page, '#voiceIssueTitle');
+    const voiceFieldStyle = await focusIndicatorStyle(page, '#voiceIssueTitle');
+    expect(voiceFieldStyle.outlineStyle).not.toBe('none');
+    expect(Number.parseFloat(voiceFieldStyle.outlineWidth)).toBeGreaterThan(0);
+    results.push({ label: 'voice form field', style: voiceFieldStyle });
+
+    for (const [route, selector, label] of [
+      ['#opportunities/ra-climate', '#oppReport', 'opportunity action'],
+      ['#verification', '#view-verification .verification-back', 'verification control']
+    ]) {
+      await openRoute(page, route);
+      await focusByKeyboard(page, selector);
+      const style = await focusIndicatorStyle(page, selector);
+      expect(style.outlineStyle, `${label} outline style`).not.toBe('none');
+      expect(Number.parseFloat(style.outlineWidth), `${label} outline width`).toBeGreaterThan(0);
+      results.push({ label, style });
+    }
+
+    await openRoute(page, '#home');
+    await focusByKeyboard(page, '#globalSearch');
+    const searchStyle = await focusIndicatorStyle(page, '#globalSearch');
+    expect(searchStyle.outlineStyle).not.toBe('none');
+    expect(Number.parseFloat(searchStyle.outlineWidth)).toBeGreaterThan(0);
+    const searchWrapperStyle = await page.locator('.search').evaluate(element => {
+      const style = getComputedStyle(element);
+      return {
+        outlineStyle: style.outlineStyle,
+        outlineWidth: style.outlineWidth,
+        outlineColor: style.outlineColor,
+        boxShadow: style.boxShadow
+      };
+    });
+    expect(searchWrapperStyle.outlineStyle).not.toBe('none');
+    expect(Number.parseFloat(searchWrapperStyle.outlineWidth)).toBeGreaterThan(0);
+
+    await page.evaluate(() => window.CampusHubDebug.setOpportunityScenario('expired'));
+    await expect(page.locator('#oppStatus')).toContainText('Expired');
+    await openRoute(page, '#verification');
+    await expect(page.locator('#verificationStatusKicker')).toContainText('Current');
+    await openRoute(page, '#notifications');
+    await expect(page.locator('.notification-state').first()).toContainText(/Unread|Read/);
+    await openRoute(page, '#voice-detail/voice-water-halls');
+    await expect(page.locator('#voiceDetailStatus')).toHaveText(/.+/);
+    await openRoute(page, '#events/guild-debate');
+    await expect(page.locator('#rsvpGoing')).toHaveAttribute('aria-pressed', 'false');
+    console.log(`[forced-colors-focus] ${JSON.stringify({ results, searchStyle, searchWrapperStyle })}`);
   });
 
   test('Sports keeps one complete accessible result announcement', async ({ page }, testInfo) => {
